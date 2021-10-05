@@ -9,7 +9,7 @@ import (
 
 var (
 	defaultListenAddress = "127.0.0.1:9000"
-	defaultProxyUrl      = "127.0.0.1:8545"
+	defaultProxyUrl      = "http://127.0.0.1:8545"
 )
 
 var listenAddress = flag.String("listen", getEnvOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")

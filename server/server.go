@@ -30,15 +30,17 @@ func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointSer
 func (r *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint at %v...", r.ListenAddress)
 
+	mux := http.NewServeMux()
+
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.Handle("/", http.HandlerFunc(r.handleHttpRequest))
+	mux.HandleFunc("/", http.HandlerFunc(r.handleHttpRequest))
 
 	// Serve files from the local 'public' directory under the '/public/' URL
 	fileServer := http.FileServer(http.Dir("./public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fileServer))
+	mux.Handle("/public/", http.StripPrefix("/public/", fileServer))
 
 	// Start serving
-	if err := http.ListenAndServe(r.ListenAddress, nil); err != nil {
+	if err := http.ListenAndServe(r.ListenAddress, limit(mux)); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
@@ -55,7 +57,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 	defer func() {
 		timeRequestNeeded := time.Since(timeRequestStart)
-		rLog("request took %f.4 sec", timeRequestNeeded.Seconds())
+		rLog("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
 
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
@@ -148,7 +150,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		timeForwardStart := time.Now() // for measuring execution time
 		defer func() {
 			timeForwardNeeded := time.Since(timeForwardStart)
-			rLog("eth_sendRawTransaction: forwarding took %f.4 sec", timeForwardNeeded.Seconds())
+			rLog("eth_sendRawTransaction: forwarding took %.6f sec", timeForwardNeeded.Seconds())
 		}()
 
 		if needsProtection {
@@ -193,7 +195,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("proxy to: %s", url)
 	proxyResp, err := ProxyRequest(url, body)
 	timeProxyNeeded := time.Since(timeProxyStart)
-	rLog("proxy response after %.4f: %v", timeProxyNeeded.Seconds(), proxyResp)
+	rLog("proxy response after %.6f: %v", timeProxyNeeded.Seconds(), proxyResp)
 
 	if err != nil {
 		rLog("ERROR: failed to make proxy request: %v", err)
