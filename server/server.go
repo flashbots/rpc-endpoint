@@ -212,9 +212,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 	respw.WriteHeader(proxyResp.StatusCode)
 	respw.Write(proxyRespBody)
-	rLog("proxied finished for %s. Result: %v", jsonReq.Method, string(proxyRespBody))
-
-	// log("Successfully relayed %s. Result: %+v", jsonReq.Method, jsonResp)
+	rLog("proxied finished for %s. Result: %s", jsonReq.Method, TruncateText(string(proxyRespBody), 200))
 }
 
 func IsBlacklisted(ip string) bool {

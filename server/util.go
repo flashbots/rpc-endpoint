@@ -41,3 +41,16 @@ func ReqLog(requestId string, format string, v ...interface{}) {
 	prefix := fmt.Sprintf("[%s] ", requestId)
 	log.Printf(prefix+format, v...)
 }
+
+func TruncateText(s string, max int) string {
+	if len(s) > max {
+		r := 0
+		for i := range s {
+			r++
+			if r > max {
+				return s[:i]
+			}
+		}
+	}
+	return s
+}
