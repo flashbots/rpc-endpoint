@@ -64,7 +64,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 
 	if req.Method == "GET" {
-		http.ServeFile(respw, req, "./public/index.html")
+		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
 		return
 	}
 
