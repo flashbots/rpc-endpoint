@@ -56,7 +56,7 @@ func (r *PrivateTxRelayer) _sendTransaction(reqId string, rawJsonReq *JsonRpcReq
 
 	// Prepare eth_sendRawTransaction JSON-RPC request
 	rawTxHex, ok := rawJsonReq.Params[0].(string)
-	fmt.Printf("Raw tx: %s", rawTxHex)
+	// ReqLog(reqId, "Raw tx: %s", rawTxHex)
 	if !ok || len(rawTxHex) < 2 {
 		return nil, errors.New("invalid raw transaction")
 	}
