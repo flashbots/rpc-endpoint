@@ -2,11 +2,15 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 // No IPs blacklisted right now
@@ -43,10 +47,22 @@ func (r *RpcEndPointServer) Start() {
 }
 
 func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *http.Request) {
+	timeRequestStart := time.Now() // for measuring execution time
+
+	requestId := uuid.New()
+	rLog := func(format string, v ...interface{}) {
+		prefix := fmt.Sprintf("[%s] ", requestId)
+		log.Printf(prefix+format, v...)
+	}
+
+	defer func() {
+		timeRequestNeeded := time.Since(timeRequestStart)
+		rLog("request took %f.4 sec", timeRequestNeeded.Seconds())
+	}()
+
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 
-	// Serve a static file if the user is in a browser
 	if req.Method == "GET" {
 		http.ServeFile(respw, req, "./public/index.html")
 		return
@@ -57,12 +73,13 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	log.Printf("Number of Go-routines %d", runtime.NumGoroutine())
+	rLog("POST request. goroutines=%d", runtime.NumGoroutine())
 
-	// No blacklisted IPs for now
+	// For now restrict to certain IPs:
 	ip := GetIP(req)
+
 	if IsBlacklisted(ip) {
-		log.Printf("Blocked: IP=%s", ip)
+		rLog("Blocked: IP=%s", ip)
 		respw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -72,11 +89,12 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	url := r.ProxyUrl
 	if len(req.URL.String()) >= 6 {
 		// Debug
-		log.Println(req.URL.String())
+		// rLog.Println(req.URL.String())
 		url = req.URL.String()[6:]
+		rLog("Using custom url:", url)
 	}
 
-	log.Println("Using url:", url)
+	// log.Println("Using url:", url)
 
 	// Currently commented out because this check only supports Chrome MetaMask.
 	// We need to add support for other common browsers / wallets if we would like to support them.
@@ -89,73 +107,75 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	// Read request body:
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("ERROR: failed to read request body: %v", err)
+		rLog("ERROR: failed to read request body: %v", err)
 		respw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
-	log.Printf("[debug] Received: IP=%s", ip)
+	// log.Printf("[debug] Received: IP=%s", ip)
 	// log.Printf("[debug] Received: IP=%s Header=%v", ip, req.Header)
 	// log.Printf("[debug] Received: IP=%s Body=%s Header=%v", ip, string(body), req.Header)
 
 	// Parse JSON RPC:
 	var jsonReq *JsonRpcRequest
 	if err := json.Unmarshal(body, &jsonReq); err != nil {
-		log.Printf("ERROR: failed to parse JSON RPC request: %v", err)
+		rLog("ERROR: failed to parse JSON RPC request: %v", err)
 		respw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	rLog("JSON-RPC method: %s", jsonReq.Method)
+
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		isOFACBlacklisted, err := r.TxRelayer.checkForOFACList(jsonReq)
 		if err != nil {
-			log.Printf("ERROR: failed to check transaction OFAC status: %v", err)
+			rLog("ERROR: failed to check transaction OFAC status: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if isOFACBlacklisted {
-			log.Printf("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
+			rLog("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
 			respw.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		needsProtection, err := r.TxRelayer.EvaluateTransactionForFrontrunningProtection(jsonReq)
 		if err != nil {
-			log.Printf("ERROR: failed to evaluate transaction: %v", err)
+			rLog("ERROR: failed to evaluate transaction: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if needsProtection {
-			log.Printf("Sending tx to Flashbots")
+			rLog("eth_sendRawTransaction: sending tx to Flashbots")
 			// Evaluated that this transaction needs protection and should be relayed
 			jsonResp, err := r.TxRelayer.SendToTxManager(jsonReq)
 			if err != nil {
-				log.Printf("ERROR: failed to relay tx: %v", err)
+				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
 				return
 			}
 			if err := json.NewEncoder(respw).Encode(jsonResp); err != nil {
-				log.Printf("ERROR: failed to encode JSON RPC: %v", err)
+				rLog("ERROR: failed to encode JSON RPC: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
 			}
-			log.Printf("Successfully relayed %s", jsonReq.Method)
+			rLog("eth_sendRawTransaction: successfully relayed to Flashbots.")
 			return
 		} else {
-			log.Printf("Sending tx to mempool")
+			rLog("eth_sendRawTransaction: sending tx to mempool")
 			// Evaluated that this transaction does not need protection and can be sent to the mempool
 			jsonResp, err := r.TxRelayer.SendTransactionToMempool(jsonReq, url)
 			if err != nil {
-				log.Printf("ERROR: failed to relay tx: %v", err)
+				rLog("ERROR: failed to relay tx to Mempool: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
 				return
 			}
 			if err := json.NewEncoder(respw).Encode(jsonResp); err != nil {
-				log.Printf("ERROR: failed to encode JSON RPC: %v", err)
+				rLog("ERROR: failed to encode JSON RPC: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
 			}
-			log.Printf("Successfully relayed %s", jsonReq.Method)
+			rLog("eth_sendRawTransaction: successfully relayed to mempool.")
 			return
 		}
 	}
@@ -165,16 +185,19 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	// log.Printf("body: %v", body)
 
 	// Non-eth_sendRawTransaction requests go through ProxyUrl:
+	timeProxyStart := time.Now() // for measuring execution time
+	rLog("proxy to: %s", url)
 	proxyResp, err := ProxyRequest(url, body)
-	log.Printf("resp: %v", proxyResp)
+	timeProxyNeeded := time.Since(timeProxyStart)
+	rLog("proxy response after %.4f: %v", timeProxyNeeded.Seconds(), proxyResp)
 	if err != nil {
-		log.Printf("ERROR: failed to make proxy request: %v", err)
+		rLog("ERROR: failed to make proxy request: %v", err)
 		respw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
 	if err != nil {
-		log.Printf("ERROR: failed to read proxy response: %v", err)
+		rLog("ERROR: failed to read proxy response: %v", err)
 		respw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -182,9 +205,9 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 	respw.WriteHeader(proxyResp.StatusCode)
 	respw.Write(proxyRespBody)
-	// log.Printf("Successfully proxied %s. Result: %v", jsonReq.Method, string(proxyRespBody))
-	log.Printf("Successfully proxied %s", jsonReq.Method)
-	// log.Printf("Successfully relayed %s. Result: %+v", jsonReq.Method, jsonResp)
+	rLog("proxied finished for %s. Result: %v", jsonReq.Method, string(proxyRespBody))
+
+	// log("Successfully relayed %s. Result: %+v", jsonReq.Method, jsonResp)
 }
 
 func IsBlacklisted(ip string) bool {
