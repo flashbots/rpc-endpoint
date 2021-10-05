@@ -9,7 +9,7 @@ import (
 
 var (
 	defaultListenAddress = "127.0.0.1:9000"
-	defaultProxyUrl      = "127.0.0.1:8545"
+	defaultProxyUrl      = "http://127.0.0.1:8545"
 )
 
 var listenAddress = flag.String("listen", getEnvOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
@@ -17,8 +17,7 @@ var proxyUrl = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl
 
 func main() {
 	flag.Parse()
-	relayer := server.NewPrivateTxRelayer()
-	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl, relayer)
+	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl)
 	s.Start()
 }
 

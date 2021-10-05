@@ -18,29 +18,29 @@ var blacklistedIps = []string{"127.0.0.2"}
 type RpcEndPointServer struct {
 	ListenAddress string
 	ProxyUrl      string
-	TxRelayer     *PrivateTxRelayer
 }
 
-func NewRpcEndPointServer(listenAddress string, proxyUrl string, txRelayer *PrivateTxRelayer) *RpcEndPointServer {
+func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		ListenAddress: listenAddress,
 		ProxyUrl:      proxyUrl,
-		TxRelayer:     txRelayer,
 	}
 }
 
 func (r *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint at %v...", r.ListenAddress)
 
+	mux := http.NewServeMux()
+
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.Handle("/", http.HandlerFunc(r.handleHttpRequest))
+	mux.HandleFunc("/", http.HandlerFunc(r.handleHttpRequest))
 
 	// Serve files from the local 'public' directory under the '/public/' URL
 	fileServer := http.FileServer(http.Dir("./public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fileServer))
+	mux.Handle("/public/", http.StripPrefix("/public/", fileServer))
 
 	// Start serving
-	if err := http.ListenAndServe(r.ListenAddress, nil); err != nil {
+	if err := http.ListenAndServe(r.ListenAddress, limit(mux)); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
@@ -57,7 +57,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 	defer func() {
 		timeRequestNeeded := time.Since(timeRequestStart)
-		rLog("request took %f.4 sec", timeRequestNeeded.Seconds())
+		rLog("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
 
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
@@ -127,7 +127,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("JSON-RPC method: %s", jsonReq.Method)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		isOFACBlacklisted, err := r.TxRelayer.checkForOFACList(requestId, jsonReq)
+		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to check transaction OFAC status: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
@@ -140,7 +140,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 			return
 		}
 
-		needsProtection, err := r.TxRelayer.EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
+		needsProtection, err := EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to evaluate transaction: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
@@ -150,13 +150,13 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		timeForwardStart := time.Now() // for measuring execution time
 		defer func() {
 			timeForwardNeeded := time.Since(timeForwardStart)
-			rLog("eth_sendRawTransaction: forwarding took %f.4 sec", timeForwardNeeded.Seconds())
+			rLog("eth_sendRawTransaction: forwarding took %.6f sec", timeForwardNeeded.Seconds())
 		}()
 
 		if needsProtection {
 			rLog("eth_sendRawTransaction: sending tx to Flashbots")
 			// Evaluated that this transaction needs protection and should be relayed
-			jsonResp, err := r.TxRelayer.SendToTxManager(requestId, jsonReq)
+			jsonResp, err := SendToTxManager(requestId, jsonReq)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
@@ -171,7 +171,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		} else {
 			rLog("eth_sendRawTransaction: sending tx to mempool via %s", url)
 			// Evaluated that this transaction does not need protection and can be sent to the mempool
-			jsonResp, err := r.TxRelayer.SendTransactionToMempool(requestId, jsonReq, url)
+			jsonResp, err := SendTransactionToMempool(requestId, jsonReq, url)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Mempool: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
@@ -195,7 +195,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("proxy to: %s", url)
 	proxyResp, err := ProxyRequest(url, body)
 	timeProxyNeeded := time.Since(timeProxyStart)
-	rLog("proxy response after %.4f: %v", timeProxyNeeded.Seconds(), proxyResp)
+	rLog("proxy response after %.6f: %v", timeProxyNeeded.Seconds(), proxyResp)
 
 	if err != nil {
 		rLog("ERROR: failed to make proxy request: %v", err)

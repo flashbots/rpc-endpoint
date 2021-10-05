@@ -36,19 +36,9 @@ var ofacBlacklist = []string{
 	"0x9F4cda013E354b8fC285BF4b9A60460cEe7f7Ea9",
 }
 
-type PrivateTxRelayer struct {
-	TxManagerUrl string
-}
+var TxManagerUrl = "https://protection.flashbots.net/v1/rpc"
 
-func NewPrivateTxRelayer() *PrivateTxRelayer {
-	relayer := &PrivateTxRelayer{
-		TxManagerUrl: "https://protection.flashbots.net/v1/rpc",
-	}
-
-	return relayer
-}
-
-func (r *PrivateTxRelayer) _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
+func _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return nil, errors.New("invalid params")
@@ -118,18 +108,18 @@ func (r *PrivateTxRelayer) _sendTransaction(reqId string, rawJsonReq *JsonRpcReq
 	return jsonResp, nil
 }
 
-func (r *PrivateTxRelayer) SendTransactionToMempool(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
-	return r._sendTransaction(reqId, rawJsonReq, url)
+func SendTransactionToMempool(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
+	return _sendTransaction(reqId, rawJsonReq, url)
 }
 
 // TxManagers manage the submission of transactions. They repeatedly submit transactions as bundles and monitor for inclusion.
 // Currently the Flashbots team operates one which you can post eth_sendRawTransaction json rpc calls to.
 // We post proxied transactions to the txManager
-func (r *PrivateTxRelayer) SendToTxManager(reqId string, rawJsonReq *JsonRpcRequest) (*JsonRpcResponse, error) {
-	return r._sendTransaction(reqId, rawJsonReq, r.TxManagerUrl)
+func SendToTxManager(reqId string, rawJsonReq *JsonRpcRequest) (*JsonRpcResponse, error) {
+	return _sendTransaction(reqId, rawJsonReq, TxManagerUrl)
 }
 
-func (r *PrivateTxRelayer) checkForOFACList(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
+func CheckForOFACList(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return false, errors.New("invalid params")
@@ -164,7 +154,7 @@ func (r *PrivateTxRelayer) checkForOFACList(reqId string, rawJsonReq *JsonRpcReq
 	return false, nil
 }
 
-func (r *PrivateTxRelayer) EvaluateTransactionForFrontrunningProtection(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
+func EvaluateTransactionForFrontrunningProtection(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return false, errors.New("invalid params")
