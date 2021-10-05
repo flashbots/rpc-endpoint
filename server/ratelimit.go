@@ -77,12 +77,10 @@ func limit(next http.Handler) http.Handler {
 
 		// If exists, use IP forwarded from Cloudflare
 		cfForwardedFor := r.Header["X-Forwarded-For"]
-		if len(cfForwardedFor) == 0 {
-			if logMissingForwardedForHeader {
-				log.Println("Error: No X-Forwarded-For header from", ip)
-			}
-		} else {
+		if len(cfForwardedFor) > 0 {
 			ip = cfForwardedFor[0]
+		} else if logMissingForwardedForHeader {
+			log.Println("Error: No X-Forwarded-For header from", ip)
 		}
 
 		// Limit by IP
