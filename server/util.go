@@ -2,6 +2,8 @@ package server
 
 import (
 	"bytes"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -33,4 +35,9 @@ func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 		Timeout: time.Duration(10 * time.Second),
 	}
 	return client.Do(req)
+}
+
+func ReqLog(requestId string, format string, v ...interface{}) {
+	prefix := fmt.Sprintf("[%s] ", requestId)
+	log.Printf(prefix+format, v...)
 }
