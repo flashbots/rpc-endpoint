@@ -18,14 +18,12 @@ var blacklistedIps = []string{"127.0.0.2"}
 type RpcEndPointServer struct {
 	ListenAddress string
 	ProxyUrl      string
-	TxRelayer     *PrivateTxRelayer
 }
 
-func NewRpcEndPointServer(listenAddress string, proxyUrl string, txRelayer *PrivateTxRelayer) *RpcEndPointServer {
+func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		ListenAddress: listenAddress,
 		ProxyUrl:      proxyUrl,
-		TxRelayer:     txRelayer,
 	}
 }
 
@@ -127,7 +125,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("JSON-RPC method: %s", jsonReq.Method)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		isOFACBlacklisted, err := r.TxRelayer.checkForOFACList(requestId, jsonReq)
+		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to check transaction OFAC status: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
@@ -140,7 +138,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 			return
 		}
 
-		needsProtection, err := r.TxRelayer.EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
+		needsProtection, err := EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to evaluate transaction: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
@@ -156,7 +154,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		if needsProtection {
 			rLog("eth_sendRawTransaction: sending tx to Flashbots")
 			// Evaluated that this transaction needs protection and should be relayed
-			jsonResp, err := r.TxRelayer.SendToTxManager(requestId, jsonReq)
+			jsonResp, err := SendToTxManager(requestId, jsonReq)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
@@ -171,7 +169,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		} else {
 			rLog("eth_sendRawTransaction: sending tx to mempool via %s", url)
 			// Evaluated that this transaction does not need protection and can be sent to the mempool
-			jsonResp, err := r.TxRelayer.SendTransactionToMempool(requestId, jsonReq, url)
+			jsonResp, err := SendTransactionToMempool(requestId, jsonReq, url)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Mempool: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)

@@ -17,8 +17,7 @@ var proxyUrl = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl
 
 func main() {
 	flag.Parse()
-	relayer := server.NewPrivateTxRelayer()
-	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl, relayer)
+	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl)
 	s.Start()
 }
 
