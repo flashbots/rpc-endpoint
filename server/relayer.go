@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -39,19 +38,17 @@ var ofacBlacklist = []string{
 
 type PrivateTxRelayer struct {
 	TxManagerUrl string
-	id           uint64
 }
 
 func NewPrivateTxRelayer() *PrivateTxRelayer {
 	relayer := &PrivateTxRelayer{
 		TxManagerUrl: "https://protection.flashbots.net/v1/rpc",
-		id:           uint64(1e9),
 	}
 
 	return relayer
 }
 
-func (r *PrivateTxRelayer) _sendTransaction(rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
+func (r *PrivateTxRelayer) _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return nil, errors.New("invalid params")
@@ -74,26 +71,26 @@ func (r *PrivateTxRelayer) _sendTransaction(rawJsonReq *JsonRpcRequest, url stri
 	}
 
 	// Execute eth_sendRawTransaction JSON-RPC request
-	log.Printf("Json data: %s", jsonData)
+	ReqLog(reqId, "Json data: %s", jsonData)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("Error sending tx (sending request): %s", err)
+		ReqLog(reqId, "Error sending tx (sending request): %s", err)
 		return nil, err
 	}
 
 	// Check response for errors
-	log.Printf("resp: %v", resp)
+	ReqLog(reqId, "resp: %v", resp)
 	respData, err := ioutil.ReadAll(resp.Body)
-	log.Printf("respData: %s", respData)
+	ReqLog(reqId, "respData: %s", respData)
 	if err != nil {
-		log.Printf("Error sending tx (reading body): %s", err)
+		ReqLog(reqId, "Error sending tx (reading body): %s", err)
 		return nil, err
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
 	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
-		log.Printf("Error sending tx (decoding json rpc response): %s", err)
+		ReqLog(reqId, "Error sending tx (decoding json rpc response): %s", err)
 		return nil, err
 	}
 
@@ -121,18 +118,18 @@ func (r *PrivateTxRelayer) _sendTransaction(rawJsonReq *JsonRpcRequest, url stri
 	return jsonResp, nil
 }
 
-func (r *PrivateTxRelayer) SendTransactionToMempool(rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
-	return r._sendTransaction(rawJsonReq, url)
+func (r *PrivateTxRelayer) SendTransactionToMempool(reqId string, rawJsonReq *JsonRpcRequest, url string) (*JsonRpcResponse, error) {
+	return r._sendTransaction(reqId, rawJsonReq, url)
 }
 
 // TxManagers manage the submission of transactions. They repeatedly submit transactions as bundles and monitor for inclusion.
 // Currently the Flashbots team operates one which you can post eth_sendRawTransaction json rpc calls to.
 // We post proxied transactions to the txManager
-func (r *PrivateTxRelayer) SendToTxManager(rawJsonReq *JsonRpcRequest) (*JsonRpcResponse, error) {
-	return r._sendTransaction(rawJsonReq, r.TxManagerUrl)
+func (r *PrivateTxRelayer) SendToTxManager(reqId string, rawJsonReq *JsonRpcRequest) (*JsonRpcResponse, error) {
+	return r._sendTransaction(reqId, rawJsonReq, r.TxManagerUrl)
 }
 
-func (r *PrivateTxRelayer) checkForOFACList(rawJsonReq *JsonRpcRequest) (bool, error) {
+func (r *PrivateTxRelayer) checkForOFACList(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return false, errors.New("invalid params")
@@ -157,7 +154,7 @@ func (r *PrivateTxRelayer) checkForOFACList(rawJsonReq *JsonRpcRequest) (bool, e
 		return false, errors.New("error getting from")
 	}
 
-	log.Printf("from: %v", from)
+	ReqLog(reqId, "from: %v", from)
 
 	for _, address := range ofacBlacklist {
 		if from == address {
@@ -167,7 +164,7 @@ func (r *PrivateTxRelayer) checkForOFACList(rawJsonReq *JsonRpcRequest) (bool, e
 	return false, nil
 }
 
-func (r *PrivateTxRelayer) EvaluateTransactionForFrontrunningProtection(rawJsonReq *JsonRpcRequest) (bool, error) {
+func (r *PrivateTxRelayer) EvaluateTransactionForFrontrunningProtection(reqId string, rawJsonReq *JsonRpcRequest) (bool, error) {
 	// Validate JSON RPC parameters:
 	if len(rawJsonReq.Params) == 0 {
 		return false, errors.New("invalid params")
@@ -186,10 +183,11 @@ func (r *PrivateTxRelayer) EvaluateTransactionForFrontrunningProtection(rawJsonR
 		fmt.Println("error unmarshalling")
 		return false, errors.New("error unmarshalling")
 	}
-	log.Printf("Evaluating transaction with hash: %v", tx.Hash())
+
+	ReqLog(reqId, "Evaluating transaction with hash: %v", tx.Hash())
 
 	gas := tx.Gas()
-	log.Printf("gas: %v", gas)
+	ReqLog(reqId, "gas: %v", gas)
 
 	// Flashbots Relay will reject anything less than 42000 gas, so we just send those to the mempool
 	// Anyway things with that low of gas probably don't need frontrunning protection regardless
@@ -201,10 +199,10 @@ func (r *PrivateTxRelayer) EvaluateTransactionForFrontrunningProtection(rawJsonR
 	// In checkForFunctions() we check to see if the function selector being called is one that we know doesn't need frontrunning protection
 	// If checkForFunctions() returns false then that means this transaction does not need frontrunning protection
 	data := hex.EncodeToString(tx.Data())
-	log.Printf("data: %v", data)
+	ReqLog(reqId, "data: %v", data)
 
 	if len(data) == 0 {
-		log.Printf("Data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
+		ReqLog(reqId, "Data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
 		return false, nil
 	}
 

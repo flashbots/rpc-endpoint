@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -49,10 +48,11 @@ func (r *RpcEndPointServer) Start() {
 func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *http.Request) {
 	timeRequestStart := time.Now() // for measuring execution time
 
-	requestId := uuid.New()
+	requestId := uuid.New().String()
+
+	// rLog for request-log (it prefixes logs with the request id)
 	rLog := func(format string, v ...interface{}) {
-		prefix := fmt.Sprintf("[%s] ", requestId)
-		log.Printf(prefix+format, v...)
+		ReqLog(requestId, format, v...)
 	}
 
 	defer func() {
@@ -127,7 +127,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("JSON-RPC method: %s", jsonReq.Method)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		isOFACBlacklisted, err := r.TxRelayer.checkForOFACList(jsonReq)
+		isOFACBlacklisted, err := r.TxRelayer.checkForOFACList(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to check transaction OFAC status: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
@@ -140,17 +140,23 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 			return
 		}
 
-		needsProtection, err := r.TxRelayer.EvaluateTransactionForFrontrunningProtection(jsonReq)
+		needsProtection, err := r.TxRelayer.EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
 		if err != nil {
 			rLog("ERROR: failed to evaluate transaction: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
+		timeForwardStart := time.Now() // for measuring execution time
+		defer func() {
+			timeForwardNeeded := time.Since(timeForwardStart)
+			rLog("eth_sendRawTransaction: forwarding took %f.4 sec", timeForwardNeeded.Seconds())
+		}()
+
 		if needsProtection {
 			rLog("eth_sendRawTransaction: sending tx to Flashbots")
 			// Evaluated that this transaction needs protection and should be relayed
-			jsonResp, err := r.TxRelayer.SendToTxManager(jsonReq)
+			jsonResp, err := r.TxRelayer.SendToTxManager(requestId, jsonReq)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
@@ -163,9 +169,9 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 			rLog("eth_sendRawTransaction: successfully relayed to Flashbots.")
 			return
 		} else {
-			rLog("eth_sendRawTransaction: sending tx to mempool")
+			rLog("eth_sendRawTransaction: sending tx to mempool via %s", url)
 			// Evaluated that this transaction does not need protection and can be sent to the mempool
-			jsonResp, err := r.TxRelayer.SendTransactionToMempool(jsonReq, url)
+			jsonResp, err := r.TxRelayer.SendTransactionToMempool(requestId, jsonReq, url)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Mempool: %v", err)
 				respw.WriteHeader(http.StatusBadRequest)
@@ -190,6 +196,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	proxyResp, err := ProxyRequest(url, body)
 	timeProxyNeeded := time.Since(timeProxyStart)
 	rLog("proxy response after %.4f: %v", timeProxyNeeded.Seconds(), proxyResp)
+
 	if err != nil {
 		rLog("ERROR: failed to make proxy request: %v", err)
 		respw.WriteHeader(http.StatusBadRequest)
