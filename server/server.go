@@ -30,17 +30,11 @@ func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointSer
 func (r *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint at %v...", r.ListenAddress)
 
-	mux := http.NewServeMux()
-
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	mux.HandleFunc("/", http.HandlerFunc(r.handleHttpRequest))
-
-	// Serve files from the local 'public' directory under the '/public/' URL
-	fileServer := http.FileServer(http.Dir("./public"))
-	mux.Handle("/public/", http.StripPrefix("/public/", fileServer))
+	http.HandleFunc("/", http.HandlerFunc(r.handleHttpRequest))
 
 	// Start serving
-	if err := http.ListenAndServe(r.ListenAddress, limit(mux)); err != nil {
+	if err := http.ListenAndServe(r.ListenAddress, nil); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
