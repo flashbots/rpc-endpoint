@@ -67,10 +67,8 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	rLog("POST request. goroutines=%d", runtime.NumGoroutine())
-
-	// For now restrict to certain IPs:
 	ip := GetIP(req)
+	rLog("POST request from ip: %s - goroutines: %d", ip, runtime.NumGoroutine())
 
 	if IsBlacklisted(ip) {
 		rLog("Blocked: IP=%s", ip)
@@ -118,7 +116,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	rLog("JSON-RPC method: %s", jsonReq.Method)
+	rLog("JSON-RPC method: %s ip: %s", jsonReq.Method, ip)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)

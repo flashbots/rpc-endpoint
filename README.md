@@ -24,7 +24,7 @@ We're open to new ways of evaluating what needs frontrunning protection and welc
 
 ## Using the RPC endpoint as an end user
 
-Please refer to this [guide](/public/index.html)
+Please refer to the [quick-start guide](https://docs.flashbots.net/flashbots-protect/rpc/quick-start/)
 
 ## Usage
 

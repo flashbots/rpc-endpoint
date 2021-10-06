@@ -10,7 +10,7 @@ import (
 )
 
 func GetIP(r *http.Request) string {
-	forwarded := r.Header.Get("X-FORWARDED-FOR")
+	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
 		return forwarded
 	}
