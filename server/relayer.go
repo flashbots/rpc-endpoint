@@ -50,6 +50,9 @@ func _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*Js
 	if !ok || len(rawTxHex) < 2 {
 		return nil, errors.New("invalid raw transaction")
 	}
+
+	ReqLog(reqId, "_sendTransaction rawTx: %s", rawTxHex)
+
 	jsonData, err := json.Marshal(JsonRpcMessage{
 		ID:      1,
 		Version: "2.0",
@@ -61,7 +64,6 @@ func _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*Js
 	}
 
 	// Execute eth_sendRawTransaction JSON-RPC request
-	ReqLog(reqId, "Json data: %s", jsonData)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		ReqLog(reqId, "Error sending tx (sending request): %s", err)

@@ -116,7 +116,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	rLog("JSON-RPC method: %s ip: %s", jsonReq.Method, ip)
+	rLog("JSON-RPC method: %s from ip: %s", jsonReq.Method, ip)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)
