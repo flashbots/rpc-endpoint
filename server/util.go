@@ -2,11 +2,15 @@ package server
 
 import (
 	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 func GetIP(r *http.Request) string {
@@ -40,6 +44,39 @@ func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 func ReqLog(requestId string, format string, v ...interface{}) {
 	prefix := fmt.Sprintf("[%s] ", requestId)
 	log.Printf(prefix+format, v...)
+}
+
+func GetSenderFromTx(tx *types.Transaction) (string, error) {
+	signer := types.LatestSignerForChainID(tx.ChainId())
+	sender, err := types.Sender(signer, tx)
+	if err != nil {
+		return "", err
+	}
+	return sender.Hex(), nil
+}
+
+func GetSenderFromRawTx(rawTxHex string) (string, error) {
+	if len(rawTxHex) < 2 {
+		return "", errors.New("invalid raw transaction")
+	}
+
+	rawTxBytes, err := hex.DecodeString(rawTxHex[2:])
+	if err != nil {
+		return "", errors.New("invalid raw transaction")
+	}
+
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
+		fmt.Println("error unmarshalling:", err)
+		return "", errors.New("error unmarshalling")
+	}
+
+	from, err := GetSenderFromTx(tx)
+	if err != nil {
+		return "", errors.New("error getting from")
+	}
+
+	return from, nil
 }
 
 func TruncateText(s string, max int) string {

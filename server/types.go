@@ -9,13 +9,6 @@ type JsonRpcRequest struct {
 	Version string        `json:"jsonrpc,omitempty"`
 }
 
-type JsonRpcMessage struct {
-	Version string   `json:"jsonrpc,omitempty"`
-	ID      int      `json:"id,omitempty"`
-	Method  string   `json:"method,omitempty"`
-	Params  []string `json:"params,omitempty"`
-}
-
 type JsonRpcResponse struct {
 	Id      interface{}   `json:"id"`
 	Result  interface{}   `json:"result,omitempty"`

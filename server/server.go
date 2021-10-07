@@ -119,14 +119,20 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("JSON-RPC method: %s ip: %s", jsonReq.Method, ip)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)
-		if err != nil {
-			rLog("ERROR: failed to check transaction OFAC status: %v", err)
+		if len(jsonReq.Params) < 1 {
+			rLog("ERROR: no params for eth_sendRawTransaction")
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if isOFACBlacklisted {
+		txFrom, err := GetSenderFromRawTx(jsonReq.Params[0].(string))
+		if err != nil {
+			rLog("ERROR: couldn't get address from rawTx: %v", err)
+			respw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if isOnOFACList(txFrom) {
 			rLog("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
 			respw.WriteHeader(http.StatusUnauthorized)
 			return
@@ -147,64 +153,56 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 		if needsProtection {
 			rLog("eth_sendRawTransaction: sending tx to Flashbots")
-			// Evaluated that this transaction needs protection and should be relayed
-			jsonResp, err := SendToTxManager(requestId, jsonReq)
+			proxyResp, err := SendToTxManager(requestId, jsonReq)
 			if err != nil {
 				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
-				respw.WriteHeader(http.StatusBadRequest)
+				respw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			if err := json.NewEncoder(respw).Encode(jsonResp); err != nil {
-				rLog("ERROR: failed to encode JSON RPC: %v", err)
-				respw.WriteHeader(http.StatusBadRequest)
+
+			// Send proxy response back to user request
+			if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
+				rLog("ERROR writing proxy response to user request: %v", err)
+				respw.WriteHeader(http.StatusInternalServerError)
 			}
 			rLog("eth_sendRawTransaction: successfully relayed to Flashbots.")
 			return
+
 		} else {
 			rLog("eth_sendRawTransaction: sending tx to mempool via %s", url)
-			// Evaluated that this transaction does not need protection and can be sent to the mempool
-			jsonResp, err := SendTransactionToMempool(requestId, jsonReq, url)
+			proxyResp, err := SendTransactionToMempool(requestId, jsonReq, url)
 			if err != nil {
-				rLog("ERROR: failed to relay tx to Mempool: %v", err)
-				respw.WriteHeader(http.StatusBadRequest)
+				rLog("ERROR: failed to relay tx to mempool: %v", err)
+				respw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			if err := json.NewEncoder(respw).Encode(jsonResp); err != nil {
-				rLog("ERROR: failed to encode JSON RPC: %v", err)
-				respw.WriteHeader(http.StatusBadRequest)
+
+			// Send proxy response back to user request
+			if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
+				rLog("ERROR writing proxy response to user request: %v", err)
+				respw.WriteHeader(http.StatusInternalServerError)
 			}
 			rLog("eth_sendRawTransaction: successfully relayed to mempool.")
 			return
 		}
 	}
 
-	// Proxy request:
-	// log.Printf("url: %v", url)
-	// log.Printf("body: %v", body)
-
-	// Non-eth_sendRawTransaction requests go through ProxyUrl:
+	// Non-eth_sendRawTransaction requests go through proxy:
 	timeProxyStart := time.Now() // for measuring execution time
 	rLog("proxy to: %s", url)
 	proxyResp, err := ProxyRequest(url, body)
 	timeProxyNeeded := time.Since(timeProxyStart)
 	rLog("proxy response after %.6f: %v", timeProxyNeeded.Seconds(), proxyResp)
-
 	if err != nil {
 		rLog("ERROR: failed to make proxy request: %v", err)
-		respw.WriteHeader(http.StatusBadRequest)
+		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
-	if err != nil {
-		rLog("ERROR: failed to read proxy response: %v", err)
-		respw.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	defer proxyResp.Body.Close()
 
-	respw.WriteHeader(proxyResp.StatusCode)
-	respw.Write(proxyRespBody)
-	rLog("proxied finished for %s. Result: %s", jsonReq.Method, TruncateText(string(proxyRespBody), 200))
+	if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
+		rLog("ERROR writing proxy response to user request: %v", err)
+		respw.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func IsBlacklisted(ip string) bool {
@@ -214,4 +212,17 @@ func IsBlacklisted(ip string) bool {
 		}
 	}
 	return false
+}
+
+func writeProxyResponseToRequest(respw *http.ResponseWriter, proxyResp *http.Response) error {
+	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
+	if err != nil {
+		return err
+	}
+	defer proxyResp.Body.Close()
+
+	// Write
+	(*respw).WriteHeader(proxyResp.StatusCode)
+	_, err = (*respw).Write(proxyRespBody)
+	return err
 }
