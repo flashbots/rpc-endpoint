@@ -1,17 +1,12 @@
 package server
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/ethereum/go-ethereum/core/types"
 )
-
-const TxManagerUrl = "https://protection.flashbots.net/v1/rpc"
 
 var methodsWithProtection = map[string]bool{
 	"a9059cbb": true, // transfer
@@ -20,46 +15,6 @@ var methodsWithProtection = map[string]bool{
 	"2e1a7d4d": true, // weth withdraw
 	"d0e30db0": true, // weth deposit
 	"f242432a": true, // safe transfer NFT
-}
-
-// Returns (*JsonRpcResponse, httpStatusCode, error)
-func _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*http.Response, error) {
-	// Sanity check JSON RPC parameters:
-	if len(rawJsonReq.Params) == 0 {
-		return nil, errors.New("invalid params")
-	}
-
-	rawTxHex, ok := rawJsonReq.Params[0].(string)
-	if !ok || len(rawTxHex) < 2 {
-		return nil, errors.New("invalid raw transaction")
-	}
-
-	// Make JSON
-	jsonData, err := json.Marshal(rawJsonReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Forward
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		ReqLog(reqId, "Error sending tx (sending request): %s", err)
-		return nil, err
-	}
-
-	// ReqLog(reqId, "resp: %v", resp)
-	return resp, nil
-}
-
-func SendTransactionToMempool(reqId string, rawJsonReq *JsonRpcRequest, url string) (*http.Response, error) {
-	return _sendTransaction(reqId, rawJsonReq, url)
-}
-
-// TxManagers manage the submission of transactions. They repeatedly submit transactions as bundles and monitor for inclusion.
-// Currently the Flashbots team operates one which you can post eth_sendRawTransaction json rpc calls to.
-// We post proxied transactions to the txManager
-func SendToTxManager(reqId string, rawJsonReq *JsonRpcRequest) (*http.Response, error) {
-	return _sendTransaction(reqId, rawJsonReq, TxManagerUrl)
 }
 
 // Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
@@ -109,6 +64,6 @@ func EvaluateTransactionForFrontrunningProtection(reqId string, rawJsonReq *Json
 		return false, nil
 	}
 
-	_, needsProtection := methodsWithProtection[data[0:8]]
+	needsProtection := methodsWithProtection[data[0:8]]
 	return needsProtection, nil
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const TxManagerUrl = "https://protection.flashbots.net/v1/rpc"
+
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
@@ -81,12 +83,9 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	url := r.ProxyUrl
 	if len(req.URL.String()) >= 6 {
 		// Debug
-		// rLog.Println(req.URL.String())
 		url = req.URL.String()[6:]
 		rLog("Using custom url:", url)
 	}
-
-	// log.Println("Using url:", url)
 
 	// Currently commented out because this check only supports Chrome MetaMask.
 	// We need to add support for other common browsers / wallets if we would like to support them.
@@ -104,11 +103,8 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 	defer req.Body.Close()
-	// log.Printf("[debug] Received: IP=%s", ip)
-	// log.Printf("[debug] Received: IP=%s Header=%v", ip, req.Header)
-	// log.Printf("[debug] Received: IP=%s Body=%s Header=%v", ip, string(body), req.Header)
 
-	// Parse JSON RPC:
+	// Parse JSON RPC
 	var jsonReq *JsonRpcRequest
 	if err := json.Unmarshal(body, &jsonReq); err != nil {
 		rLog("ERROR: failed to parse JSON RPC request: %v", err)
@@ -118,6 +114,7 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 
 	rLog("JSON-RPC method: %s ip: %s", jsonReq.Method, ip)
 
+	needsProtection := false
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		if len(jsonReq.Params) < 1 {
 			rLog("ERROR: no params for eth_sendRawTransaction")
@@ -138,52 +135,15 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 			return
 		}
 
-		needsProtection, err := EvaluateTransactionForFrontrunningProtection(requestId, jsonReq)
-		if err != nil {
+		if needsProtection, err = EvaluateTransactionForFrontrunningProtection(requestId, jsonReq); err != nil {
 			rLog("ERROR: failed to evaluate transaction: %v", err)
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		timeForwardStart := time.Now() // for measuring execution time
-		defer func() {
-			timeForwardNeeded := time.Since(timeForwardStart)
-			rLog("eth_sendRawTransaction: forwarding took %.6f sec", timeForwardNeeded.Seconds())
-		}()
-
 		if needsProtection {
+			url = TxManagerUrl
 			rLog("eth_sendRawTransaction: sending tx to Flashbots")
-			proxyResp, err := SendToTxManager(requestId, jsonReq)
-			if err != nil {
-				rLog("ERROR: failed to relay tx to Flashbots: %v", err)
-				respw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			// Send proxy response back to user request
-			if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
-				rLog("ERROR writing proxy response to user request: %v", err)
-				respw.WriteHeader(http.StatusInternalServerError)
-			}
-			rLog("eth_sendRawTransaction: successfully relayed to Flashbots.")
-			return
-
-		} else {
-			rLog("eth_sendRawTransaction: sending tx to mempool via %s", url)
-			proxyResp, err := SendTransactionToMempool(requestId, jsonReq, url)
-			if err != nil {
-				rLog("ERROR: failed to relay tx to mempool: %v", err)
-				respw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			// Send proxy response back to user request
-			if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
-				rLog("ERROR writing proxy response to user request: %v", err)
-				respw.WriteHeader(http.StatusInternalServerError)
-			}
-			rLog("eth_sendRawTransaction: successfully relayed to mempool.")
-			return
 		}
 	}
 
@@ -199,9 +159,14 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	if err := writeProxyResponseToRequest(&respw, proxyResp); err != nil {
+	err = writeProxyResponseToRequest(&respw, proxyResp)
+	if err != nil {
 		rLog("ERROR writing proxy response to user request: %v", err)
 		respw.WriteHeader(http.StatusInternalServerError)
+	}
+
+	if needsProtection {
+		rLog("successfully relayed to Flashbots")
 	}
 }
 
