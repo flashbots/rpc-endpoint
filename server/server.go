@@ -119,14 +119,20 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 	rLog("JSON-RPC method: %s ip: %s", jsonReq.Method, ip)
 
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		isOFACBlacklisted, err := CheckForOFACList(requestId, jsonReq)
-		if err != nil {
-			rLog("ERROR: failed to check transaction OFAC status: %v", err)
+		if len(jsonReq.Params) < 1 {
+			rLog("ERROR: no params for eth_sendRawTransaction")
 			respw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if isOFACBlacklisted {
+		txFrom, err := RawTxFrom(jsonReq.Params[0].(string))
+		if err != nil {
+			rLog("ERROR: couldn't get address from rawTx: %v", err)
+			respw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if isOnOFACList(txFrom) {
 			rLog("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
 			respw.WriteHeader(http.StatusUnauthorized)
 			return
