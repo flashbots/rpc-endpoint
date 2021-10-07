@@ -64,7 +64,6 @@ func _sendTransaction(reqId string, rawJsonReq *JsonRpcRequest, url string) (*Js
 	}
 
 	// Execute eth_sendRawTransaction JSON-RPC request
-	ReqLog(reqId, "Json data: %s", jsonData)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		ReqLog(reqId, "Error sending tx (sending request): %s", err)
