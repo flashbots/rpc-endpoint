@@ -114,7 +114,7 @@ func (r *RpcRequest) process() {
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 	} else {
-		// Just proxy to mempool
+		// Just proxy the request to a node
 		if r.proxyRequest() {
 			r.log("Proxy to mempool successful: %s", r.jsonReq.Method)
 		} else {
