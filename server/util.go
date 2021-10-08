@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -41,11 +39,6 @@ func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	return client.Do(req)
 }
 
-func ReqLog(requestId string, format string, v ...interface{}) {
-	prefix := fmt.Sprintf("[%s] ", requestId)
-	log.Printf(prefix+format, v...)
-}
-
 func GetSenderFromTx(tx *types.Transaction) (string, error) {
 	signer := types.LatestSignerForChainID(tx.ChainId())
 	sender, err := types.Sender(signer, tx)
@@ -67,7 +60,6 @@ func GetSenderFromRawTx(rawTxHex string) (string, error) {
 
 	tx := new(types.Transaction)
 	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
-		fmt.Println("error unmarshalling:", err)
 		return "", errors.New("error unmarshalling")
 	}
 
