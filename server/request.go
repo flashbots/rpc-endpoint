@@ -18,7 +18,8 @@ import (
 	"github.com/google/uuid"
 )
 
-var methodsWithProtection = map[string]bool{
+// Functions that never need protection
+var allowedFunctions = map[string]bool{
 	"a9059cbb": true, // transfer
 	"23b872dd": true, // transferFrom
 	"095ea7b3": true, // approve
@@ -26,6 +27,10 @@ var methodsWithProtection = map[string]bool{
 	"d0e30db0": true, // weth deposit
 	"f242432a": true, // safe transfer NFT
 }
+
+// Blacklist for certain rawTx strings from being forwarded to BE.
+// tx are added to blacklist after BE responds with 'Bundle submitted has already failed too many times'
+var blacklistedRawTx = make(map[string]bool)
 
 type RpcRequest struct {
 	respw *http.ResponseWriter
@@ -35,9 +40,11 @@ type RpcRequest struct {
 	timeStarted time.Time
 	proxyUrl    string
 
-	body    []byte
-	jsonReq *JsonRpcRequest
-	ip      string
+	// extracted during request lifecycle:
+	body     []byte
+	jsonReq  *JsonRpcRequest
+	ip       string
+	rawTxHex string
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string) *RpcRequest {
@@ -56,7 +63,7 @@ func (r *RpcRequest) log(format string, v ...interface{}) {
 }
 
 func (r *RpcRequest) logError(format string, v ...interface{}) {
-	prefix := fmt.Sprintf("[%s] error: ", r.uid)
+	prefix := fmt.Sprintf("[%s] ERROR: ", r.uid)
 	log.Printf(prefix+format, v...)
 }
 
@@ -108,6 +115,7 @@ func (r *RpcRequest) process() {
 		r.handle_sendRawTransaction()
 	} else {
 		r.proxyRequest()
+		r.log("Successfully proxied to mempool: %s", r.jsonReq.Method)
 	}
 }
 
@@ -119,14 +127,22 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	rawTxHex, ok := r.jsonReq.Params[0].(string)
-	if !ok || len(rawTxHex) < 2 {
+	r.rawTxHex = r.jsonReq.Params[0].(string)
+	if len(r.rawTxHex) < 2 {
 		r.logError("invalid raw transaction (wrong length)")
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	txFrom, err := GetSenderFromRawTx(rawTxHex)
+	r.log("rawTx: %s", r.rawTxHex)
+
+	if blacklistedRawTx[r.rawTxHex] {
+		r.logError("rawTx blocked because bundle failed too many times")
+		(*r.respw).WriteHeader(http.StatusTooManyRequests)
+		return
+	}
+
+	txFrom, err := GetSenderFromRawTx(r.rawTxHex)
 	if err != nil {
 		r.logError("couldn't get address from rawTx: %v", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
@@ -139,7 +155,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	needsProtection, err := r.isTxNeedingFrontrunningProtection(rawTxHex)
+	needsProtection, err := r.isTxNeedingFrontrunningProtection(r.rawTxHex)
 	if err != nil {
 		r.logError("failed to evaluate transaction: %v", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
@@ -150,10 +166,18 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.proxyUrl = TxManagerUrl
 	}
 
+	// Proxy now!
 	r.proxyRequest()
+
+	// Log after proxying
+	if needsProtection {
+		r.log("Successfully proxied to Flashbots: eth_sendRawTransaction")
+	} else {
+		r.log("Successfully proxied to mempool: eth_sendRawTransaction")
+	}
 }
 
-func (r *RpcRequest) proxyRequest() {
+func (r *RpcRequest) proxyRequest() (success bool) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxy to: %s", r.proxyUrl)
 
@@ -162,11 +186,11 @@ func (r *RpcRequest) proxyRequest() {
 
 	// Afterwards, check time and result
 	timeProxyNeeded := time.Since(timeProxyStart)
-	r.log("proxy response %s after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
+	r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 	if err != nil {
 		r.logError("failed to make proxy request: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return
+		return false
 	}
 
 	// Read body
@@ -175,16 +199,38 @@ func (r *RpcRequest) proxyRequest() {
 	if err != nil {
 		r.logError("failed to decode proxy request body: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return
+		return false
 	}
 
-	// Write to request
+	// Unmarshall JSON-RPC response and check for error inside
+	jsonRpcResp := new(JsonRpcResponse)
+	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
+		r.logError("failed decoding proxy json-rpc response: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		return false
+	}
+
+	// If JSON-RPC had an error response, parse but still pass back to user
+	if jsonRpcResp.Error != nil {
+		r.handleProxyError(jsonRpcResp.Error)
+	}
+
+	// Write status code header and body back to user request
 	(*r.respw).WriteHeader(proxyResp.StatusCode)
 	_, err = (*r.respw).Write(proxyRespBody)
 	if err != nil {
 		r.logError("failed writing proxy response to user request: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return
+		return false
+	}
+
+	return true
+}
+
+func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
+	r.log("proxy response json-rpc error: %s", rpcError.Error())
+	if rpcError.Message == "Bundle submitted has already failed too many times" {
+		r.log("rawTx added to blocklist")
+		blacklistedRawTx[r.rawTxHex] = true
 	}
 }
 
@@ -221,6 +267,9 @@ func (r *RpcRequest) isTxNeedingFrontrunningProtection(rawTxHex string) (bool, e
 		return false, nil
 	}
 
-	needsProtection := methodsWithProtection[data[0:8]]
-	return needsProtection, nil
+	if allowedFunctions[data[0:8]] {
+		return false, nil // no protection needed
+	} else {
+		return true, nil // needs protection
+	}
 }

@@ -36,6 +36,6 @@ go run main.go --listen 127.0.0.1:9000 --proxy PROXY_URL
 
 Example call:
 
-```
+```bash
 curl localhost:9000 -f -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1}'
 ```
