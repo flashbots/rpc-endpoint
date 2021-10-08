@@ -154,7 +154,7 @@ func (r *RpcRequest) process() {
 		}
 
 		// Just proxy the request to a node
-		if r.proxyRequest(r.defaultProxyUrl) {
+		if success, _ := r.proxyRequest(r.defaultProxyUrl, true); success {
 			r.log("Proxy to mempool successful: %s", r.jsonReq.Method)
 		} else {
 			r.log("Proxy to mempool failed: %s", r.jsonReq.Method)
@@ -222,17 +222,28 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	proxySuccess := r.proxyRequest(url)
+	proxySuccess, _ := r.proxyRequest(url, false)
 
 	// Log after proxying
 	if proxySuccess {
+		jsonResp := &JsonRpcResponse{
+			Id:      r.jsonReq.Id,
+			Result:  r.tx.Hash().Hex(),
+			Version: "2.0",
+		}
+		if err := json.NewEncoder(*r.respw).Encode(jsonResp); err != nil {
+			r.logError("eth_sendRawTransaction writing response failed: %v", err)
+			(*r.respw).WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
 	} else {
 		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
 	}
 }
 
-func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
+func (r *RpcRequest) proxyRequest(proxyUrl string, writeResponse bool) (success bool, proxyResponse *JsonRpcResponse) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -245,7 +256,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 	if err != nil {
 		r.logError("failed to make proxy request: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, nil
 	}
 
 	// Read body
@@ -254,7 +265,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 	if err != nil {
 		r.logError("failed to decode proxy request body: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, nil
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
@@ -262,7 +273,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, nil
 	}
 
 	// If JSON-RPC had an error response, parse but still pass back to user
@@ -270,15 +281,19 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 		r.handleProxyError(jsonRpcResp.Error)
 	}
 
+	if !writeResponse {
+		return true, jsonRpcResp
+	}
+
 	// Write status code header and body back to user request
 	(*r.respw).WriteHeader(proxyResp.StatusCode)
 	_, err = (*r.respw).Write(proxyRespBody)
 	if err != nil {
 		r.logError("failed writing proxy response to user request: %v", err)
-		return false
+		return false, jsonRpcResp
 	}
 
-	return true
+	return true, jsonRpcResp
 }
 
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
