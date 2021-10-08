@@ -6,7 +6,6 @@ package server
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -45,6 +44,7 @@ type RpcRequest struct {
 	jsonReq  *JsonRpcRequest
 	ip       string
 	rawTxHex string
+	tx       *types.Transaction
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string) *RpcRequest {
@@ -114,7 +114,7 @@ func (r *RpcRequest) process() {
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 	} else {
-		// Just proxy to mempool
+		// Just proxy the request to a node
 		if r.proxyRequest() {
 			r.log("Proxy to mempool successful: %s", r.jsonReq.Method)
 		} else {
@@ -146,7 +146,15 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	txFrom, err := GetSenderFromRawTx(r.rawTxHex)
+	tx, err := GetTx(r.rawTxHex)
+	if err != nil {
+		r.logError("Error getting transaction object")
+		(*r.respw).WriteHeader(http.StatusBadRequest)
+		return
+	}
+	r.tx = tx
+
+	txFrom, err := GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.logError("couldn't get address from rawTx: %v", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
@@ -159,7 +167,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	needsProtection, err := r.isTxNeedingFrontrunningProtection(r.rawTxHex)
+	needsProtection, err := r.doesTxNeedFrontrunningProtection(r.tx)
 	if err != nil {
 		r.logError("failed to evaluate transaction: %v", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
@@ -249,21 +257,7 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 
 // Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
 // for example simple ERC20 transfers.
-func (r *RpcRequest) isTxNeedingFrontrunningProtection(rawTxHex string) (bool, error) {
-	if len(rawTxHex) < 2 {
-		return false, errors.New("invalid raw transaction (wrong length)")
-	}
-
-	rawTxBytes, err := hex.DecodeString(rawTxHex[2:])
-	if err != nil {
-		return false, fmt.Errorf("invalid raw transaction: %s", err)
-	}
-
-	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
-		return false, fmt.Errorf("error unmarshalling: %s", err)
-	}
-
+func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bool, error) {
 	gas := tx.Gas()
 	r.log("[protect-check] gas: %v", gas)
 
@@ -280,9 +274,17 @@ func (r *RpcRequest) isTxNeedingFrontrunningProtection(rawTxHex string) (bool, e
 		return false, nil
 	}
 
-	if allowedFunctions[data[0:8]] {
-		return false, nil // no protection needed
+	if isOnFunctionWhiteList(data[0:8]) {
+		return false, nil // function being called is on our whitelist and no protection needed
 	} else {
-		return true, nil // needs protection
+		return true, nil // needs protection if not on whitelist
+	}
+}
+
+func isOnFunctionWhiteList(data string) bool {
+	if allowedFunctions[data[0:8]] {
+		return true
+	} else {
+		return false
 	}
 }

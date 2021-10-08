@@ -39,6 +39,24 @@ func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	return client.Do(req)
 }
 
+func GetTx(rawTxHex string) (*types.Transaction, error) {
+	if len(rawTxHex) < 2 {
+		return nil, errors.New("invalid raw transaction")
+	}
+
+	rawTxBytes, err := hex.DecodeString(rawTxHex[2:])
+	if err != nil {
+		return nil, errors.New("invalid raw transaction")
+	}
+
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
+		return nil, errors.New("error unmarshalling")
+	}
+
+	return tx, nil
+}
+
 func GetSenderFromTx(tx *types.Transaction) (string, error) {
 	signer := types.LatestSignerForChainID(tx.ChainId())
 	sender, err := types.Sender(signer, tx)
@@ -48,21 +66,7 @@ func GetSenderFromTx(tx *types.Transaction) (string, error) {
 	return sender.Hex(), nil
 }
 
-func GetSenderFromRawTx(rawTxHex string) (string, error) {
-	if len(rawTxHex) < 2 {
-		return "", errors.New("invalid raw transaction")
-	}
-
-	rawTxBytes, err := hex.DecodeString(rawTxHex[2:])
-	if err != nil {
-		return "", errors.New("invalid raw transaction")
-	}
-
-	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
-		return "", errors.New("error unmarshalling")
-	}
-
+func GetSenderFromRawTx(tx *types.Transaction) (string, error) {
 	from, err := GetSenderFromTx(tx)
 	if err != nil {
 		return "", errors.New("error getting from")
