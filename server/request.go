@@ -30,7 +30,7 @@ var allowedFunctions = map[string]bool{
 
 // Blacklist for certain rawTx strings from being forwarded to BE.
 // tx are added to blacklist after BE responds with 'Bundle submitted has already failed too many times'
-var blacklistedRawTx = make(map[string]bool)
+var blacklistedRawTx = make(map[string]time.Time) // key is the rawTxHex, value is time added
 
 type RpcRequest struct {
 	respw *http.ResponseWriter
@@ -140,7 +140,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.log("rawTx: %s", r.rawTxHex)
 
-	if blacklistedRawTx[r.rawTxHex] {
+	if _, isBlacklistedTx := blacklistedRawTx[r.rawTxHex]; isBlacklistedTx {
 		r.logError("rawTx blocked because bundle failed too many times")
 		(*r.respw).WriteHeader(http.StatusTooManyRequests)
 		return
@@ -238,8 +238,15 @@ func (r *RpcRequest) proxyRequest() (success bool) {
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 	r.log("proxy response json-rpc error: %s", rpcError.Error())
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
-		blacklistedRawTx[r.rawTxHex] = true
+		blacklistedRawTx[r.rawTxHex] = time.Now()
 		r.log("rawTx added to blocklist. entries: %d", len(blacklistedRawTx))
+
+		// Cleanup old entries
+		for key, entry := range blacklistedRawTx {
+			if time.Since(entry) > 4*time.Hour {
+				delete(blacklistedRawTx, key)
+			}
+		}
 	}
 }
 
