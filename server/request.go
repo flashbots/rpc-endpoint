@@ -114,8 +114,12 @@ func (r *RpcRequest) process() {
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 	} else {
-		r.proxyRequest()
-		r.log("Successfully proxied to mempool: %s", r.jsonReq.Method)
+		// Just proxy to mempool
+		if r.proxyRequest() {
+			r.log("Proxy to mempool successful: %s", r.jsonReq.Method)
+		} else {
+			r.log("Proxy to mempool failed: %s", r.jsonReq.Method)
+		}
 	}
 }
 
@@ -167,19 +171,24 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	r.proxyRequest()
+	proxySuccess := r.proxyRequest()
 
 	// Log after proxying
+	target := "mempool"
 	if needsProtection {
-		r.log("Successfully proxied to Flashbots: eth_sendRawTransaction")
+		target = "Flashbots"
+	}
+
+	if proxySuccess {
+		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
 	} else {
-		r.log("Successfully proxied to mempool: eth_sendRawTransaction")
+		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
 	}
 }
 
 func (r *RpcRequest) proxyRequest() (success bool) {
 	timeProxyStart := time.Now() // for measuring execution time
-	r.log("proxy to: %s", r.proxyUrl)
+	r.log("proxyRequest to: %s", r.proxyUrl)
 
 	// Proxy request
 	proxyResp, err := ProxyRequest(r.proxyUrl, r.body)
@@ -229,8 +238,8 @@ func (r *RpcRequest) proxyRequest() (success bool) {
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 	r.log("proxy response json-rpc error: %s", rpcError.Error())
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
-		r.log("rawTx added to blocklist")
 		blacklistedRawTx[r.rawTxHex] = true
+		r.log("rawTx added to blocklist. entries: %d", len(blacklistedRawTx))
 	}
 }
 
