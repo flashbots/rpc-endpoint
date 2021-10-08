@@ -166,7 +166,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
+	target := "mempool"
 	if needsProtection {
+		target = "Flashbots"
 		r.proxyUrl = TxManagerUrl
 	}
 
@@ -174,11 +176,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	proxySuccess := r.proxyRequest()
 
 	// Log after proxying
-	target := "mempool"
-	if needsProtection {
-		target = "Flashbots"
-	}
-
 	if proxySuccess {
 		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
 	} else {
