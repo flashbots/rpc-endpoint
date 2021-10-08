@@ -4,6 +4,7 @@ Request represents an incoming client request
 package server
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -30,6 +31,13 @@ var allowedFunctions = map[string]bool{
 // Blacklist for certain rawTx strings from being forwarded to BE.
 // tx are added to blacklist after BE responds with 'Bundle submitted has already failed too many times'
 var blacklistedRawTx = make(map[string]time.Time) // key is the rawTxHex, value is time added
+
+var blacklistedAccountAndNonces = make(map[string]NonceBlocknumber)
+
+type NonceBlocknumber struct {
+	Nonce uint64
+	Block uint64
+}
 
 type RpcRequest struct {
 	respw *http.ResponseWriter
@@ -240,11 +248,76 @@ func (r *RpcRequest) proxyRequest() (success bool) {
 	return true
 }
 
+func (r *RpcRequest) getNonce() (uint64, error) {
+	txFrom, err := GetSenderFromRawTx(r.tx)
+	if err != nil {
+		r.logError("couldn't get address from rawTx: %v", err)
+		(*r.respw).WriteHeader(http.StatusBadRequest)
+		return 0, err
+	}
+
+	jsonData, err := json.Marshal(JsonRpcRequest{
+		Id:      1,
+		Version: "2.0",
+		Method:  "eth_getTransactionCount",
+		Params:  []interface{}{txFrom, "latest"},
+	})
+
+	if err != nil {
+		r.logError("failed to marshal JSON RPC request: %v", err)
+		return 0, err
+	}
+
+	// Execute eth_sendRawTransaction JSON-RPC request
+	resp, err := http.Post(r.proxyUrl, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		r.log("Error sending eth_getTransactionCount (sending request): %s", err)
+		return 0, err
+	}
+
+	// Check response for errors
+	r.log("resp: %v", resp)
+	respData, err := ioutil.ReadAll(resp.Body)
+	r.log("respData: %s", respData)
+	if err != nil {
+		r.log("Error sending tx (reading body): %s", err)
+		return 0, err
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
+	jsonRpcResp := new(JsonRpcResponse)
+	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+		r.log("Error sending tx (decoding json rpc response): %s", err)
+		return 0, err
+	}
+
+	if jsonRpcResp.Error != nil {
+		r.log("json rpc response error: %s", *jsonRpcResp.Error)
+		return 0, err
+	}
+
+	// getTransactionCount request here
+	return 1, nil
+}
+
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 	r.log("proxy response json-rpc error: %s", rpcError.Error())
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
 		blacklistedRawTx[r.rawTxHex] = time.Now()
 		r.log("rawTx added to blocklist. entries: %d", len(blacklistedRawTx))
+
+		from, err := GetSenderFromTx(r.tx)
+		if err != nil {
+			r.logError("Error deriving tx from")
+		}
+		nonce, err := r.getNonce()
+		if err != nil {
+			r.logError("Error getting nonce: %s", err)
+		}
+		blacklistedAccountAndNonces[from] = NonceBlocknumber{
+			Nonce: nonce,
+			Block: 0, // TBD
+		}
 
 		// Cleanup old entries
 		for key, entry := range blacklistedRawTx {
