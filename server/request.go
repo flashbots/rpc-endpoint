@@ -100,7 +100,7 @@ func (r *RpcRequest) process() {
 	customProxyUrl, ok := r.req.URL.Query()["url"]
 	if ok && len(customProxyUrl[0]) > 1 {
 		r.defaultProxyUrl = customProxyUrl[0]
-		r.log("Using custom url:", r.defaultProxyUrl)
+		r.log("Using custom url: %s", r.defaultProxyUrl)
 	}
 
 	// Decode request JSON RPC
@@ -134,20 +134,20 @@ func (r *RpcRequest) process() {
 					delete(mmBlacklistedAccountAndNonce, addr)
 				}
 
-				// Prepare hijacked response
+				// Prepare custom JSON-RPC response
 				resp := JsonRpcResponse{
 					Id:      r.jsonReq.Id,
 					Version: "2.0",
 					Result:  fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1),
 				}
 
-				// Write back
+				// Write to client request
 				if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
 					r.logError("hijacking eth_getTransactionCount failed: %v", err)
 					(*r.respw).WriteHeader(http.StatusInternalServerError)
 					return
 				} else {
-					r.log("Hijacking eth_getTransactionCount successful")
+					r.log("hijacking eth_getTransactionCount successful for %s", addr)
 					return
 				}
 			}
@@ -288,6 +288,13 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 		blacklistedRawTx[r.rawTxHex] = time.Now()
 		r.log("rawTx added to blocklist. entries: %d", len(blacklistedRawTx))
 
+		// Cleanup old rawTx blacklist entries
+		for key, entry := range blacklistedRawTx {
+			if time.Since(entry) > 4*time.Hour {
+				delete(blacklistedRawTx, key)
+			}
+		}
+
 		// To prepare for MM retrying the transactions, we get the txCount and then return it +1 for next four tries
 		nonce, err := eth_getTransactionCount(r.defaultProxyUrl, r.txFrom)
 		if err != nil {
@@ -295,16 +302,8 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 			return
 		}
 		// fmt.Println("NONCE", nonce, "for", r.txFrom)
-
 		mmBlacklistedAccountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
 			Nonce: nonce,
-		}
-
-		// Cleanup old entries
-		for key, entry := range blacklistedRawTx {
-			if time.Since(entry) > 4*time.Hour {
-				delete(blacklistedRawTx, key)
-			}
 		}
 	}
 }
