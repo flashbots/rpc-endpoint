@@ -124,7 +124,7 @@ func (r *RpcRequest) process() {
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 	} else {
-		if r.jsonReq.Method == "eth_getTransactionCount" && len(r.jsonReq.Params) > 0 { // hijack call if needed to prevent MM from spamming
+		if r.jsonReq.Method == "eth_getTransactionCount" && len(r.jsonReq.Params) > 0 { // intercept call if needed to prevent MM from spamming
 			addr := strings.ToLower(r.jsonReq.Params[0].(string))
 			mmHelperBlacklistEntry, mmHelperBlacklistEntryFound := mmBlacklistedAccountAndNonce[addr]
 			if mmHelperBlacklistEntryFound {
@@ -143,11 +143,11 @@ func (r *RpcRequest) process() {
 
 				// Write to client request
 				if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
-					r.logError("hijacking eth_getTransactionCount failed: %v", err)
+					r.logError("Intercepting eth_getTransactionCount failed: %v", err)
 					(*r.respw).WriteHeader(http.StatusInternalServerError)
 					return
 				} else {
-					r.log("hijacking eth_getTransactionCount successful for %s", addr)
+					r.log("Intercepting eth_getTransactionCount successful for %s", addr)
 					return
 				}
 			}
@@ -155,9 +155,9 @@ func (r *RpcRequest) process() {
 
 		// Just proxy the request to a node
 		if r.proxyRequest(r.defaultProxyUrl) {
-			r.log("Proxy to mempool successful: %s", r.jsonReq.Method)
+			r.log("Proxy to node successful: %s", r.jsonReq.Method)
 		} else {
-			r.log("Proxy to mempool failed: %s", r.jsonReq.Method)
+			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
 	}
 }
