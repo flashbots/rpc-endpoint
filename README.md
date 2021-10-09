@@ -39,3 +39,10 @@ Example call:
 ```bash
 curl localhost:9000 -f -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1}'
 ```
+
+## Maintainers
+
+This project is currently maintained by:
+
+* [@bertcmiller](https://twitter.com/bertcmiller)
+* [@metachris](https://twitter.com/metachris)
