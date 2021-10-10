@@ -165,8 +165,9 @@ func (r *RpcRequest) process() {
 			ethCallReq := r.jsonReq.Params[0].(map[string]interface{})
 			addressTo := strings.ToLower(ethCallReq["to"].(string))
 
-			if addressTo == "0xd30149eca3c00be8aa36799ccfe171d79b4155d9" {
-				r.log("Address is to the Flashbots RPC Contract")
+			if addressTo == "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a" {
+				r.handle_eth_call_to_FlashRPC_Contract()
+				return
 			}
 
 		}
@@ -177,6 +178,23 @@ func (r *RpcRequest) process() {
 		} else {
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
+	}
+}
+
+func (r *RpcRequest) handle_eth_call_to_FlashRPC_Contract() {
+	resp := JsonRpcResponse{
+		Id:      r.jsonReq.Id,
+		Version: "2.0",
+		Result:  "0x0000000000000000000000000000000000000000000000000000000000000001",
+	}
+
+	if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
+		r.logError("Intercepting eth_call failed: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		r.log("Intercepting eth_call successful")
+		return
 	}
 }
 
