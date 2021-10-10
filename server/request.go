@@ -57,7 +57,6 @@ type RpcRequest struct {
 	txFrom   string
 }
 
-// map[data:0xb9dc7766 from:0x34ca25940dbb0ce7e95db1fed8f8acf2b0ee9b09 gas:0x2dc6c0 to:0xd30149eca3c00be8aa36799ccfe171d79b4155d9 value:0x0]
 type ethCallRequest struct {
 	data  string
 	from  string
@@ -165,6 +164,9 @@ func (r *RpcRequest) process() {
 			ethCallReq := r.jsonReq.Params[0].(map[string]interface{})
 			addressTo := strings.ToLower(ethCallReq["to"].(string))
 
+			// Only handle calls to the Flashbots RPC check contract
+			// 0xf1a54b075 --> 0xflashbots
+			// https://etherscan.io/address/0xf1a54b0759b58661cea17cff19dd37940a9b5f1a#readContract
 			if addressTo == "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a" {
 				r.handle_eth_call_to_FlashRPC_Contract()
 				return
