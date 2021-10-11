@@ -13,7 +13,6 @@ type JsonRpcResponse struct {
 	Id      interface{}   `json:"id"`
 	Result  interface{}   `json:"result,omitempty"`
 	Error   *JsonRpcError `json:"error,omitempty"`
-	Message interface{}   `json:"message,omitempty"`
 	Version string        `json:"jsonrpc,omitempty"`
 }
 
