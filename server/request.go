@@ -47,6 +47,7 @@ type RpcRequest struct {
 	uid             string
 	timeStarted     time.Time
 	defaultProxyUrl string
+	txManagerUrl    string
 
 	// extracted during request lifecycle:
 	body     []byte
@@ -57,13 +58,14 @@ type RpcRequest struct {
 	txFrom   string
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
 		uid:             uuid.New().String(),
 		timeStarted:     time.Now(),
 		defaultProxyUrl: proxyUrl,
+		txManagerUrl:    txManagerUrl,
 	}
 }
 
@@ -120,6 +122,9 @@ func (r *RpcRequest) process() {
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+	// if strings.Contains(os.Getenv("RPC_LOG_PARAMS_FOR"), r.jsonReq.Method) {
+	// 	r.log("rpcreq method: %s args: %s", r.jsonReq.Method, r.jsonReq.Params)
+	// }
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
@@ -161,8 +166,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.log("rawTx: %s", r.rawTxHex)
 
 	if _, isBlacklistedTx := blacklistedRawTx[r.rawTxHex]; isBlacklistedTx {
-		r.logError("rawTx blocked because bundle failed too many times")
-		(*r.respw).WriteHeader(http.StatusTooManyRequests)
+		r.log("rawTx blocked because bundle failed too many times")
+		r.writeRpcError("rawTx blocked because bundle failed too many times")
 		return
 	}
 
@@ -197,7 +202,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	url := r.defaultProxyUrl
 	if needsProtection {
 		target = "Flashbots"
-		url = TxManagerUrl
+		url = r.txManagerUrl
 	}
 
 	// Proxy now!
@@ -310,6 +315,21 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 		return false, nil // function being called is on our whitelist and no protection needed
 	} else {
 		return true, nil // needs protection if not on whitelist
+	}
+}
+
+func (r *RpcRequest) writeRpcError(msg string) {
+	res := JsonRpcResponse{
+		Id: r.jsonReq.Id,
+		Error: &JsonRpcError{
+			Code:    -32603,
+			Message: msg,
+		},
+	}
+
+	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
+		r.logError("failed writing error response: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }
 
