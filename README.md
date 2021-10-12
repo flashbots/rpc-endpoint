@@ -1,7 +1,7 @@
 ## Flashbots RPC Endpoint (_flashbots-rpc-endpoint_)
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-![Discord](https://img.shields.io/discord/755466764501909692)
+[![Discord](https://img.shields.io/discord/755466764501909692)](https://discord.gg/7hvTycdNcK)
 
 This repository contains code for a simple server which can be used as an RPC endpoint in popular Ethereum wallets.
 
