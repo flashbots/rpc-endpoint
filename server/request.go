@@ -47,6 +47,7 @@ type RpcRequest struct {
 	uid             string
 	timeStarted     time.Time
 	defaultProxyUrl string
+	txManagerUrl    string
 
 	// extracted during request lifecycle:
 	body     []byte
@@ -57,21 +58,14 @@ type RpcRequest struct {
 	txFrom   string
 }
 
-type ethCallRequest struct {
-	data  string
-	from  string
-	gas   string
-	to    string
-	value string
-}
-
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
 		uid:             uuid.New().String(),
 		timeStarted:     time.Now(),
 		defaultProxyUrl: proxyUrl,
+		txManagerUrl:    txManagerUrl,
 	}
 }
 
@@ -128,50 +122,22 @@ func (r *RpcRequest) process() {
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+	// if strings.Contains(os.Getenv("RPC_LOG_PARAMS_FOR"), r.jsonReq.Method) {
+	// 	r.log("rpcreq method: %s args: %s", r.jsonReq.Method, r.jsonReq.Params)
+	// }
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
+
 	} else {
-		if r.jsonReq.Method == "eth_getTransactionCount" && len(r.jsonReq.Params) > 0 { // intercept call if needed to prevent MM from spamming
-			addr := strings.ToLower(r.jsonReq.Params[0].(string))
-			mmHelperBlacklistEntry, mmHelperBlacklistEntryFound := mmBlacklistedAccountAndNonce[addr]
-			if mmHelperBlacklistEntryFound {
-				// MM should get nonce+1 four times to stop resending
-				mmBlacklistedAccountAndNonce[addr].NumTries += 1
-				if mmBlacklistedAccountAndNonce[addr].NumTries == 4 {
-					delete(mmBlacklistedAccountAndNonce, addr)
-				}
-
-				// Prepare custom JSON-RPC response
-				resp := JsonRpcResponse{
-					Id:      r.jsonReq.Id,
-					Version: "2.0",
-					Result:  fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1),
-				}
-
-				// Write to client request
-				if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
-					r.logError("Intercepting eth_getTransactionCount failed: %v", err)
-					(*r.respw).WriteHeader(http.StatusInternalServerError)
-					return
-				} else {
-					r.log("Intercepting eth_getTransactionCount successful for %s", addr)
-					return
-				}
-			}
-		}
-		if r.jsonReq.Method == "eth_call" && len(r.jsonReq.Params) > 0 {
-			ethCallReq := r.jsonReq.Params[0].(map[string]interface{})
-			addressTo := strings.ToLower(ethCallReq["to"].(string))
-
-			// Only handle calls to the Flashbots RPC check contract
-			// 0xf1a54b075 --> 0xflashbots
-			// https://etherscan.io/address/0xf1a54b0759b58661cea17cff19dd37940a9b5f1a#readContract
-			if addressTo == "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a" {
-				r.handle_eth_call_to_FlashRPC_Contract()
-				return
-			}
-
+		// Normal proxy mode. Check for intercepts
+		if r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount() { // intercept if MM needs to show an error to user
+			return
+		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
+			return
+		} else if r.jsonReq.Method == "net_version" {
+			r.writeRpcResponse("1")
+			return
 		}
 
 		// Just proxy the request to a node
@@ -180,23 +146,6 @@ func (r *RpcRequest) process() {
 		} else {
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
-	}
-}
-
-func (r *RpcRequest) handle_eth_call_to_FlashRPC_Contract() {
-	resp := JsonRpcResponse{
-		Id:      r.jsonReq.Id,
-		Version: "2.0",
-		Result:  "0x0000000000000000000000000000000000000000000000000000000000000001",
-	}
-
-	if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
-		r.logError("Intercepting eth_call failed: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return
-	} else {
-		r.log("Intercepting eth_call successful")
-		return
 	}
 }
 
@@ -220,8 +169,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.log("rawTx: %s", r.rawTxHex)
 
 	if _, isBlacklistedTx := blacklistedRawTx[r.rawTxHex]; isBlacklistedTx {
-		r.logError("rawTx blocked because bundle failed too many times")
-		(*r.respw).WriteHeader(http.StatusTooManyRequests)
+		r.log("rawTx blocked because bundle failed too many times")
+		r.writeRpcError("rawTx blocked because bundle failed too many times")
 		return
 	}
 
@@ -256,7 +205,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	url := r.defaultProxyUrl
 	if needsProtection {
 		target = "Flashbots"
-		url = TxManagerUrl
+		url = r.txManagerUrl
 	}
 
 	// Proxy now!
@@ -369,6 +318,35 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 		return false, nil // function being called is on our whitelist and no protection needed
 	} else {
 		return true, nil // needs protection if not on whitelist
+	}
+}
+
+func (r *RpcRequest) writeRpcError(msg string) {
+	res := JsonRpcResponse{
+		Id:      r.jsonReq.Id,
+		Version: "2.0",
+		Error: &JsonRpcError{
+			Code:    -32603,
+			Message: msg,
+		},
+	}
+
+	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
+		r.logError("failed writing error response: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (r *RpcRequest) writeRpcResponse(result interface{}) {
+	res := JsonRpcResponse{
+		Id:      r.jsonReq.Id,
+		Version: "2.0",
+		Result:  result,
+	}
+
+	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
+		r.logError("failed writing rpc response: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }
 
