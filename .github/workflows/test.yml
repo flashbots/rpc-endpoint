@@ -14,4 +14,4 @@ jobs:
       run: gofmt -d ./
 
     - name: Test
-      run: go test ./...
+      run: go test test/*

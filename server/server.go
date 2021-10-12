@@ -1,12 +1,15 @@
 package server
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
-const TxManagerUrl = "https://protection.flashbots.net/v1/rpc"
+const _txManagerUrl = "https://protection.flashbots.net/v1/rpc"
 
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
@@ -14,12 +17,14 @@ var blacklistedIps = []string{"127.0.0.2"}
 type RpcEndPointServer struct {
 	ListenAddress string
 	ProxyUrl      string
+	TxManagerUrl  string
 }
 
 func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		ListenAddress: listenAddress,
 		ProxyUrl:      proxyUrl,
+		TxManagerUrl:  _txManagerUrl,
 	}
 }
 
@@ -27,7 +32,8 @@ func (r *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint at %v...", r.ListenAddress)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", http.HandlerFunc(r.handleHttpRequest))
+	http.HandleFunc("/", http.HandlerFunc(r.HandleHttpRequest))
+	http.HandleFunc("/health", http.HandlerFunc(r.handleHealthRequest))
 
 	// Start serving
 	if err := http.ListenAndServe(r.ListenAddress, nil); err != nil {
@@ -35,7 +41,7 @@ func (r *RpcEndPointServer) Start() {
 	}
 }
 
-func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *http.Request) {
+func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 
@@ -49,8 +55,14 @@ func (r *RpcEndPointServer) handleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, r.ProxyUrl)
+	request := NewRpcRequest(&respw, req, r.ProxyUrl, r.TxManagerUrl)
 	request.process()
+}
+
+func (r *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	respw.WriteHeader(http.StatusOK)
+	msg := fmt.Sprintf("All systems OK: %s", time.Now().UTC())
+	io.WriteString(respw, msg)
 }
 
 func IsBlacklisted(ip string) bool {
