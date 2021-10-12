@@ -18,21 +18,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// Functions that never need protection
-var allowedFunctions = map[string]bool{
-	"a9059cbb": true, // transfer
-	"23b872dd": true, // transferFrom
-	"095ea7b3": true, // approve
-	"2e1a7d4d": true, // weth withdraw
-	"d0e30db0": true, // weth deposit
-	"f242432a": true, // safe transfer NFT
-}
-
-// Blacklist for certain rawTx strings from being forwarded to BE.
-// tx are added to blacklist after BE responds with 'Bundle submitted has already failed too many times'
-var blacklistedRawTx = make(map[string]time.Time) // key is the rawTxHex, value is time added
-
-// Helper to stop MetaMask from retrying
+// MetaMask keeps re-sending tx, bombarding the system with eth_sendRawTransaction calls. If this happens, we prevent
+// the tx from being forwarded to the TxManager, and force MetaMask to return an error (using eth_getTransactionCount).
+var blacklistedRawTx = make(map[string]time.Time) // [rawTxHex]time-added
 var mmBlacklistedAccountAndNonce = make(map[string]*mmNonceHelper)
 
 type mmNonceHelper struct {
@@ -40,6 +28,7 @@ type mmNonceHelper struct {
 	NumTries uint64
 }
 
+// RPC request for a single client JSON-RPC request
 type RpcRequest struct {
 	respw *http.ResponseWriter
 	req   *http.Request
@@ -258,6 +247,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 	}
 
 	// Write status code header and body back to user request
+	(*r.respw).Header().Set("Content-Type", "application/json")
 	(*r.respw).WriteHeader(proxyResp.StatusCode)
 	_, err = (*r.respw).Write(proxyRespBody)
 	if err != nil {
@@ -322,6 +312,8 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 }
 
 func (r *RpcRequest) writeRpcError(msg string) {
+	(*r.respw).Header().Set("Content-Type", "application/json")
+
 	res := JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
@@ -338,6 +330,8 @@ func (r *RpcRequest) writeRpcError(msg string) {
 }
 
 func (r *RpcRequest) writeRpcResponse(result interface{}) {
+	(*r.respw).Header().Set("Content-Type", "application/json")
+
 	res := JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
@@ -347,13 +341,5 @@ func (r *RpcRequest) writeRpcResponse(result interface{}) {
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-func isOnFunctionWhiteList(data string) bool {
-	if allowedFunctions[data[0:8]] {
-		return true
-	} else {
-		return false
 	}
 }
