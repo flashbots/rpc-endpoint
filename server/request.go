@@ -135,6 +135,9 @@ func (r *RpcRequest) process() {
 			return
 		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
+		} else if r.jsonReq.Method == "net_version" {
+			r.writeRpcResponse("1")
+			return
 		}
 
 		// Just proxy the request to a node
@@ -320,7 +323,8 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 
 func (r *RpcRequest) writeRpcError(msg string) {
 	res := JsonRpcResponse{
-		Id: r.jsonReq.Id,
+		Id:      r.jsonReq.Id,
+		Version: "2.0",
 		Error: &JsonRpcError{
 			Code:    -32603,
 			Message: msg,
@@ -329,6 +333,19 @@ func (r *RpcRequest) writeRpcError(msg string) {
 
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing error response: %v", err)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (r *RpcRequest) writeRpcResponse(result interface{}) {
+	res := JsonRpcResponse{
+		Id:      r.jsonReq.Id,
+		Version: "2.0",
+		Result:  result,
+	}
+
+	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
+		r.logError("failed writing rpc response: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }

@@ -11,9 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var RpcBackendServerUrl string
+
 func init() {
-	rpcBackendServer := httptest.NewServer(http.HandlerFunc(rpcBackendHandler))
+	rpcBackendServer := httptest.NewServer(http.HandlerFunc(RpcBackendHandler))
 	fmt.Println("rpc backend:", rpcBackendServer.URL)
+	RpcBackendServerUrl = rpcBackendServer.URL
 
 	s := server.NewRpcEndPointServer("", rpcBackendServer.URL)
 	s.TxManagerUrl = rpcBackendServer.URL
@@ -81,4 +84,16 @@ func TestEthCallIntercept(t *testing.T) {
 	}})
 	res2 := sendRpcAndParseResponseOrFailNow(t, req2)
 	require.Equal(t, "0x12345", res2.Result, "FlashRPC contract - eth_call passthrough")
+}
+
+func TestNetVersionIntercept(t *testing.T) {
+	// eth_call intercept
+	req := newRpcRequest("net_version", []interface{}{})
+	res, err := sendRpcAndParseResponseTo(RpcBackendServerUrl, req)
+	require.Nil(t, err, err)
+	require.Equal(t, "3", res.Result, "net_version from backend")
+
+	res = sendRpcAndParseResponseOrFailNow(t, req)
+	require.Nil(t, res.Error)
+	require.Equal(t, "1", res.Result, "net_version intercept")
 }

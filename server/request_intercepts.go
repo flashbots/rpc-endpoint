@@ -1,9 +1,7 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 )
 
@@ -26,20 +24,8 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	}
 
 	// Prepare custom JSON-RPC response
-	resp := JsonRpcResponse{
-		Id:      r.jsonReq.Id,
-		Version: "2.0",
-		Result:  fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1),
-	}
-
-	// Write to client request
-	if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
-		r.logError("Intercepting eth_getTransactionCount failed: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return true
-	}
-
-	r.log("Intercepting eth_getTransactionCount successful for %s", addr)
+	r.writeRpcResponse(fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1))
+	r.log("Intercepted eth_getTransactionCount for %s", addr)
 	return true
 }
 
@@ -59,18 +45,7 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 		return false
 	}
 
-	resp := JsonRpcResponse{
-		Id:      r.jsonReq.Id,
-		Version: "2.0",
-		Result:  "0x0000000000000000000000000000000000000000000000000000000000000001",
-	}
-
-	if err := json.NewEncoder(*r.respw).Encode(resp); err != nil {
-		r.logError("Intercepting eth_call failed: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return true
-	}
-
-	r.log("Intercepting eth_call successful")
+	r.writeRpcResponse("0x0000000000000000000000000000000000000000000000000000000000000001")
+	r.log("Intercepted eth_call")
 	return true
 }

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/flashbots/rpc-endpoint/server"
 )
@@ -25,12 +24,15 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 		} else {
 			return "1", nil
 		}
+
+	case "net_version":
+		return "3", nil
 	}
 
 	return 18, fmt.Errorf("foo")
 }
 
-func rpcBackendHandler(w http.ResponseWriter, req *http.Request) {
+func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	log.Printf("%s %s %s\n", req.RemoteAddr, req.Method, req.URL)
@@ -81,13 +83,4 @@ func rpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		log.Printf("error writing response: %v", err)
 	}
-}
-
-func ServeRpcBackend() {
-	http.HandleFunc("/", rpcBackendHandler)
-	http.HandleFunc("/quit", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Println("bye")
-		os.Exit(0)
-	})
-	log.Fatal(http.ListenAndServe("localhost:8080", nil))
 }
