@@ -1,3 +1,6 @@
+/*
+ * Test helpers.
+ */
 package test
 
 import (

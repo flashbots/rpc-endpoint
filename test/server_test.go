@@ -1,3 +1,6 @@
+/*
+ * RPC endpoint tests.
+ */
 package test
 
 import (

@@ -1,3 +1,6 @@
+/*
+ * Dummy RPC backend. Implements Ethereum JSON-RPC calls that the tests need.
+ */
 package test
 
 import (

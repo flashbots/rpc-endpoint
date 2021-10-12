@@ -7,3 +7,6 @@ all:
 
 clean:
 	rm -rf rpc-endpoint build/
+
+test:
+	go test test/*
