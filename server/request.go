@@ -140,10 +140,16 @@ func (r *RpcRequest) process() {
 			return
 		}
 
-		// Just proxy the request to a node
-		if r.proxyRequest(r.defaultProxyUrl, false) {
+		// Proxy the request to a node
+		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+
+		// Write the response to user
+		if readJsonRpcSuccess {
+			(*r.respw).WriteHeader(proxyHttpStatus)
+			r._writeRpcResponse(jsonResp)
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
 		} else {
+			(*r.respw).WriteHeader(http.StatusInternalServerError)
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
 	}
@@ -209,19 +215,28 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	proxySuccess := r.proxyRequest(url, true)
+	readJsonRpcSuccess, _, jsonResp := r.proxyRequestRead(url)
 
 	// Log after proxying
-	if proxySuccess {
-		r.writeRpcResponse(r.tx.Hash().Hex())
-		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
-	} else {
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
+	if !readJsonRpcSuccess {
 		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Write JSON-RPC response now
+	if jsonResp.Error != nil {
+		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
+		r._writeRpcResponse(jsonResp)
+		return
+	} else {
+		r.writeRpcResponse(r.tx.Hash().Hex())
+		r.log("Proxy to %s successful: eth_sendRawTransaction (with tx-hash)", target)
+		return
 	}
 }
 
-func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (success bool) {
+func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *JsonRpcResponse) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -233,8 +248,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 	r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 	if err != nil {
 		r.logError("failed to make proxy request: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// Read body
@@ -242,16 +256,14 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
 	if err != nil {
 		r.logError("failed to decode proxy request body: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// If JSON-RPC had an error response, parse but still pass back to user
@@ -259,19 +271,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 		r.handleProxyError(jsonRpcResp.Error)
 	}
 
-	if skipWritingReponse {
-		return true
-	}
-
-	// Write status code header and body back to user request
-	(*r.respw).WriteHeader(proxyResp.StatusCode)
-	_, err = (*r.respw).Write(proxyRespBody)
-	if err != nil {
-		r.logError("failed writing proxy response to user request: %v", err)
-		return false
-	}
-
-	return true
+	return true, proxyResp.StatusCode, jsonRpcResp
 }
 
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
@@ -349,7 +349,10 @@ func (r *RpcRequest) writeRpcResponse(result interface{}) {
 		Version: "2.0",
 		Result:  result,
 	}
+	r._writeRpcResponse(&res)
+}
 
+func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
