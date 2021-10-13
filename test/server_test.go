@@ -100,3 +100,11 @@ func TestNetVersionIntercept(t *testing.T) {
 	require.Nil(t, res.Error)
 	require.Equal(t, "1", res.Result, "net_version intercept")
 }
+
+func TestSendBundleResponse(t *testing.T) {
+	// should be tx hash
+	req_sendRawTransaction := newRpcRequest("eth_sendRawTransaction", []interface{}{"0xf8ac8201018527d064ee00830197f594269616d549d7e8eaa82dfb17028d0b212d11232a80b844a9059cbb000000000000000000000000c5daad04f42f923ed03a4e1e192e9ca9f46a14d50000000000000000000000000000000000000000000000000e92596fd629000025a013838b4bc34c2c3bf77f635cfa8d910e19092f38a8d7326077dbcc05f1f3fab1a06740cde8bdd8c27df60b5dd260f671b2f560e5387a83618a18d0793e17a17e02"})
+	r1 := sendRpcAndParseResponseOrFailNow(t, req_sendRawTransaction)
+	require.Nil(t, r1.Error, r1.Error)
+	require.Equal(t, "0xfc211edc6cfe4de65c8aa654d2bf5fec366486729b5b0867d4a7595f0bb5b6d5", r1.Result)
+}

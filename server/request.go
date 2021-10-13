@@ -141,7 +141,7 @@ func (r *RpcRequest) process() {
 		}
 
 		// Just proxy the request to a node
-		if r.proxyRequest(r.defaultProxyUrl) {
+		if r.proxyRequest(r.defaultProxyUrl, false) {
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
 		} else {
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
@@ -209,17 +209,19 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	proxySuccess := r.proxyRequest(url)
+	proxySuccess := r.proxyRequest(url, true)
 
 	// Log after proxying
 	if proxySuccess {
+		r.writeRpcResponse(r.tx.Hash().Hex())
 		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
 	} else {
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
 		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
 	}
 }
 
-func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
+func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (success bool) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -255,6 +257,10 @@ func (r *RpcRequest) proxyRequest(proxyUrl string) (success bool) {
 	// If JSON-RPC had an error response, parse but still pass back to user
 	if jsonRpcResp.Error != nil {
 		r.handleProxyError(jsonRpcResp.Error)
+	}
+
+	if skipWritingReponse {
+		return true
 	}
 
 	// Write status code header and body back to user request

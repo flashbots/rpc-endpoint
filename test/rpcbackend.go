@@ -25,7 +25,7 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 		if req.Params[0] == RawTxBundleFailedTooManyTimes {
 			return "", fmt.Errorf("Bundle submitted has already failed too many times") //lint:ignore ST1005 we mimic the error from the protect tx manager
 		} else {
-			return "1", nil
+			return "bundle-id-from-BE", nil
 		}
 
 	case "net_version":
