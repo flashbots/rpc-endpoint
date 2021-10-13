@@ -145,6 +145,7 @@ func (r *RpcRequest) process() {
 
 		// Write the response to user
 		if readJsonRpcSuccess {
+			(*r.respw).Header().Set("Content-Type", "application/json")
 			(*r.respw).WriteHeader(proxyHttpStatus)
 			r._writeRpcResponse(jsonResp)
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
@@ -225,6 +226,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Write JSON-RPC response now
+	(*r.respw).Header().Set("Content-Type", "application/json")
 	(*r.respw).WriteHeader(proxyHttpStatus)
 	if jsonResp.Error != nil {
 		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
