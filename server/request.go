@@ -18,21 +18,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// Functions that never need protection
-var allowedFunctions = map[string]bool{
-	"a9059cbb": true, // transfer
-	"23b872dd": true, // transferFrom
-	"095ea7b3": true, // approve
-	"2e1a7d4d": true, // weth withdraw
-	"d0e30db0": true, // weth deposit
-	"f242432a": true, // safe transfer NFT
-}
-
-// Blacklist for certain rawTx strings from being forwarded to BE.
-// tx are added to blacklist after BE responds with 'Bundle submitted has already failed too many times'
+// MetaMask keeps re-sending tx, bombarding the system with eth_sendRawTransaction calls. If this happens, we prevent
+// the tx from being forwarded to the TxManager, and force MetaMask to return an error (using eth_getTransactionCount).
 var blacklistedRawTx = make(map[string]time.Time) // key is the rawTxHex, value is time added
-
-// Helper to stop MetaMask from retrying
 var mmBlacklistedAccountAndNonce = make(map[string]*mmNonceHelper)
 
 type mmNonceHelper struct {
@@ -40,6 +28,7 @@ type mmNonceHelper struct {
 	NumTries uint64
 }
 
+// RPC request for a single client JSON-RPC request
 type RpcRequest struct {
 	respw *http.ResponseWriter
 	req   *http.Request
@@ -56,6 +45,11 @@ type RpcRequest struct {
 	rawTxHex string
 	tx       *types.Transaction
 	txFrom   string
+
+	// response flags
+	respHeaderContentTypeWritten bool
+	respHeaderStatusCodeWritten  bool
+	respBodyWritten              bool
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
@@ -79,6 +73,26 @@ func (r *RpcRequest) logError(format string, v ...interface{}) {
 	log.Printf(prefix+format, v...)
 }
 
+func (r *RpcRequest) writeHeaderStatus(statusCode int) {
+	if r.respHeaderStatusCodeWritten {
+		return
+	}
+	(*r.respw).WriteHeader(http.StatusUnauthorized)
+	r.respHeaderStatusCodeWritten = true
+}
+
+func (r *RpcRequest) writeHeaderContentType(contentType string) {
+	if r.respHeaderContentTypeWritten {
+		return
+	}
+	(*r.respw).Header().Set("Content-Type", contentType)
+	r.respHeaderContentTypeWritten = true
+}
+
+func (r *RpcRequest) writeHeaderContentTypeJson() {
+	r.writeHeaderContentType("application/json")
+}
+
 func (r *RpcRequest) process() {
 	var err error
 
@@ -93,7 +107,7 @@ func (r *RpcRequest) process() {
 
 	if IsBlacklisted(r.ip) {
 		r.log("Blocked: IP=%s", r.ip)
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
+		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
 
@@ -110,14 +124,14 @@ func (r *RpcRequest) process() {
 	r.body, err = ioutil.ReadAll(r.req.Body)
 	if err != nil {
 		r.logError("failed to read request body: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
 		r.logError("failed to parse JSON RPC request: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -136,14 +150,20 @@ func (r *RpcRequest) process() {
 		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
 		} else if r.jsonReq.Method == "net_version" {
-			r.writeRpcResponse("1")
+			r.writeRpcResult("1")
 			return
 		}
 
-		// Just proxy the request to a node
-		if r.proxyRequest(r.defaultProxyUrl, false) {
+		// Proxy the request to a node
+		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+
+		// Write the response to user
+		if readJsonRpcSuccess {
+			r.writeHeaderStatus(proxyHttpStatus)
+			r._writeRpcResponse(jsonResp)
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
 		} else {
+			r.writeHeaderStatus(http.StatusInternalServerError)
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
 	}
@@ -155,14 +175,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
 		r.logError("no params for eth_sendRawTransaction")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
 		r.logError("invalid raw transaction (wrong length)")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -177,27 +197,27 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
 		r.logError("Error getting transaction object")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.logError("couldn't get address from rawTx: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
+		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
 
 	needsProtection, err := r.doesTxNeedFrontrunningProtection(r.tx)
 	if err != nil {
 		r.logError("failed to evaluate transaction: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -209,19 +229,35 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	proxySuccess := r.proxyRequest(url, true)
+	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(url)
 
 	// Log after proxying
-	if proxySuccess {
-		r.writeRpcResponse(r.tx.Hash().Hex())
-		r.log("Proxy to %s successful: eth_sendRawTransaction", target)
-	} else {
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
+	if !readJsonRpcSuccess {
 		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+
+	// Write JSON-RPC response now
+	r.writeHeaderContentTypeJson()
+	r.writeHeaderStatus(proxyHttpStatus)
+	if jsonResp.Error != nil {
+		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
+
+		// write the original response to the user
+		r._writeRpcResponse(jsonResp)
+		return
+	} else {
+		// TxManager returns bundle hash, but this call needs to return tx hash
+		txHash := r.tx.Hash().Hex()
+		r.writeRpcResult(txHash)
+		r.log("Proxy to %s successful: eth_sendRawTransaction - tx-hash: %s", target, txHash)
+		return
 	}
 }
 
-func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (success bool) {
+// Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
+func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *JsonRpcResponse) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -233,8 +269,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 	r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 	if err != nil {
 		r.logError("failed to make proxy request: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// Read body
@@ -242,16 +277,14 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
 	if err != nil {
 		r.logError("failed to decode proxy request body: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-		return false
+		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// If JSON-RPC had an error response, parse but still pass back to user
@@ -259,19 +292,7 @@ func (r *RpcRequest) proxyRequest(proxyUrl string, skipWritingReponse bool) (suc
 		r.handleProxyError(jsonRpcResp.Error)
 	}
 
-	if skipWritingReponse {
-		return true
-	}
-
-	// Write status code header and body back to user request
-	(*r.respw).WriteHeader(proxyResp.StatusCode)
-	_, err = (*r.respw).Write(proxyRespBody)
-	if err != nil {
-		r.logError("failed writing proxy response to user request: %v", err)
-		return false
-	}
-
-	return true
+	return true, proxyResp.StatusCode, jsonRpcResp
 }
 
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
@@ -336,30 +357,31 @@ func (r *RpcRequest) writeRpcError(msg string) {
 			Message: msg,
 		},
 	}
-
-	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
-		r.logError("failed writing error response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-	}
+	r._writeRpcResponse(&res)
 }
 
-func (r *RpcRequest) writeRpcResponse(result interface{}) {
+func (r *RpcRequest) writeRpcResult(result interface{}) {
 	res := JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
 		Result:  result,
 	}
+	r._writeRpcResponse(&res)
+}
+
+func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
+	if r.respBodyWritten {
+		r.logError("_writeRpcResponse: response already written")
+		return
+	}
+
+	r.writeHeaderContentTypeJson()     // set content type to json, if not yet set
+	r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
 
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		r.writeHeaderStatus(http.StatusInternalServerError)
 	}
-}
 
-func isOnFunctionWhiteList(data string) bool {
-	if allowedFunctions[data[0:8]] {
-		return true
-	} else {
-		return false
-	}
+	r.respBodyWritten = true
 }

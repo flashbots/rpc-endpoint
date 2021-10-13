@@ -1,7 +1,7 @@
+// OFAC banned addresses
 package server
 
 var ofacBlacklist = map[string]bool{
-	// OFAC banned addresses
 	"0x8576acc5c05d6ce88f4e49bf65bdf0c62f91353c": true,
 	"0xd882cFc20F52f2599D84b8e8D58C7FB62cfE344b": true,
 	"0x901bb9583b24D97e995513C6778dc6888AB6870e": true,
