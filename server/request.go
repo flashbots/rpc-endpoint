@@ -215,7 +215,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy now!
-	readJsonRpcSuccess, _, jsonResp := r.proxyRequestRead(url)
+	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(url)
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
@@ -225,6 +225,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Write JSON-RPC response now
+	(*r.respw).WriteHeader(proxyHttpStatus)
 	if jsonResp.Error != nil {
 		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
 		r._writeRpcResponse(jsonResp)
@@ -236,6 +237,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 }
 
+// Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
 func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *JsonRpcResponse) {
 	timeProxyStart := time.Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
