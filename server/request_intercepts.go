@@ -46,6 +46,6 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 	}
 
 	r.writeRpcResult("0x0000000000000000000000000000000000000000000000000000000000000001")
-	r.log("Intercepted eth_call")
+	r.log("Intercepted eth_call to FlashRPC contract")
 	return true
 }
