@@ -24,7 +24,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	}
 
 	// Prepare custom JSON-RPC response
-	r.writeRpcResponse(fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1))
+	r.writeRpcResult(fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1))
 	r.log("Intercepted eth_getTransactionCount for %s", addr)
 	return true
 }
@@ -45,7 +45,7 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 		return false
 	}
 
-	r.writeRpcResponse("0x0000000000000000000000000000000000000000000000000000000000000001")
+	r.writeRpcResult("0x0000000000000000000000000000000000000000000000000000000000000001")
 	r.log("Intercepted eth_call")
 	return true
 }

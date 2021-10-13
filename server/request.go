@@ -56,6 +56,11 @@ type RpcRequest struct {
 	rawTxHex string
 	tx       *types.Transaction
 	txFrom   string
+
+	// response flags
+	respHeaderContentTypeWritten bool
+	respHeaderStatusCodeWritten  bool
+	respBodyWritten              bool
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
@@ -79,6 +84,26 @@ func (r *RpcRequest) logError(format string, v ...interface{}) {
 	log.Printf(prefix+format, v...)
 }
 
+func (r *RpcRequest) writeHeaderStatus(statusCode int) {
+	if r.respHeaderStatusCodeWritten {
+		return
+	}
+	(*r.respw).WriteHeader(http.StatusUnauthorized)
+	r.respHeaderStatusCodeWritten = true
+}
+
+func (r *RpcRequest) writeHeaderContentType(contentType string) {
+	if r.respHeaderContentTypeWritten {
+		return
+	}
+	(*r.respw).Header().Set("Content-Type", contentType)
+	r.respHeaderContentTypeWritten = true
+}
+
+func (r *RpcRequest) writeHeaderContentTypeJson() {
+	r.writeHeaderContentType("application/json")
+}
+
 func (r *RpcRequest) process() {
 	var err error
 
@@ -93,7 +118,7 @@ func (r *RpcRequest) process() {
 
 	if IsBlacklisted(r.ip) {
 		r.log("Blocked: IP=%s", r.ip)
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
+		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
 
@@ -110,14 +135,14 @@ func (r *RpcRequest) process() {
 	r.body, err = ioutil.ReadAll(r.req.Body)
 	if err != nil {
 		r.logError("failed to read request body: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
 		r.logError("failed to parse JSON RPC request: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -136,7 +161,7 @@ func (r *RpcRequest) process() {
 		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
 		} else if r.jsonReq.Method == "net_version" {
-			r.writeRpcResponse("1")
+			r.writeRpcResult("1")
 			return
 		}
 
@@ -145,12 +170,11 @@ func (r *RpcRequest) process() {
 
 		// Write the response to user
 		if readJsonRpcSuccess {
-			(*r.respw).Header().Set("Content-Type", "application/json")
-			(*r.respw).WriteHeader(proxyHttpStatus)
+			r.writeHeaderStatus(proxyHttpStatus)
 			r._writeRpcResponse(jsonResp)
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
 		} else {
-			(*r.respw).WriteHeader(http.StatusInternalServerError)
+			r.writeHeaderStatus(http.StatusInternalServerError)
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
 		}
 	}
@@ -162,14 +186,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
 		r.logError("no params for eth_sendRawTransaction")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
 		r.logError("invalid raw transaction (wrong length)")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -184,27 +208,27 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
 		r.logError("Error getting transaction object")
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.logError("couldn't get address from rawTx: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
+		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
 
 	needsProtection, err := r.doesTxNeedFrontrunningProtection(r.tx)
 	if err != nil {
 		r.logError("failed to evaluate transaction: %v", err)
-		(*r.respw).WriteHeader(http.StatusBadRequest)
+		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -221,20 +245,24 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Log after proxying
 	if !readJsonRpcSuccess {
 		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
 
 	// Write JSON-RPC response now
-	(*r.respw).Header().Set("Content-Type", "application/json")
-	(*r.respw).WriteHeader(proxyHttpStatus)
+	r.writeHeaderContentTypeJson()
+	r.writeHeaderStatus(proxyHttpStatus)
 	if jsonResp.Error != nil {
 		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
+
+		// write the original response to the user
 		r._writeRpcResponse(jsonResp)
 		return
 	} else {
-		r.writeRpcResponse(r.tx.Hash().Hex())
-		r.log("Proxy to %s successful: eth_sendRawTransaction (with tx-hash)", target)
+		// TxManager returns bundle hash, but this call needs to return tx hash
+		txHash := r.tx.Hash().Hex()
+		r.writeRpcResult(txHash)
+		r.log("Proxy to %s successful: eth_sendRawTransaction - tx-hash: %s", target, txHash)
 		return
 	}
 }
@@ -340,14 +368,10 @@ func (r *RpcRequest) writeRpcError(msg string) {
 			Message: msg,
 		},
 	}
-
-	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
-		r.logError("failed writing error response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
-	}
+	r._writeRpcResponse(&res)
 }
 
-func (r *RpcRequest) writeRpcResponse(result interface{}) {
+func (r *RpcRequest) writeRpcResult(result interface{}) {
 	res := JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
@@ -357,10 +381,20 @@ func (r *RpcRequest) writeRpcResponse(result interface{}) {
 }
 
 func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
+	if r.respBodyWritten {
+		r.logError("_writeRpcResponse: response already written")
+		return
+	}
+
+	r.writeHeaderContentTypeJson()     // set content type to json, if not yet set
+	r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
+
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)
-		(*r.respw).WriteHeader(http.StatusInternalServerError)
+		r.writeHeaderStatus(http.StatusInternalServerError)
 	}
+
+	r.respBodyWritten = true
 }
 
 func isOnFunctionWhiteList(data string) bool {
