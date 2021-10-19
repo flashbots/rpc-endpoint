@@ -77,8 +77,8 @@ func (r *RpcRequest) writeHeaderStatus(statusCode int) {
 	if r.respHeaderStatusCodeWritten {
 		return
 	}
-	(*r.respw).WriteHeader(http.StatusUnauthorized)
 	r.respHeaderStatusCodeWritten = true
+	(*r.respw).WriteHeader(statusCode)
 }
 
 func (r *RpcRequest) writeHeaderContentType(contentType string) {
