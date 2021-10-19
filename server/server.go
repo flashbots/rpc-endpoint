@@ -9,34 +9,32 @@ import (
 	"time"
 )
 
-const _txManagerUrl = "https://protection.flashbots.net/v1/rpc"
-
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
 type RpcEndPointServer struct {
-	ListenAddress string
-	ProxyUrl      string
-	TxManagerUrl  string
+	listenAddress string
+	proxyUrl      string
+	txManagerUrl  string
 }
 
-func NewRpcEndPointServer(listenAddress string, proxyUrl string) *RpcEndPointServer {
+func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string) *RpcEndPointServer {
 	return &RpcEndPointServer{
-		ListenAddress: listenAddress,
-		ProxyUrl:      proxyUrl,
-		TxManagerUrl:  _txManagerUrl,
+		listenAddress: listenAddress,
+		proxyUrl:      proxyUrl,
+		txManagerUrl:  txManagerUrl,
 	}
 }
 
 func (r *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v...", r.ListenAddress)
+	log.Printf("Starting rpc endpoint at %v...", r.listenAddress)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(r.HandleHttpRequest))
 	http.HandleFunc("/health", http.HandlerFunc(r.handleHealthRequest))
 
 	// Start serving
-	if err := http.ListenAndServe(r.ListenAddress, nil); err != nil {
+	if err := http.ListenAndServe(r.listenAddress, nil); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
@@ -55,7 +53,7 @@ func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, r.ProxyUrl, r.TxManagerUrl)
+	request := NewRpcRequest(&respw, req, r.proxyUrl, r.txManagerUrl)
 	request.process()
 }
 

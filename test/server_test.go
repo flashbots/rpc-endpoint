@@ -21,8 +21,7 @@ func init() {
 	fmt.Println("rpc backend:", rpcBackendServer.URL)
 	RpcBackendServerUrl = rpcBackendServer.URL
 
-	s := server.NewRpcEndPointServer("", rpcBackendServer.URL)
-	s.TxManagerUrl = rpcBackendServer.URL
+	s := server.NewRpcEndPointServer("", rpcBackendServer.URL, rpcBackendServer.URL)
 	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(s.HandleHttpRequest))
 	fmt.Println("rpc endpoint:", rpcEndpointServer.URL)
 	RpcEndpointUrl = rpcEndpointServer.URL
