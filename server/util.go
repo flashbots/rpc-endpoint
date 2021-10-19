@@ -137,12 +137,48 @@ func eth_getTransactionCount(nodeUrl string, address string) (uint64, error) {
 		return 0, errors.Wrap(jsonRpcResp.Error, "[eth_getTransactionCount] json-rpc response error")
 	}
 
-	// getTransactionCount request here
-	txCntHex := fmt.Sprintf("%v", jsonRpcResp.Result)
-	txCntInt, err := strconv.ParseInt(txCntHex[2:], 16, 64)
+	// Get RPC result into a string
+	var respStr string
+	err = json.Unmarshal(jsonRpcResp.Result, &respStr)
 	if err != nil {
-		return 0, errors.Wrap(err, fmt.Sprintf("[eth_getTransactionCount] failed converting %s to int", txCntHex))
+		return 0, errors.Wrap(err, "[eth_getTransactionCount] json umarshal of response result to string failed")
+	}
+
+	if len(respStr) < 4 {
+		return 0, errors.Wrap(err, "[eth_getTransactionCount] invalid response content (less than 4 chars)")
+	}
+
+	// Convert from hex to integer
+	txCntInt, err := strconv.ParseInt(respStr[2:], 16, 64)
+	if err != nil {
+		return 0, errors.Wrap(err, fmt.Sprintf("[eth_getTransactionCount] failed converting %s to int", respStr))
 	}
 
 	return uint64(txCntInt), nil
+}
+
+func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcResponse, error) {
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal")
+	}
+
+	// fmt.Printf("%s\n", jsonData)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, errors.Wrap(err, "post")
+	}
+
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read")
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
+	jsonRpcResp := new(JsonRpcResponse)
+	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+		return nil, errors.Wrap(err, "unmarshal")
+	}
+
+	return jsonRpcResp, nil
 }

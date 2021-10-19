@@ -13,16 +13,29 @@ import (
 	"github.com/flashbots/rpc-endpoint/server"
 )
 
+var getBundleStatusByTransactionHash_Response = server.GetBundleStatusByTransactionHashResponse{
+	TxHash: TestTx_BundleFailedTooManyTimes_Hash,
+	Status: "FAILED_BUNDLE",
+}
+
 func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error) {
 	switch req.Method {
 	case "eth_getTransactionCount":
 		return "0x22", nil
+		// return hex.DecodeString("0x22")
 
 	case "eth_call":
 		return "0x12345", nil
 
+	case "eth_getTransactionReceipt":
+		if req.Params[0] == TestTx_BundleFailedTooManyTimes_Hash {
+			return nil, nil
+		} else if req.Params[0] == TestTx_MM2_Hash {
+			return nil, nil
+		}
+
 	case "eth_sendRawTransaction":
-		if req.Params[0] == RawTxBundleFailedTooManyTimes {
+		if req.Params[0] == TestTx_BundleFailedTooManyTimes_RawTx {
 			return "", fmt.Errorf("Bundle submitted has already failed too many times") //lint:ignore ST1005 we mimic the error from the protect tx manager
 		} else {
 			return "bundle-id-from-BE", nil
@@ -30,14 +43,20 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 
 	case "net_version":
 		return "3", nil
+
+	case "null":
+		return nil, nil
+
+	case "eth_getBundleStatusByTransactionHash":
+		return getBundleStatusByTransactionHash_Response, nil
+
 	}
 
-	return 18, fmt.Errorf("foo")
+	return "", fmt.Errorf("no RPC method handler implemented for %s", req.Method)
 }
 
 func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
-
 	log.Printf("%s %s %s\n", req.RemoteAddr, req.Method, req.URL)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -55,7 +74,7 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			log.Printf("error writing response: %v", err)
+			log.Printf("error writing response 1: %v - data: %s", err, res)
 		}
 	}
 
@@ -78,12 +97,16 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res := server.JsonRpcResponse{
-		Id:     jsonReq.Id,
-		Result: rawRes,
+	w.WriteHeader(http.StatusOK)
+	resBytes, err := json.Marshal(rawRes)
+	if err != nil {
+		fmt.Println("error mashalling rawRes:", rawRes, err)
 	}
+
+	res := server.NewJsonRpcResponse(jsonReq.Id, resBytes)
+
 	// Write to client request
 	if err := json.NewEncoder(w).Encode(res); err != nil {
-		log.Printf("error writing response: %v", err)
+		log.Printf("error writing response 2: %v - data: %s", err, rawRes)
 	}
 }

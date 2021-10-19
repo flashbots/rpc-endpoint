@@ -1,6 +1,9 @@
 package server
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type JsonRpcRequest struct {
 	Id      interface{}   `json:"id"`
@@ -9,11 +12,24 @@ type JsonRpcRequest struct {
 	Version string        `json:"jsonrpc,omitempty"`
 }
 
+func NewJsonRpcRequest(id interface{}, method string, params []interface{}) *JsonRpcRequest {
+	return &JsonRpcRequest{
+		Id:      id,
+		Method:  method,
+		Params:  params,
+		Version: "2.0",
+	}
+}
+
+func NewJsonRpcRequest1(id interface{}, method string, param interface{}) *JsonRpcRequest {
+	return NewJsonRpcRequest(id, method, []interface{}{param})
+}
+
 type JsonRpcResponse struct {
-	Id      interface{}   `json:"id"`
-	Result  interface{}   `json:"result,omitempty"`
-	Error   *JsonRpcError `json:"error,omitempty"`
-	Version string        `json:"jsonrpc,omitempty"`
+	Id      interface{}     `json:"id"`
+	Result  json.RawMessage `json:"result"`
+	Error   *JsonRpcError   `json:"error,omitempty"`
+	Version string          `json:"jsonrpc"`
 }
 
 // RpcError: https://www.jsonrpc.org/specification#error_object
@@ -24,4 +40,22 @@ type JsonRpcError struct {
 
 func (err JsonRpcError) Error() string {
 	return fmt.Sprintf("Error %d (%s)", err.Code, err.Message)
+}
+
+func NewJsonRpcResponse(id interface{}, result json.RawMessage) *JsonRpcResponse {
+	return &JsonRpcResponse{
+		Id:      id,
+		Result:  result,
+		Version: "2.0",
+	}
+}
+
+type GetBundleStatusByTransactionHashResponse struct {
+	TxHash            string `json:"txHash"`            // "0x0aeb9c61b342f7fc94a10d41c5d30a049a9cfa9ab764c6dd02204a19960ee567"
+	Status            string `json:"status"`            // "FAILED_BUNDLE"
+	Message           string `json:"message"`           // "Expired - The base fee was to low to execute this transaction, please try again"
+	Error             string `json:"error"`             // "max fee per gas less than block base fee"
+	BlocksCount       int    `json:"blocksCount"`       // 2
+	ReceivedTimestamp int    `json:"receivedTimestamp"` // 1634568851003
+	StatusTimestamp   int    `json:"statusTimestamp"`   // 1634568873862
 }
