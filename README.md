@@ -1,15 +1,15 @@
-## Flashbots RPC Endpoint (_flashbots-rpc-endpoint_)
+## Flashbots RPC Endpoint
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![Discord](https://img.shields.io/discord/755466764501909692)](https://discord.gg/7hvTycdNcK)
 
-This repository contains code for a simple server which can be used as an RPC endpoint in popular Ethereum wallets.
+This repository contains code for a server which can be used as an RPC endpoint in popular Ethereum wallets.
 
-The endpoint is **https://rpc.flashbots.net/**
+The endpoint is live at **https://rpc.flashbots.net/**
 
 It does two basic things:
-- First, it receives json-rpc requests, proxies those to a node, and responds with the result of the proxied request.
-- Second, it sends transactions to a "transaction manager," which manages the submission of that transaction to Flashbots. Currently that transaction manager is the Flashbots Protect API by default.
+- First, it receives JSON-RPC requests, proxies those to a node, and responds with the result of the proxied request.
+- Second, it sends transactions to a "transaction manager", which manages the submission of that transaction to Flashbots. Currently that transaction manager is the Flashbots Protect API by default.
 
 ## Usage
 

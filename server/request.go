@@ -127,15 +127,12 @@ func (r *RpcRequest) process() {
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.logError("failed to parse JSON RPC request: %v", err)
+		r.logError("failed to parse JSON RPC request: %v - body: %s", err, r.body)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
-	// if strings.Contains(os.Getenv("RPC_LOG_PARAMS_FOR"), r.jsonReq.Method) {
-	// 	r.log("rpcreq method: %s args: %s", r.jsonReq.Method, r.jsonReq.Params)
-	// }
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
@@ -193,7 +190,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.logError("Error getting transaction object")
+		r.logError("getting transaction object failed")
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
@@ -283,7 +280,8 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 
 	// Afterwards, check time and result
 	timeProxyNeeded := time.Since(timeProxyStart)
-	r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
+	r.log("proxy response %d after %.6f sec", proxyResp.StatusCode, timeProxyNeeded.Seconds())
+	// r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 
 	// Read body
 	defer proxyResp.Body.Close()
@@ -336,9 +334,9 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 	}
 
 	data := hex.EncodeToString(tx.Data())
-	r.log("[protect-check] data: %v", data)
+	r.log("[protect-check] tx-data: %v", data)
 	if len(data) == 0 {
-		r.log("[protect-check] Data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
+		r.log("[protect-check] data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
 		return false, nil
 	}
 
