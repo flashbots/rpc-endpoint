@@ -63,15 +63,9 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 			return false
 		}
 
-		nonce, err := eth_getTransactionCount(r.defaultProxyUrl, mmRawTxTrack.txFrom)
-		if err != nil {
-			r.logError("[MM2] failed getting nonce: %s", err)
-			return
-		}
-
 		MetaMaskFix.blacklistedRawTx[strings.ToLower(txHash)] = Now()
 		MetaMaskFix.accountAndNonce[strings.ToLower(mmRawTxTrack.txFrom)] = &mmNonceHelper{
-			Nonce: nonce,
+			Nonce: 1e9,
 		}
 	}
 

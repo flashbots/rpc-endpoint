@@ -96,6 +96,7 @@ func TestMetamaskEthGetTransactionCount(t *testing.T) {
 	// Next 4 getTransactionCount calls should return wrong result (to make MM fail the tx)
 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
+	require.Equal(t, "0x3b9aca01", valueAfter1, "getTxCount #1")
 
 	valueAfter2 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 	assert.Equal(t, valueAfter1, valueAfter2, "getTxCount #2")

@@ -316,15 +316,9 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 		r.log("rawTx with hash %s added to blocklist. entries: %d", r.tx.Hash().Hex(), len(MetaMaskFix.blacklistedRawTx))
 		MetaMaskFix.CleanupStaleEntries()
 
-		// To prepare for MM retrying the transactions, we get the txCount and then return it +1 for next four tries
-		nonce, err := eth_getTransactionCount(r.defaultProxyUrl, r.txFrom)
-		if err != nil {
-			r.logError("failed getting nonce: %s", err)
-			return
-		}
 		// fmt.Println("NONCE", nonce, "for", r.txFrom)
 		MetaMaskFix.accountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
-			Nonce: nonce,
+			Nonce: 1e9,
 		}
 	}
 }
