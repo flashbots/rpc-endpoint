@@ -316,7 +316,7 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 
 		// fmt.Println("NONCE", nonce, "for", r.txFrom)
 		MetaMaskFix.accountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
-			Nonce: 1e9,
+			Nonce: 9e9,
 		}
 	}
 }
