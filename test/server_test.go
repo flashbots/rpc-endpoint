@@ -203,10 +203,8 @@ func TestMetamaskFix2WithBlacklist(t *testing.T) {
 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_MM2_From, "latest"})
 	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 
-	// first we set the clock 1 hour back, to predate entries
-	server.Now = func() time.Time {
-		return time.Now().Add(-1 * time.Hour)
-	}
+	// set the clock back 14 min, to predate entries
+	setServerTimeOffset(-14 * time.Minute)
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_MM2_RawTx})
@@ -215,7 +213,7 @@ func TestMetamaskFix2WithBlacklist(t *testing.T) {
 	fmt.Printf("\n\n\n")
 
 	// Set the clock to normal, so that more than 16 minutes have passed and we can trigger the codepath for RPC to query the backend
-	server.Now = time.Now
+	setServerTimeOffset(0)
 	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
 	require.Equal(t, "null", string(jsonResp.Result))
@@ -226,12 +224,20 @@ func TestMetamaskFix2WithBlacklist(t *testing.T) {
 	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
 }
 
+func setServerTimeOffset(td time.Duration) {
+	server.Now = func() time.Time {
+		return time.Now().Add(td)
+	}
+}
+
 // If getTxReceipt call is made within 16 minutes, no blacklisting occurs
 func TestMetamaskFix2WithoutBlacklist(t *testing.T) {
 	resetTestServers()
 
 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_MM2_From, "latest"})
 	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+
+	setServerTimeOffset(-13 * time.Minute)
 
 	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_MM2_RawTx})
@@ -240,7 +246,8 @@ func TestMetamaskFix2WithoutBlacklist(t *testing.T) {
 	fmt.Printf("\n\n\n\n\n")
 
 	// Set the clock to normal, so that more than 16 minutes have passed and we can trigger
-	server.Now = time.Now
+	setServerTimeOffset(0)
+
 	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
 	_ = jsonResp
