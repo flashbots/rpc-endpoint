@@ -41,7 +41,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 		return
 	}
 	if backendResp.Error != nil {
-		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error)
+		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error.Message)
 		return
 	}
 	r.log("[MM2] BE response: %s", string(backendResp.Result))
