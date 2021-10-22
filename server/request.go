@@ -18,15 +18,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// MetaMask keeps re-sending tx, bombarding the system with eth_sendRawTransaction calls. If this happens, we prevent
-// the tx from being forwarded to the TxManager, and force MetaMask to return an error (using eth_getTransactionCount).
-var blacklistedRawTx = make(map[string]time.Time) // key is the rawTxHex, value is time added
-var mmBlacklistedAccountAndNonce = make(map[string]*mmNonceHelper)
+var Now = time.Now // used to mock time in tests
 
-type mmNonceHelper struct {
-	Nonce    uint64
-	NumTries uint64
-}
+var MetaMaskFix = NewMetaMaskFixer()
 
 // RPC request for a single client JSON-RPC request
 type RpcRequest struct {
@@ -57,7 +51,7 @@ func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl strin
 		respw:           respw,
 		req:             req,
 		uid:             uuid.New().String(),
-		timeStarted:     time.Now(),
+		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		txManagerUrl:    txManagerUrl,
 	}
@@ -82,11 +76,14 @@ func (r *RpcRequest) writeHeaderStatus(statusCode int) {
 }
 
 func (r *RpcRequest) writeHeaderContentType(contentType string) {
+	if r.respHeaderStatusCodeWritten {
+		r.logError("writeHeaderContentType failed because status code was already written")
+	}
 	if r.respHeaderContentTypeWritten {
 		return
 	}
-	(*r.respw).Header().Set("Content-Type", contentType)
 	r.respHeaderContentTypeWritten = true
+	(*r.respw).Header().Set("Content-Type", contentType)
 }
 
 func (r *RpcRequest) writeHeaderContentTypeJson() {
@@ -130,15 +127,12 @@ func (r *RpcRequest) process() {
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.logError("failed to parse JSON RPC request: %v", err)
+		r.logError("failed to parse JSON RPC request: %v - body: %s", err, r.body)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
-	// if strings.Contains(os.Getenv("RPC_LOG_PARAMS_FOR"), r.jsonReq.Method) {
-	// 	r.log("rpcreq method: %s args: %s", r.jsonReq.Method, r.jsonReq.Params)
-	// }
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
@@ -157,8 +151,14 @@ func (r *RpcRequest) process() {
 		// Proxy the request to a node
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
+		// After proxy, perhaps check backend [MM fix #3 step 2]
+		if r.jsonReq.Method == "eth_getTransactionReceipt" {
+			r.check_post_getTransactionReceipt(jsonResp)
+		}
+
 		// Write the response to user
 		if readJsonRpcSuccess {
+			r.writeHeaderContentTypeJson()
 			r.writeHeaderStatus(proxyHttpStatus)
 			r._writeRpcResponse(jsonResp)
 			r.log("Proxy to node successful: %s", r.jsonReq.Method)
@@ -188,25 +188,35 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.log("rawTx: %s", r.rawTxHex)
 
-	if _, isBlacklistedTx := blacklistedRawTx[r.rawTxHex]; isBlacklistedTx {
+	r.tx, err = GetTx(r.rawTxHex)
+	if err != nil {
+		r.logError("getting transaction object failed")
+		r.writeHeaderStatus(http.StatusBadRequest)
+		return
+	}
+
+	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())]; isBlacklistedTx {
 		r.log("rawTx blocked because bundle failed too many times")
 		r.writeRpcError("rawTx blocked because bundle failed too many times")
 		return
 	}
 
-	r.tx, err = GetTx(r.rawTxHex)
-	if err != nil {
-		r.logError("Error getting transaction object")
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
+	// Get tx from address
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.logError("couldn't get address from rawTx: %v", err)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
+	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
+
+	// Remember time when tx was received and cleanup old entries
+	MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())] = &mmRawTxTracker{
+		submittedAt: Now(),
+		tx:          r.tx,
+		txFrom:      r.txFrom,
+	}
+	MetaMaskFix.CleanupStaleEntries()
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
@@ -242,7 +252,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.writeHeaderContentTypeJson()
 	r.writeHeaderStatus(proxyHttpStatus)
 	if jsonResp.Error != nil {
-		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
+		r.log("Proxy to %s successful: eth_sendRawTransaction - with JSON-RPC Error %s", target, jsonResp.Error)
 
 		// write the original response to the user
 		r._writeRpcResponse(jsonResp)
@@ -258,19 +268,20 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
 func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *JsonRpcResponse) {
-	timeProxyStart := time.Now() // for measuring execution time
+	timeProxyStart := Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
 	// Proxy request
 	proxyResp, err := ProxyRequest(proxyUrl, r.body)
-
-	// Afterwards, check time and result
-	timeProxyNeeded := time.Since(timeProxyStart)
-	r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 	if err != nil {
 		r.logError("failed to make proxy request: %v", err)
 		return false, proxyResp.StatusCode, jsonResp
 	}
+
+	// Afterwards, check time and result
+	timeProxyNeeded := time.Since(timeProxyStart)
+	r.log("proxy response %d after %.6f sec", proxyResp.StatusCode, timeProxyNeeded.Seconds())
+	// r.log("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 
 	// Read body
 	defer proxyResp.Body.Close()
@@ -299,25 +310,13 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 	r.log("proxy response json-rpc error: %s", rpcError.Error())
 
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
-		blacklistedRawTx[r.rawTxHex] = time.Now()
-		r.log("rawTx added to blocklist. entries: %d", len(blacklistedRawTx))
+		MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())] = Now()
+		r.log("rawTx with hash %s added to blocklist. entries: %d", r.tx.Hash().Hex(), len(MetaMaskFix.blacklistedRawTx))
+		MetaMaskFix.CleanupStaleEntries()
 
-		// Cleanup old rawTx blacklist entries
-		for key, entry := range blacklistedRawTx {
-			if time.Since(entry) > 4*time.Hour {
-				delete(blacklistedRawTx, key)
-			}
-		}
-
-		// To prepare for MM retrying the transactions, we get the txCount and then return it +1 for next four tries
-		nonce, err := eth_getTransactionCount(r.defaultProxyUrl, r.txFrom)
-		if err != nil {
-			r.logError("failed getting nonce: %s", err)
-			return
-		}
 		// fmt.Println("NONCE", nonce, "for", r.txFrom)
-		mmBlacklistedAccountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
-			Nonce: nonce,
+		MetaMaskFix.accountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
+			Nonce: 1e9,
 		}
 	}
 }
@@ -335,9 +334,9 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 	}
 
 	data := hex.EncodeToString(tx.Data())
-	r.log("[protect-check] data: %v", data)
+	r.log("[protect-check] tx-data: %v", data)
 	if len(data) == 0 {
-		r.log("[protect-check] Data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
+		r.log("[protect-check] data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
 		return false, nil
 	}
 
@@ -361,10 +360,16 @@ func (r *RpcRequest) writeRpcError(msg string) {
 }
 
 func (r *RpcRequest) writeRpcResult(result interface{}) {
+	resBytes, err := json.Marshal(result)
+	if err != nil {
+		r.logError("writeRpcResult error marshalling %s: %s", result, err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
 	res := JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
-		Result:  result,
+		Result:  resBytes,
 	}
 	r._writeRpcResponse(&res)
 }
@@ -375,8 +380,13 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 		return
 	}
 
-	r.writeHeaderContentTypeJson()     // set content type to json, if not yet set
-	r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
+	if !r.respHeaderContentTypeWritten {
+		r.writeHeaderContentTypeJson() // set content type to json, if not yet set
+	}
+
+	if !r.respHeaderStatusCodeWritten {
+		r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
+	}
 
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)

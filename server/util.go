@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -97,52 +96,28 @@ func TruncateText(s string, max int) string {
 	return s
 }
 
-func eth_getTransactionCount(nodeUrl string, address string) (uint64, error) {
-	if address == "" {
-		return 0, fmt.Errorf("[eth_getTransactionCount] no address given")
-	}
-
-	jsonData, err := json.Marshal(JsonRpcRequest{
-		Id:      1,
-		Version: "2.0",
-		Method:  "eth_getTransactionCount",
-		Params:  []interface{}{address, "latest"},
-	})
-
+func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcResponse, error) {
+	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return 0, errors.Wrap(err, "[eth_getTransactionCount] failed to marshal JSON RPC request")
+		return nil, errors.Wrap(err, "marshal")
 	}
 
-	// Execute eth_sendRawTransaction JSON-RPC request
-	resp, err := http.Post(nodeUrl, "application/json", bytes.NewBuffer(jsonData))
+	// fmt.Printf("%s\n", jsonData)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return 0, errors.Wrap(err, "[eth_getTransactionCount] sending request failed")
+		return nil, errors.Wrap(err, "post")
 	}
 
-	// Check response for errors
-	// fmt.Printf("[eth_getTransactionCount] resp: %v\n", resp)
 	respData, err := ioutil.ReadAll(resp.Body)
-	// fmt.Printf("[eth_getTransactionCount] respData: %s\n", respData)
 	if err != nil {
-		return 0, errors.Wrap(err, "[eth_getTransactionCount] failed reading body")
+		return nil, errors.Wrap(err, "read")
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
 	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
-		return 0, errors.Wrap(err, "[eth_getTransactionCount] failed decoding json rpc response")
+		return nil, errors.Wrap(err, "unmarshal")
 	}
 
-	if jsonRpcResp.Error != nil {
-		return 0, errors.Wrap(jsonRpcResp.Error, "[eth_getTransactionCount] json-rpc response error")
-	}
-
-	// getTransactionCount request here
-	txCntHex := fmt.Sprintf("%v", jsonRpcResp.Result)
-	txCntInt, err := strconv.ParseInt(txCntHex[2:], 16, 64)
-	if err != nil {
-		return 0, errors.Wrap(err, fmt.Sprintf("[eth_getTransactionCount] failed converting %s to int", txCntHex))
-	}
-
-	return uint64(txCntInt), nil
+	return jsonRpcResp, nil
 }

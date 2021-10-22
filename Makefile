@@ -1,4 +1,4 @@
-.PHONY: all test clean
+.PHONY: all test clean lint
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 
@@ -10,3 +10,6 @@ clean:
 
 test:
 	go test test/*
+
+lint:
+	gofmt -d ./
