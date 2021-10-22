@@ -196,8 +196,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())]; isBlacklistedTx {
-		r.log("rawTx blocked because bundle failed too many times")
-		r.writeRpcError("rawTx blocked because bundle failed too many times")
+		msg := "rawTx blocked because bundle failed too many times"
+		r.log(msg)
+		r.writeRpcError(msg)
 		return
 	}
 
@@ -252,7 +253,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.writeHeaderContentTypeJson()
 	r.writeHeaderStatus(proxyHttpStatus)
 	if jsonResp.Error != nil {
-		r.log("Proxy to %s successful: eth_sendRawTransaction - with JSON-RPC Error %s", target, jsonResp.Error)
+		r.log("Proxy to %s successful: eth_sendRawTransaction - with JSON-RPC Error %s", target, jsonResp.Error.Message)
 
 		// write the original response to the user
 		r._writeRpcResponse(jsonResp)
@@ -307,7 +308,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 }
 
 func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
-	r.log("proxy response json-rpc error: %s", rpcError.Error())
+	r.log("proxy response json-rpc error: %s", rpcError.Message)
 
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
 		MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())] = Now()
