@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-// Returns true if request has already received a response, false if request should contiue
-func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonRpcResponse) (requestFinished bool) {
+// After getTransactionReceipt, check if result is null, and if >16 min since submission, query TxManager BE (MM fix 2)
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
-		return false
+		return
 	}
 
 	if len(r.jsonReq.Params) < 1 {
-		return false
+		return
 	}
 
 	txHash := r.jsonReq.Params[0].(string)
@@ -23,12 +23,12 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 
 	rawTxSubmission, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
 	if !txFound {
-		return false
+		return
 	}
 
 	td := time.Since(rawTxSubmission.submittedAt)
 	if td < 17*time.Minute { // do nothing until at least 16 minutes passed
-		return false
+		return
 	}
 
 	r.log("[MM2] eth_getTransactionReceipt result came back empty and > 16 min, tx %s", txHash)
@@ -38,11 +38,11 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 	backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
 	if err != nil {
 		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s: %s", txHash, err)
-		return false
+		return
 	}
 	if backendResp.Error != nil {
 		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error)
-		return false
+		return
 	}
 	r.log("[MM2] BE response: %s", string(backendResp.Result))
 
@@ -50,7 +50,7 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 	err = json.Unmarshal(backendResp.Result, &statusResponse)
 	if err != nil {
 		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed unmarshal rpc result for %s: %s - %s", txHash, jsonResp.Result, err)
-		return false
+		return
 	}
 
 	// r.log("[MM2] BE response: %d, %v", statusResponse)
@@ -60,7 +60,7 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 		mmRawTxTrack, found := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
 		if !found {
 			r.logError("[MM2] couldn't find previous transaction")
-			return false
+			return
 		}
 
 		MetaMaskFix.blacklistedRawTx[strings.ToLower(txHash)] = Now()
@@ -68,8 +68,6 @@ func (r *RpcRequest) intercept_post_mm_eth_getTransactionReceipt(jsonResp *JsonR
 			Nonce: 1e9,
 		}
 	}
-
-	return false
 }
 
 func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished bool) {

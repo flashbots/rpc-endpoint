@@ -152,8 +152,8 @@ func (r *RpcRequest) process() {
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
 		// After proxy, perhaps check backend [MM fix #3 step 2]
-		if r.jsonReq.Method == "eth_getTransactionReceipt" && r.intercept_post_mm_eth_getTransactionReceipt(jsonResp) {
-			return
+		if r.jsonReq.Method == "eth_getTransactionReceipt" {
+			r.check_post_getTransactionReceipt(jsonResp)
 		}
 
 		// Write the response to user
@@ -252,7 +252,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.writeHeaderContentTypeJson()
 	r.writeHeaderStatus(proxyHttpStatus)
 	if jsonResp.Error != nil {
-		r.log("Proxy to %s successful: eth_sendRawTransaction (with error in response)", target)
+		r.log("Proxy to %s successful: eth_sendRawTransaction - with JSON-RPC Error %s", target, jsonResp.Error)
 
 		// write the original response to the user
 		r._writeRpcResponse(jsonResp)
