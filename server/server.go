@@ -9,25 +9,37 @@ import (
 	"time"
 )
 
+var Now = time.Now // used to mock time in tests
+
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
+
+// Transactions should only be sent once to the relay
+var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
+
+// Metamask fix helper
+var MetaMaskFix = NewMetaMaskFixer()
 
 type RpcEndPointServer struct {
 	listenAddress string
 	proxyUrl      string
 	txManagerUrl  string
+	relayUrl      string
+	useRelay      bool
 }
 
-func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string) *RpcEndPointServer {
+func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		listenAddress: listenAddress,
 		proxyUrl:      proxyUrl,
 		txManagerUrl:  txManagerUrl,
+		relayUrl:      relayUrl,
+		useRelay:      useRelay,
 	}
 }
 
 func (r *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v...", r.listenAddress)
+	log.Printf("Starting rpc endpoint at %v (using relay %v)...", r.listenAddress, r.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(r.HandleHttpRequest))
@@ -53,7 +65,7 @@ func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, r.proxyUrl, r.txManagerUrl)
+	request := NewRpcRequest(&respw, req, r.proxyUrl, r.txManagerUrl, r.relayUrl, r.useRelay)
 	request.process()
 }
 

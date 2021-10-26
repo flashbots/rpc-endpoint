@@ -18,10 +18,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var Now = time.Now // used to mock time in tests
-
-var MetaMaskFix = NewMetaMaskFixer()
-
 // RPC request for a single client JSON-RPC request
 type RpcRequest struct {
 	respw *http.ResponseWriter
@@ -31,6 +27,8 @@ type RpcRequest struct {
 	timeStarted     time.Time
 	defaultProxyUrl string
 	txManagerUrl    string
+	relayUrl        string
+	useRelay        bool
 
 	// extracted during request lifecycle:
 	body     []byte
@@ -46,7 +44,7 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string, relayUrl string, useRelay bool) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
@@ -54,6 +52,8 @@ func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl strin
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		txManagerUrl:    txManagerUrl,
+		relayUrl:        relayUrl,
+		useRelay:        useRelay,
 	}
 }
 
@@ -103,7 +103,7 @@ func (r *RpcRequest) process() {
 	r.log("POST request from ip: %s - goroutines: %d", r.ip, runtime.NumGoroutine())
 
 	if IsBlacklisted(r.ip) {
-		r.log("Blocked: IP=%s", r.ip)
+		r.log("Blocked IP: %s", r.ip)
 		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
@@ -235,7 +235,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	target := "mempool"
 	url := r.defaultProxyUrl
 	if needsProtection {
-		target = "Flashbots"
+		if r.useRelay {
+			r.sendTxToRelay()
+			return
+		}
+
+		target = "TxManager"
 		url = r.txManagerUrl
 	}
 
@@ -394,4 +399,33 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 	}
 
 	r.respBodyWritten = true
+}
+
+// Send tx to relay and finish request (write response)
+func (r *RpcRequest) sendTxToRelay() {
+	txHash := r.tx.Hash().Hex()
+	if _, wasAlreadyForwarded := txForwardedToRelay[txHash]; wasAlreadyForwarded {
+		r.log("[sendTxToRelay] already sent %s", txHash)
+		r.writeRpcResult(txHash)
+		return
+	}
+
+	r.log("[sendTxToRelay] sending %s", txHash)
+	txForwardedToRelay[txHash] = Now()
+
+	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", r.rawTxHex)
+	backendResp, err := SendRpcAndParseResponseTo(r.relayUrl, jsonRpcReq)
+	if err != nil {
+		r.logError("[sendTxToRelay] failed for %s: %s", txHash, err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+
+	if backendResp.Error != nil {
+		r.logError("[sendTxToRelay] failed for %s (BE error): %s", txHash, backendResp.Error.Message)
+		r.handleProxyError(backendResp.Error)
+	}
+
+	r._writeRpcResponse(backendResp)
+	r.log("[sendTxToRelay] done")
 }

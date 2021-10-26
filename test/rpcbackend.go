@@ -18,7 +18,11 @@ var getBundleStatusByTransactionHash_Response = server.GetBundleStatusByTransact
 	Status: "FAILED_BUNDLE",
 }
 
+var MockBackendLastRequest *server.JsonRpcRequest
+
 func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error) {
+	MockBackendLastRequest = req
+
 	switch req.Method {
 	case "eth_getTransactionCount":
 		return "0x22", nil
@@ -39,6 +43,14 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 			return "", fmt.Errorf("Bundle submitted has already failed too many times") //lint:ignore ST1005 we mimic the error from the protect tx manager
 		} else {
 			return "bundle-id-from-BE", nil
+		}
+
+	case "eth_sendPrivateTransaction":
+		fmt.Println("BE eth_sendPrivateTransaction", req.Params[0])
+		if req.Params[0] == TestTx_BundleFailedTooManyTimes_RawTx {
+			return TestTx_BundleFailedTooManyTimes_Hash, nil
+		} else {
+			return "some-tx-hash", nil
 		}
 
 	case "net_version":
