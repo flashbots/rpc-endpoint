@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// After getTransactionReceipt, check if result is null, and if >16 min since submission, query TxManager BE (MM fix 2)
+// Check if getTransactionReceipt of a submitted tx is null. If submitted longer than time threshold ago, query TxManager BE to see if tx failed.
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
@@ -19,21 +19,22 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	}
 
 	txHash := r.jsonReq.Params[0].(string)
-	r.log("[MM2] eth_getTransactionReceipt for tx %s", txHash)
-
 	rawTxSubmission, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
 	if !txFound {
 		return
 	}
 
 	td := time.Since(rawTxSubmission.submittedAt)
-	if td < 17*time.Minute { // do nothing until at least 16 minutes passed
+	minutesSinceSubmission := td.Minutes()
+	r.log("[MM2] check_post_getTransactionReceipt for tx %s - submittedAt %.2f min ago", txHash, minutesSinceSubmission)
+
+	if minutesSinceSubmission < 14 { // do nothing until at least 14 minutes passed
 		return
 	}
 
-	r.log("[MM2] eth_getTransactionReceipt result came back empty and > 16 min, tx %s", txHash)
+	r.log("[MM2] eth_getTransactionReceipt result came back empty and > time threshold: tx %s", txHash)
 
-	// result null, and sent before, but more than 16 min ago. Call eth_getBundleStatusByTransactionHash on BE now
+	// result null, and sent before, but more than time threshold ago. Call eth_getBundleStatusByTransactionHash on BE now
 	req := NewJsonRpcRequest1(1, "eth_getBundleStatusByTransactionHash", txHash)
 	backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
 	if err != nil {

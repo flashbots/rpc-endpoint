@@ -133,6 +133,7 @@ func (r *RpcRequest) process() {
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+	MetaMaskFix.CleanupStaleEntries()
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
@@ -217,7 +218,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		tx:          r.tx,
 		txFrom:      r.txFrom,
 	}
-	MetaMaskFix.CleanupStaleEntries()
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
@@ -313,7 +313,6 @@ func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
 	if rpcError.Message == "Bundle submitted has already failed too many times" {
 		MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())] = Now()
 		r.log("rawTx with hash %s added to blocklist. entries: %d", r.tx.Hash().Hex(), len(MetaMaskFix.blacklistedRawTx))
-		MetaMaskFix.CleanupStaleEntries()
 
 		// fmt.Println("NONCE", nonce, "for", r.txFrom)
 		MetaMaskFix.accountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{

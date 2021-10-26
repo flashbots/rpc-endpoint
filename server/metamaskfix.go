@@ -24,14 +24,14 @@ func NewMetaMaskFixer() metaMaskFixer {
 
 func (mmf *metaMaskFixer) CleanupStaleEntries() {
 	for key, entry := range mmf.rawTransactionSubmission {
-		if time.Since(entry.submittedAt) > 4*time.Hour {
+		if time.Since(entry.submittedAt).Hours() > 4 {
 			delete(mmf.rawTransactionSubmission, key)
 			delete(mmf.accountAndNonce, entry.txFrom)
 		}
 	}
 
 	for key, entry := range mmf.blacklistedRawTx {
-		if time.Since(entry) > 4*time.Hour {
+		if time.Since(entry).Hours() > 4 {
 			delete(mmf.blacklistedRawTx, key)
 		}
 	}
