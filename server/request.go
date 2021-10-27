@@ -4,6 +4,7 @@ Request represents an incoming client request
 package server
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -29,6 +30,7 @@ type RpcRequest struct {
 	txManagerUrl    string
 	relayUrl        string
 	useRelay        bool
+	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
 	body     []byte
@@ -44,7 +46,7 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string, relayUrl string, useRelay bool) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
@@ -54,6 +56,7 @@ func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl strin
 		txManagerUrl:    txManagerUrl,
 		relayUrl:        relayUrl,
 		useRelay:        useRelay,
+		relaySigningKey: relaySigningKey,
 	}
 }
 
@@ -414,7 +417,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	txForwardedToRelay[txHash] = Now()
 
 	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", r.rawTxHex)
-	backendResp, err := SendRpcAndParseResponseTo(r.relayUrl, jsonRpcReq)
+	backendResp, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
 	if err != nil {
 		r.logError("[sendTxToRelay] failed for %s: %s", txHash, err)
 		r.writeHeaderStatus(http.StatusInternalServerError)

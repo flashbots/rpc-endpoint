@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
@@ -9,7 +10,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 )
 
@@ -109,6 +113,51 @@ func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcRespons
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read")
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
+	jsonRpcResp := new(JsonRpcResponse)
+	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+		return nil, errors.Wrap(err, "unmarshal")
+	}
+
+	return jsonRpcResp, nil
+}
+
+func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *JsonRpcRequest) (*JsonRpcResponse, error) {
+	body, err := json.Marshal(jsonRpcReq)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal")
+	}
+
+	hashedBody := crypto.Keccak256Hash([]byte(body)).Hex()
+	sig, err := crypto.Sign(accounts.TextHash([]byte(hashedBody)), privKey)
+	if err != nil {
+		return nil, err
+	}
+	signature := crypto.PubkeyToAddress(privKey.PublicKey).Hex() + ":" + hexutil.Encode(sig)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("X-Flashbots-Signature", signature)
+	httpClient := &http.Client{
+		Timeout: time.Second * 30,
+	}
+
+	response, err := httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "post")
+	}
+	defer response.Body.Close()
+
+	respData, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read")
 	}

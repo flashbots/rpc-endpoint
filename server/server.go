@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"io"
 	"log"
@@ -21,37 +22,39 @@ var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
 var MetaMaskFix = NewMetaMaskFixer()
 
 type RpcEndPointServer struct {
-	listenAddress string
-	proxyUrl      string
-	txManagerUrl  string
-	relayUrl      string
-	useRelay      bool
+	listenAddress   string
+	proxyUrl        string
+	txManagerUrl    string
+	relayUrl        string
+	useRelay        bool
+	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool) *RpcEndPointServer {
+func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
 	return &RpcEndPointServer{
-		listenAddress: listenAddress,
-		proxyUrl:      proxyUrl,
-		txManagerUrl:  txManagerUrl,
-		relayUrl:      relayUrl,
-		useRelay:      useRelay,
+		listenAddress:   listenAddress,
+		proxyUrl:        proxyUrl,
+		txManagerUrl:    txManagerUrl,
+		relayUrl:        relayUrl,
+		useRelay:        useRelay,
+		relaySigningKey: relaySigningKey,
 	}
 }
 
-func (r *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v (using relay %v)...", r.listenAddress, r.useRelay)
+func (s *RpcEndPointServer) Start() {
+	log.Printf("Starting rpc endpoint at %v (using relay %v)...", s.listenAddress, s.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", http.HandlerFunc(r.HandleHttpRequest))
-	http.HandleFunc("/health", http.HandlerFunc(r.handleHealthRequest))
+	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
+	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
 
 	// Start serving
-	if err := http.ListenAndServe(r.listenAddress, nil); err != nil {
+	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
 
-func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
+func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 
@@ -65,11 +68,11 @@ func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, r.proxyUrl, r.txManagerUrl, r.relayUrl, r.useRelay)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.txManagerUrl, s.relayUrl, s.useRelay, s.relaySigningKey)
 	request.process()
 }
 
-func (r *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.WriteHeader(http.StatusOK)
 	msg := fmt.Sprintf("All systems OK: %s", time.Now().UTC())
 	io.WriteString(respw, msg)

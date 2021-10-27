@@ -5,21 +5,34 @@ package test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var RpcBackendServerUrl string
+
+var relaySigningKey *ecdsa.PrivateKey
+
+func init() {
+	var err error
+	relaySigningKey, err = crypto.HexToECDSA("7bdeed70a07d5a45546e83a88dd430f71348592e747d2d3eb23f32db003eb0e1")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func setServerTimeNowOffset(td time.Duration) {
 	server.Now = func() time.Time {
@@ -31,11 +44,13 @@ func setServerTimeNowOffset(td time.Duration) {
 func resetTestServers(useRelay bool) {
 	// Create a fresh mock backend server
 	rpcBackendServer := httptest.NewServer(http.HandlerFunc(RpcBackendHandler))
-	MockBackendLastRequest = nil
 	RpcBackendServerUrl = rpcBackendServer.URL
+	MockBackendLastRawRequest = nil
+	MockBackendLastJsonRpcRequest = nil
+	MockBackendLastJsonRpcRequestTimestamp = time.Time{}
 
 	// Create a fresh RPC endpoint server
-	s := server.NewRpcEndPointServer("", rpcBackendServer.URL, rpcBackendServer.URL, rpcBackendServer.URL, useRelay)
+	s := server.NewRpcEndPointServer("", rpcBackendServer.URL, rpcBackendServer.URL, rpcBackendServer.URL, useRelay, relaySigningKey)
 	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(s.HandleHttpRequest))
 	RpcEndpointUrl = rpcEndpointServer.URL
 
@@ -83,7 +98,6 @@ func TestJsonRpc(t *testing.T) {
 	rpcResult2 := sendRpcAndParseResponseOrFailNow(t, rpcRequest2)
 	assert.Equal(t, _id2, rpcResult2.Id)
 	assert.Equal(t, "2.0", rpcResult2.Version)
-
 }
 
 /*
@@ -280,9 +294,16 @@ func TestRelayTx(t *testing.T) {
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
 	r1 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
 	require.Nil(t, r1.Error)
-	require.Equal(t, "eth_sendPrivateTransaction", MockBackendLastRequest.Method)
-	require.Equal(t, TestTx_BundleFailedTooManyTimes_RawTx, MockBackendLastRequest.Params[0])
 
+	// Ensure that request called eth_sendPrivateTransaction with correct param
+	require.Equal(t, "eth_sendPrivateTransaction", MockBackendLastJsonRpcRequest.Method)
+	require.Equal(t, TestTx_BundleFailedTooManyTimes_RawTx, MockBackendLastJsonRpcRequest.Params[0])
+
+	// Ensure that request was signed properly
+	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
+	require.Equal(t, pubkey+":0xb09baae28a9f734157909d86c6a5cf2925af6f82af37748b02e527a28e32772849876dc70c5347d770e8e9e38f3f9e51f539b0c7503618659da1f877803f7a4d00", MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+
+	// Check result - should be the tx hash
 	var res string
 	json.Unmarshal(r1.Result, &res)
 	require.Equal(t, TestTx_BundleFailedTooManyTimes_Hash, res)

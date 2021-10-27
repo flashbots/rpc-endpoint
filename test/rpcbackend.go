@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/flashbots/rpc-endpoint/server"
 )
@@ -18,10 +19,12 @@ var getBundleStatusByTransactionHash_Response = server.GetBundleStatusByTransact
 	Status: "FAILED_BUNDLE",
 }
 
-var MockBackendLastRequest *server.JsonRpcRequest
+var MockBackendLastRawRequest *http.Request
+var MockBackendLastJsonRpcRequest *server.JsonRpcRequest
+var MockBackendLastJsonRpcRequestTimestamp time.Time
 
 func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error) {
-	MockBackendLastRequest = req
+	MockBackendLastJsonRpcRequest = req
 
 	switch req.Method {
 	case "eth_getTransactionCount":
@@ -69,6 +72,9 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 
 func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
+	MockBackendLastRawRequest = req
+	MockBackendLastJsonRpcRequestTimestamp = server.Now()
+
 	log.Printf("%s %s %s\n", req.RemoteAddr, req.Method, req.URL)
 
 	w.Header().Set("Content-Type", "application/json")
