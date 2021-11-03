@@ -42,7 +42,7 @@ func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v (using relay %v)...", s.listenAddress, s.useRelay)
+	log.Printf("Starting rpc endpoint at %v (using relay: %v)...", s.listenAddress, s.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))

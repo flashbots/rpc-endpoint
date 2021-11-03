@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flashbots/rpc-endpoint/server"
@@ -25,8 +27,8 @@ var proxyUrl = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl
 var txManagerUrl = flag.String("txmgr", getEnvOrDefault("TX_MANAGER_URL", defaultTxManagerUrl), "URL for tx manager")
 
 // Flags for using the relay
-var useRelay = flag.Bool("useRelay", false, "Use relay instead of tx-manager")
-var relayUrl = flag.String("relay", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
+var useRelay = flag.Bool("relay", false, "Use relay instead of tx-manager")
+var relayUrl = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 var relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
 
 func main() {
@@ -38,17 +40,26 @@ func main() {
 		return
 	}
 
+	log.Printf("rpc-endpoint %s\n", version)
+
 	if *useRelay && *relaySigningKey == "" {
 		log.Fatal("Cannot use the relay without a signing key.")
 	}
 
-	// Start the endpoint
-	log.Printf("rpc-endpoint %s\n", version)
-	key, err := crypto.HexToECDSA(*relaySigningKey)
-	if err != nil {
-		log.Fatal(err)
+	var key *ecdsa.PrivateKey
+	var err error
+
+	if *useRelay {
+		if strings.HasPrefix(*relaySigningKey, "0x") {
+			*relaySigningKey = (*relaySigningKey)[2:]
+		}
+		key, err = crypto.HexToECDSA(*relaySigningKey)
+		if err != nil {
+			log.Fatal("Invalid relay signing key", err)
+		}
 	}
 
+	// Start the endpoint
 	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl, *txManagerUrl, *relayUrl, *useRelay, key)
 	s.Start()
 }

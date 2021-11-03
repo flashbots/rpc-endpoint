@@ -416,10 +416,12 @@ func (r *RpcRequest) sendTxToRelay() {
 	r.log("[sendTxToRelay] sending %s", txHash)
 	txForwardedToRelay[txHash] = Now()
 
-	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", r.rawTxHex)
-	backendResp, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
+	param := make(map[string]string)
+	param["tx"] = r.rawTxHex
+	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
+	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
 	if err != nil {
-		r.logError("[sendTxToRelay] failed for %s: %s", txHash, err)
+		r.logError("[sendTxToRelay] failed for %s: %s - data: %s", txHash, err, *respBytes)
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}

@@ -126,22 +126,23 @@ func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcRespons
 	return jsonRpcResp, nil
 }
 
-func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *JsonRpcRequest) (*JsonRpcResponse, error) {
+func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *JsonRpcRequest) (jsonRpcResponse *JsonRpcResponse, responseBytes *[]byte, err error) {
 	body, err := json.Marshal(jsonRpcReq)
 	if err != nil {
-		return nil, errors.Wrap(err, "marshal")
+		return nil, nil, errors.Wrap(err, "marshal")
 	}
 
+	// fmt.Printf("body: %s\n", body)
 	hashedBody := crypto.Keccak256Hash([]byte(body)).Hex()
 	sig, err := crypto.Sign(accounts.TextHash([]byte(hashedBody)), privKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	signature := crypto.PubkeyToAddress(privKey.PublicKey).Hex() + ":" + hexutil.Encode(sig)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
@@ -153,20 +154,21 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 
 	response, err := httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "post")
+		return nil, nil, errors.Wrap(err, "post")
 	}
 	defer response.Body.Close()
 
 	respData, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "read")
+		return nil, nil, errors.Wrap(err, "read")
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
 	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
-		return nil, errors.Wrap(err, "unmarshal")
+		// fmt.Printf("unmarshal error. data: %s\n", respData)
+		return nil, &respData, errors.Wrap(err, "unmarshal")
 	}
 
-	return jsonRpcResp, nil
+	return jsonRpcResp, nil, nil
 }
