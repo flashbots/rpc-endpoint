@@ -49,8 +49,9 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 		}
 
 	case "eth_sendPrivateTransaction":
-		fmt.Println("BE eth_sendPrivateTransaction", req.Params[0])
-		if req.Params[0] == TestTx_BundleFailedTooManyTimes_RawTx {
+		param := req.Params[0].(map[string]interface{})
+		fmt.Println("BE eth_sendPrivateTransaction", param)
+		if param["tx"] == TestTx_BundleFailedTooManyTimes_RawTx {
 			return TestTx_BundleFailedTooManyTimes_Hash, nil
 		} else {
 			return "some-tx-hash", nil

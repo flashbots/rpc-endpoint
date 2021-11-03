@@ -297,14 +297,23 @@ func TestRelayTx(t *testing.T) {
 
 	// Ensure that request called eth_sendPrivateTransaction with correct param
 	require.Equal(t, "eth_sendPrivateTransaction", MockBackendLastJsonRpcRequest.Method)
-	require.Equal(t, TestTx_BundleFailedTooManyTimes_RawTx, MockBackendLastJsonRpcRequest.Params[0])
+
+	resp := MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
+	require.Equal(t, TestTx_BundleFailedTooManyTimes_RawTx, resp["tx"])
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0xb09baae28a9f734157909d86c6a5cf2925af6f82af37748b02e527a28e32772849876dc70c5347d770e8e9e38f3f9e51f539b0c7503618659da1f877803f7a4d00", MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0x5adece0bfbb877bf59e8793ce49cee8c9a772e831f57b20409c98d1ac4e3dc800702567414f4045b660c68ca381e369730a19c0b4729491dd43fa5c05247e5a701", MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
 	json.Unmarshal(r1.Result, &res)
 	require.Equal(t, TestTx_BundleFailedTooManyTimes_Hash, res)
+
+	timeStampFirstRequest := MockBackendLastJsonRpcRequestTimestamp
+
+	// Send tx again, should not arrive at backend
+	sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
+	require.Nil(t, r1.Error)
+	require.Equal(t, timeStampFirstRequest, MockBackendLastJsonRpcRequestTimestamp)
 }
