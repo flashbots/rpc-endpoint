@@ -119,7 +119,7 @@ func TestMetamaskEthGetTransactionCount(t *testing.T) {
 	// second sendRawTransaction call: is blocked because it's in MM cache
 	r2 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
 	require.NotNil(t, r2.Error)
-	require.Equal(t, "rawTx blocked because bundle failed too many times", r2.Error.Message)
+	require.Equal(t, "rawTx blocked", r2.Error.Message)
 
 	// Next 4 getTransactionCount calls should return wrong result (to make MM fail the tx)
 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)

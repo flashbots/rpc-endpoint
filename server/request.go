@@ -147,7 +147,7 @@ func (r *RpcRequest) process() {
 			return
 		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
-		} else if r.jsonReq.Method == "net_version" {
+		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
 			return
 		}
@@ -200,7 +200,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())]; isBlacklistedTx {
-		msg := "rawTx blocked because bundle failed too many times"
+		msg := "rawTx blocked"
 		r.log(msg)
 		r.writeRpcError(msg)
 		return
@@ -215,11 +215,13 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
 
-	// Remember time when tx was received and cleanup old entries
-	MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())] = &mmRawTxTracker{
-		submittedAt: Now(),
-		tx:          r.tx,
-		txFrom:      r.txFrom,
+	// Remember time when tx was received
+	if _, found := MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())]; !found {
+		MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())] = &mmRawTxTracker{
+			submittedAt: Now(),
+			tx:          r.tx,
+			txFrom:      r.txFrom,
+		}
 	}
 
 	if isOnOFACList(r.txFrom) {

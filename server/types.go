@@ -59,3 +59,9 @@ type GetBundleStatusByTransactionHashResponse struct {
 	ReceivedTimestamp int    `json:"receivedTimestamp"` // 1634568851003
 	StatusTimestamp   int    `json:"statusTimestamp"`   // 1634568873862
 }
+
+type PrivateTxApiResponse struct {
+	Status         string `json:"status"`
+	Hash           string `json:"hash"`
+	MaxBlockNumber int    `json:"maxBlockNumber"`
+}

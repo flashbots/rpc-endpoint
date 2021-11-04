@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -28,35 +30,18 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	minutesSinceSubmission := td.Minutes()
 	r.log("[MM2] check_post_getTransactionReceipt for tx %s - submittedAt %.2f min ago", txHash, minutesSinceSubmission)
 
-	if minutesSinceSubmission < 14 { // do nothing until at least 14 minutes passed
+	maxTime := 14
+	if r.useRelay {
+		maxTime = 1 // 25 blocks max
+	}
+
+	if minutesSinceSubmission < float64(maxTime) { // do nothing until at least 14 minutes passed
 		return
 	}
 
 	r.log("[MM2] eth_getTransactionReceipt result came back empty and > time threshold: tx %s", txHash)
 
-	// result null, and sent before, but more than time threshold ago. Call eth_getBundleStatusByTransactionHash on BE now
-	req := NewJsonRpcRequest1(1, "eth_getBundleStatusByTransactionHash", txHash)
-	backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
-	if err != nil {
-		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s: %s", txHash, err)
-		return
-	}
-	if backendResp.Error != nil {
-		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error.Message)
-		return
-	}
-	r.log("[MM2] BE response: %s", string(backendResp.Result))
-
-	statusResponse := new(GetBundleStatusByTransactionHashResponse)
-	err = json.Unmarshal(backendResp.Result, &statusResponse)
-	if err != nil {
-		r.logError("[MM2] eth_getBundleStatusByTransactionHash failed unmarshal rpc result for %s: %s - %s", txHash, jsonResp.Result, err)
-		return
-	}
-
-	// r.log("[MM2] BE response: %d, %v", statusResponse)
-
-	if statusResponse.Status == "FAILED_BUNDLE" {
+	setMmNonceFix := func(txHash string) {
 		r.log("[MM2] blacklisted tx hash, will receive too high of a nonce")
 		mmRawTxTrack, found := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
 		if !found {
@@ -67,6 +52,61 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 		MetaMaskFix.blacklistedRawTx[strings.ToLower(txHash)] = Now()
 		MetaMaskFix.accountAndNonce[strings.ToLower(mmRawTxTrack.txFrom)] = &mmNonceHelper{
 			Nonce: 1e9,
+		}
+	}
+
+	if r.useRelay {
+		// call private-tx-api
+		privTxApiUrl := fmt.Sprintf("http://3.21.58.202/tx/%s", txHash)
+		resp, err := http.Get(privTxApiUrl)
+		if err != nil {
+			r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			r.logError("[MM2] privTxApi call body-read failed for %s (BE error): %s", txHash, err)
+			return
+		}
+
+		r.log("[MM2] BE response: %s", string(bodyBytes))
+		respObj := new(PrivateTxApiResponse)
+		err = json.Unmarshal(bodyBytes, respObj)
+		if err != nil {
+			r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHash, err)
+			return
+		}
+
+		if respObj.Status == "FAILED" {
+			setMmNonceFix(txHash)
+		}
+
+	} else {
+		// call TxManager:eth_getBundleStatusByTransactionHash
+		req := NewJsonRpcRequest1(1, "eth_getBundleStatusByTransactionHash", txHash)
+		backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
+		if err != nil {
+			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s: %s", txHash, err)
+			return
+		}
+		if backendResp.Error != nil {
+			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error.Message)
+			return
+		}
+		r.log("[MM2] BE response: %s", string(backendResp.Result))
+
+		statusResponse := new(GetBundleStatusByTransactionHashResponse)
+		err = json.Unmarshal(backendResp.Result, &statusResponse)
+		if err != nil {
+			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed unmarshal rpc result for %s: %s - %s", txHash, jsonResp.Result, err)
+			return
+		}
+
+		// r.log("[MM2] BE response: %d, %v", statusResponse)
+		if statusResponse.Status == "FAILED_BUNDLE" {
+			setMmNonceFix(txHash)
 		}
 	}
 }
