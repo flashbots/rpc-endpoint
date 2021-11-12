@@ -31,11 +31,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	r.log("[MM2] check_post_getTransactionReceipt for tx %s - submittedAt %.2f min ago", txHash, minutesSinceSubmission)
 
 	maxTime := 14
-	if r.useRelay {
-		maxTime = 1 // 25 blocks max
-	}
-
-	if minutesSinceSubmission < float64(maxTime) { // do nothing until at least 14 minutes passed
+	if minutesSinceSubmission < float64(maxTime) { // do nothing until `maxTime` minutes passed
 		return
 	}
 
