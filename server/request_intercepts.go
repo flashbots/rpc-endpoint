@@ -32,10 +32,10 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 
 	maxTime := 14
 	if r.useRelay {
-		maxTime = 1 // 25 blocks max
+		maxTime = 1 // for relay, can query the status API immediately
 	}
 
-	if minutesSinceSubmission < float64(maxTime) { // do nothing until at least 14 minutes passed
+	if minutesSinceSubmission < float64(maxTime) { // do nothing until `maxTime` minutes passed
 		return
 	}
 
@@ -57,7 +57,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 
 	if r.useRelay {
 		// call private-tx-api
-		privTxApiUrl := fmt.Sprintf("http://3.21.58.202/tx/%s", txHash)
+		privTxApiUrl := fmt.Sprintf("https://protect.flashbots.net/tx/%s", txHash)
 		resp, err := http.Get(privTxApiUrl)
 		if err != nil {
 			r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)
@@ -71,14 +71,15 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 			return
 		}
 
-		r.log("[MM2] BE response: %s", string(bodyBytes))
 		respObj := new(PrivateTxApiResponse)
 		err = json.Unmarshal(bodyBytes, respObj)
 		if err != nil {
+			r.log("[MM2] priv-tx-api response: %s", string(bodyBytes))
 			r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHash, err)
 			return
 		}
 
+		r.log("[MM2] priv-tx-api status: %s", respObj.Status)
 		if respObj.Status == "FAILED" {
 			setMmNonceFix(txHash)
 		}
