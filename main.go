@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Start the endpoint
-	s := server.NewRpcEndPointServer(*listenAddress, *proxyUrl, *txManagerUrl, *relayUrl, *useRelay, key)
+	s := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *txManagerUrl, *relayUrl, *useRelay, key)
 	s.Start()
 }
 

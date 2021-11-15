@@ -2,8 +2,7 @@ package server
 
 import (
 	"crypto/ecdsa"
-	"fmt"
-	"io"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -22,6 +21,7 @@ var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
 var MetaMaskFix = NewMetaMaskFixer()
 
 type RpcEndPointServer struct {
+	version         string
 	listenAddress   string
 	proxyUrl        string
 	txManagerUrl    string
@@ -30,8 +30,9 @@ type RpcEndPointServer struct {
 	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
 	return &RpcEndPointServer{
+		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
 		txManagerUrl:    txManagerUrl,
@@ -42,7 +43,7 @@ func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string, relayUrl
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v (using relay: %v)...", s.listenAddress, s.useRelay)
+	log.Printf("Starting rpc endpoint v%s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
@@ -72,10 +73,26 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 	request.process()
 }
 
+type HealthResponse struct {
+	Now     time.Time `json:"time"`
+	Version string    `json:"version"`
+}
+
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	res := HealthResponse{
+		Now:     time.Now(),
+		Version: s.version,
+	}
+
+	jsonResp, err := json.Marshal(res)
+	if err != nil {
+		log.Panicln("healthCheck json error:", err)
+		respw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	respw.WriteHeader(http.StatusOK)
-	msg := fmt.Sprintf("All systems OK: %s", time.Now().UTC())
-	io.WriteString(respw, msg)
+	respw.Write(jsonResp)
 }
 
 func IsBlacklisted(ip string) bool {

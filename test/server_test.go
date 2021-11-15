@@ -50,7 +50,7 @@ func resetTestServers(useRelay bool) {
 	MockBackendLastJsonRpcRequestTimestamp = time.Time{}
 
 	// Create a fresh RPC endpoint server
-	s := server.NewRpcEndPointServer("", rpcBackendServer.URL, rpcBackendServer.URL, rpcBackendServer.URL, useRelay, relaySigningKey)
+	s := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, rpcBackendServer.URL, useRelay, relaySigningKey)
 	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(s.HandleHttpRequest))
 	RpcEndpointUrl = rpcEndpointServer.URL
 
