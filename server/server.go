@@ -17,6 +17,14 @@ var blacklistedIps = []string{"127.0.0.2"}
 // Transactions should only be sent once to the relay
 var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
 
+func cleanupOldRelayForwardings() {
+	for txHash, t := range txForwardedToRelay {
+		if time.Since(t).Minutes() > 20 {
+			delete(txForwardedToRelay, txHash)
+		}
+	}
+}
+
 // Metamask fix helper
 var MetaMaskFix = NewMetaMaskFixer()
 
@@ -45,7 +53,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl 
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint v%s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
+	log.Printf("Starting rpc endpoint %s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))

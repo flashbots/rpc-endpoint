@@ -408,6 +408,9 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
+	cleanupOldRelayForwardings() // forwards should only be blocked for a specific time
+
+	// Check if tx was already forwarded and should be blocked now
 	txHash := r.tx.Hash().Hex()
 	if _, wasAlreadyForwarded := txForwardedToRelay[txHash]; wasAlreadyForwarded {
 		r.log("[sendTxToRelay] already sent %s", txHash)
