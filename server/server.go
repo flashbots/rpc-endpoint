@@ -22,6 +22,7 @@ var MetaMaskFix = NewMetaMaskFixer()
 
 type RpcEndPointServer struct {
 	version         string
+	startTime       time.Time
 	listenAddress   string
 	proxyUrl        string
 	txManagerUrl    string
@@ -32,6 +33,7 @@ type RpcEndPointServer struct {
 
 func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
 	return &RpcEndPointServer{
+		startTime:       Now(),
 		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
@@ -74,14 +76,16 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 }
 
 type HealthResponse struct {
-	Now     time.Time `json:"time"`
-	Version string    `json:"version"`
+	Now       time.Time `json:"time"`
+	StartTime time.Time `json:"startTime"`
+	Version   string    `json:"version"`
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
 	res := HealthResponse{
-		Now:     time.Now(),
-		Version: s.version,
+		Now:       Now(),
+		StartTime: s.startTime,
+		Version:   s.version,
 	}
 
 	jsonResp, err := json.Marshal(res)
