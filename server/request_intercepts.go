@@ -21,6 +21,8 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	}
 
 	txHash := r.jsonReq.Params[0].(string)
+
+	// Make sure transaction was submitted before
 	rawTxSubmission, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
 	if !txFound {
 		return

@@ -199,10 +199,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())]; isBlacklistedTx {
-		msg := "rawTx blocked"
-		r.log(msg)
-		r.writeRpcError(msg)
+	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+
+	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[txHashLower]; isBlacklistedTx {
+		r.log("tx blocked - is on metamask-fix-blacklist")
+		r.writeRpcError("rawTx blocked")
 		return
 	}
 
@@ -215,9 +216,15 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
 
+	if r.tx.Nonce() >= 1e9 {
+		r.log("tx blocked - nonce too high: %d", r.tx.Nonce())
+		r.writeRpcError("tx rejected - nonce too high")
+		return
+	}
+
 	// Remember time when tx was received
-	if _, found := MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())]; !found {
-		MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())] = &mmRawTxTracker{
+	if _, found := MetaMaskFix.rawTransactionSubmission[txHashLower]; !found {
+		MetaMaskFix.rawTransactionSubmission[txHashLower] = &mmRawTxTracker{
 			submittedAt: Now(),
 			tx:          r.tx,
 			txFrom:      r.txFrom,
