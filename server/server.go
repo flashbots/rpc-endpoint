@@ -33,27 +33,23 @@ type RpcEndPointServer struct {
 	startTime       time.Time
 	listenAddress   string
 	proxyUrl        string
-	txManagerUrl    string
 	relayUrl        string
-	useRelay        bool
 	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		startTime:       Now(),
 		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
-		txManagerUrl:    txManagerUrl,
 		relayUrl:        relayUrl,
-		useRelay:        useRelay,
 		relaySigningKey: relaySigningKey,
 	}
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint %s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
+	log.Printf("Starting rpc endpoint %s at %v...", s.version, s.listenAddress)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
@@ -79,7 +75,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, s.proxyUrl, s.txManagerUrl, s.relayUrl, s.useRelay, s.relaySigningKey)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relayUrl, s.relaySigningKey)
 	request.process()
 }
 

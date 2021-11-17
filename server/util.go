@@ -126,6 +126,10 @@ func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcRespons
 	return jsonRpcResp, nil
 }
 
+type RelayErrorResponse struct {
+	Error string `json:"error"`
+}
+
 func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *JsonRpcRequest) (jsonRpcResponse *JsonRpcResponse, responseBytes *[]byte, err error) {
 	body, err := json.Marshal(jsonRpcReq)
 	if err != nil {
@@ -163,12 +167,19 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 		return nil, nil, errors.Wrap(err, "read")
 	}
 
-	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
+	errorResp := new(RelayErrorResponse)
+	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
+		// relay returned an error. Convert to standard JSON-RPC error
+		jsonRpcResp.Error = &JsonRpcError{Message: errorResp.Error}
+		return jsonRpcResp, &respData, nil
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
 	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
 		// fmt.Printf("unmarshal error. data: %s\n", respData)
 		return nil, &respData, errors.Wrap(err, "unmarshal")
 	}
 
-	return jsonRpcResp, nil, nil
+	return jsonRpcResp, &respData, nil
 }

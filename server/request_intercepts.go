@@ -6,10 +6,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"time"
 )
 
-// Check if getTransactionReceipt of a submitted tx is null. If submitted longer than time threshold ago, query TxManager BE to see if tx failed.
+// If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
@@ -23,25 +22,11 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	txHash := r.jsonReq.Params[0].(string)
 
 	// Make sure transaction was submitted before
-	rawTxSubmission, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
-	if !txFound {
+	if _, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]; !txFound {
 		return
 	}
 
-	td := time.Since(rawTxSubmission.submittedAt)
-	minutesSinceSubmission := td.Minutes()
-	r.log("[MM2] check_post_getTransactionReceipt for tx %s - submittedAt %.2f min ago", txHash, minutesSinceSubmission)
-
-	maxTime := 14
-	if r.useRelay {
-		maxTime = 1 // for relay, can query the status API immediately
-	}
-
-	if minutesSinceSubmission < float64(maxTime) { // do nothing until `maxTime` minutes passed
-		return
-	}
-
-	r.log("[MM2] eth_getTransactionReceipt result came back empty and > time threshold: tx %s", txHash)
+	r.log("[MM2] eth_getTransactionReceipt is null for known tx %s", txHash)
 
 	setMmNonceFix := func(txHash string) {
 		r.log("[MM2] blacklisted tx hash, will receive too high of a nonce")
@@ -57,60 +42,32 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 		}
 	}
 
-	if r.useRelay {
-		// call private-tx-api
-		privTxApiUrl := fmt.Sprintf("https://protect.flashbots.net/tx/%s", txHash)
-		resp, err := http.Get(privTxApiUrl)
-		if err != nil {
-			r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)
-			return
-		}
-		defer resp.Body.Close()
+	// call private-tx-api
+	privTxApiUrl := fmt.Sprintf("https://protect.flashbots.net/tx/%s", txHash)
+	resp, err := http.Get(privTxApiUrl)
+	if err != nil {
+		r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)
+		return
+	}
+	defer resp.Body.Close()
 
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			r.logError("[MM2] privTxApi call body-read failed for %s (BE error): %s", txHash, err)
-			return
-		}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		r.logError("[MM2] privTxApi call body-read failed for %s (BE error): %s", txHash, err)
+		return
+	}
 
-		respObj := new(PrivateTxApiResponse)
-		err = json.Unmarshal(bodyBytes, respObj)
-		if err != nil {
-			r.log("[MM2] priv-tx-api response: %s", string(bodyBytes))
-			r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHash, err)
-			return
-		}
+	respObj := new(PrivateTxApiResponse)
+	err = json.Unmarshal(bodyBytes, respObj)
+	if err != nil {
+		r.log("[MM2] priv-tx-api response: %s", string(bodyBytes))
+		r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHash, err)
+		return
+	}
 
-		r.log("[MM2] priv-tx-api status: %s", respObj.Status)
-		if respObj.Status == "FAILED" {
-			setMmNonceFix(txHash)
-		}
-
-	} else {
-		// call TxManager:eth_getBundleStatusByTransactionHash
-		req := NewJsonRpcRequest1(1, "eth_getBundleStatusByTransactionHash", txHash)
-		backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
-		if err != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s: %s", txHash, err)
-			return
-		}
-		if backendResp.Error != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error.Message)
-			return
-		}
-		r.log("[MM2] BE response: %s", string(backendResp.Result))
-
-		statusResponse := new(GetBundleStatusByTransactionHashResponse)
-		err = json.Unmarshal(backendResp.Result, &statusResponse)
-		if err != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed unmarshal rpc result for %s: %s - %s", txHash, jsonResp.Result, err)
-			return
-		}
-
-		// r.log("[MM2] BE response: %d, %v", statusResponse)
-		if statusResponse.Status == "FAILED_BUNDLE" {
-			setMmNonceFix(txHash)
-		}
+	r.log("[MM2] priv-tx-api status: %s", respObj.Status)
+	if respObj.Status == "FAILED" {
+		setMmNonceFix(txHash)
 	}
 }
 

@@ -27,9 +27,7 @@ type RpcRequest struct {
 	uid             string
 	timeStarted     time.Time
 	defaultProxyUrl string
-	txManagerUrl    string
 	relayUrl        string
-	useRelay        bool
 	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
@@ -46,16 +44,14 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
 		uid:             uuid.New().String(),
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
-		txManagerUrl:    txManagerUrl,
 		relayUrl:        relayUrl,
-		useRelay:        useRelay,
 		relaySigningKey: relaySigningKey,
 	}
 }
@@ -244,24 +240,17 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	target := "mempool"
-	url := r.defaultProxyUrl
 	if needsProtection {
-		if r.useRelay {
-			r.sendTxToRelay()
-			return
-		}
-
-		target = "TxManager"
-		url = r.txManagerUrl
+		r.sendTxToRelay()
+		return
 	}
 
-	// Proxy now!
-	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(url)
+	// Proxy to public node now
+	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
-		r.log("Proxy to %s failed: eth_sendRawTransaction", target)
+		r.logError("Proxy to mempool failed: eth_sendRawTransaction")
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
@@ -269,18 +258,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Write JSON-RPC response now
 	r.writeHeaderContentTypeJson()
 	r.writeHeaderStatus(proxyHttpStatus)
-	if jsonResp.Error != nil {
-		r.log("Proxy to %s successful: eth_sendRawTransaction - with JSON-RPC Error %s", target, jsonResp.Error.Message)
+	r._writeRpcResponse(jsonResp)
 
-		// write the original response to the user
-		r._writeRpcResponse(jsonResp)
-		return
+	if jsonResp.Error != nil {
+		r.log("Proxied eth_sendRawTransaction to mempool - with JSON-RPC Error %s", jsonResp.Error.Message)
 	} else {
-		// TxManager returns bundle hash, but this call needs to return tx hash
-		txHash := r.tx.Hash().Hex()
-		r.writeRpcResult(txHash)
-		r.log("Proxy to %s successful: eth_sendRawTransaction - tx-hash: %s", target, txHash)
-		return
+		r.log("Proxied eth_sendRawTransaction to mempool")
 	}
 }
 
@@ -316,26 +299,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 		return false, proxyResp.StatusCode, jsonResp
 	}
 
-	// If JSON-RPC had an error response, parse but still pass back to user
-	if jsonRpcResp.Error != nil {
-		r.handleProxyError(jsonRpcResp.Error)
-	}
-
 	return true, proxyResp.StatusCode, jsonRpcResp
-}
-
-func (r *RpcRequest) handleProxyError(rpcError *JsonRpcError) {
-	r.log("proxy response json-rpc error: %s", rpcError.Message)
-
-	if rpcError.Message == "Bundle submitted has already failed too many times" {
-		MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())] = Now()
-		r.log("rawTx with hash %s added to blocklist. entries: %d", r.tx.Hash().Hex(), len(MetaMaskFix.blacklistedRawTx))
-
-		// fmt.Println("NONCE", nonce, "for", r.txFrom)
-		MetaMaskFix.accountAndNonce[strings.ToLower(r.txFrom)] = &mmNonceHelper{
-			Nonce: 1e9,
-		}
-	}
 }
 
 // Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
@@ -418,14 +382,14 @@ func (r *RpcRequest) sendTxToRelay() {
 	cleanupOldRelayForwardings() // forwards should only be blocked for a specific time
 
 	// Check if tx was already forwarded and should be blocked now
-	txHash := r.tx.Hash().Hex()
+	txHash := strings.ToLower(r.tx.Hash().Hex())
 	if _, wasAlreadyForwarded := txForwardedToRelay[txHash]; wasAlreadyForwarded {
 		r.log("[sendTxToRelay] already sent %s", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}
 
-	r.log("[sendTxToRelay] sending %s", txHash)
+	r.log("[sendTxToRelay] sending %s...", txHash)
 	txForwardedToRelay[txHash] = Now()
 
 	param := make(map[string]string)
@@ -433,16 +397,15 @@ func (r *RpcRequest) sendTxToRelay() {
 	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
 	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
 	if err != nil {
-		r.logError("[sendTxToRelay] failed for %s: %s - data: %s", txHash, err, *respBytes)
+		r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err, *respBytes)
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
 
 	if backendResp.Error != nil {
-		r.logError("[sendTxToRelay] failed for %s (BE error): %s", txHash, backendResp.Error.Message)
-		r.handleProxyError(backendResp.Error)
+		r.logError("[sendTxToRelay] relay returned an error for %s: %s", txHash, backendResp.Error.Message)
 	}
 
 	r._writeRpcResponse(backendResp)
-	r.log("[sendTxToRelay] done")
+	r.log("[sendTxToRelay] sent %s", txHash)
 }
