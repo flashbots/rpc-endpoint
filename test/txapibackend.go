@@ -6,11 +6,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
-)
 
-type TxApiResponse struct {
-	Status string `json:"status"`
-}
+	"github.com/flashbots/rpc-endpoint/server"
+)
 
 func TxApiHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
@@ -23,13 +21,13 @@ func TxApiHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	txHash := req.URL.Path[4:] // by default, the first 4 characters are "/tx/"
-	resp := TxApiResponse{Status: "UNKNOWN"}
+	resp := server.PrivateTxApiResponse{Status: "UNKNOWN"}
 
 	if txHash == TestTx_MM2_Hash {
 		resp.Status = "FAILED"
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("error writing response 2: %v - data: %s", err, resp)
+		log.Printf("error writing response 2: %v - data: %v", err, resp)
 	}
 }

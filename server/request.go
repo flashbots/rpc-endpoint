@@ -132,7 +132,7 @@ func (r *RpcRequest) process() {
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
-	MetaMaskFix.CleanupStaleEntries()
+	State.cleanup()
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
@@ -197,12 +197,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
 
-	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[txHashLower]; isBlacklistedTx {
-		r.log("tx blocked - is on metamask-fix-blacklist")
-		r.writeRpcError("rawTx blocked")
-		return
-	}
-
 	// Get tx from address
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
@@ -213,19 +207,15 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.log("tx blocked - nonce too high: %d", r.tx.Nonce())
+		r.log("tx rejected - nonce too high: %d", r.tx.Nonce())
 		r.writeRpcError("tx rejected - nonce too high")
 		return
 	}
 
 	// Remember time when tx was received
-	if _, found := MetaMaskFix.rawTransactionSubmission[txHashLower]; !found {
-		MetaMaskFix.rawTransactionSubmission[txHashLower] = &mmRawTxTracker{
-			submittedAt: Now(),
-			tx:          r.tx,
-			txFrom:      r.txFrom,
-		}
-	}
+	txFromLower := strings.ToLower(r.txFrom)
+	State.txToUser[txHashLower] = NewStringWithTime(txFromLower)
+	State.userLatestTx[txFromLower] = NewStringWithTime(txHashLower)
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
@@ -379,8 +369,6 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
-	State.cleanup()
-
 	// Check if tx was already forwarded and should be blocked now
 	txHash := strings.ToLower(r.tx.Hash().Hex())
 	if _, wasAlreadyForwarded := State.txForwardedToRelay[txHash]; wasAlreadyForwarded {

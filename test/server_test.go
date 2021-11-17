@@ -58,7 +58,6 @@ func resetTestServers() {
 	RpcEndpointUrl = rpcEndpointServer.URL
 
 	// Reset the metamask fixer
-	server.MetaMaskFix = server.NewMetaMaskFixer()
 	server.State = server.NewGlobalState()
 }
 
