@@ -14,19 +14,9 @@ var Now = time.Now // used to mock time in tests
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
-// Transactions should only be sent once to the relay
-var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
-
-func cleanupOldRelayForwardings() {
-	for txHash, t := range txForwardedToRelay {
-		if time.Since(t).Minutes() > 20 {
-			delete(txForwardedToRelay, txHash)
-		}
-	}
-}
-
 // Metamask fix helper
 var MetaMaskFix = NewMetaMaskFixer()
+var State = NewGlobalState()
 
 type RpcEndPointServer struct {
 	version         string
@@ -77,12 +67,6 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 
 	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relayUrl, s.relaySigningKey)
 	request.process()
-}
-
-type HealthResponse struct {
-	Now       time.Time `json:"time"`
-	StartTime time.Time `json:"startTime"`
-	Version   string    `json:"version"`
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {

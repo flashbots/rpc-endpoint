@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type JsonRpcRequest struct {
@@ -64,4 +65,10 @@ type PrivateTxApiResponse struct {
 	Status         string `json:"status"`
 	Hash           string `json:"hash"`
 	MaxBlockNumber int    `json:"maxBlockNumber"`
+}
+
+type HealthResponse struct {
+	Now       time.Time `json:"time"`
+	StartTime time.Time `json:"startTime"`
+	Version   string    `json:"version"`
 }

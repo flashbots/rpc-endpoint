@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var ProtectTxApiHost = "https://protect.flashbots.net"
+
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
 	resultStr := string(jsonResp.Result)
@@ -43,7 +45,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	}
 
 	// call private-tx-api
-	privTxApiUrl := fmt.Sprintf("https://protect.flashbots.net/tx/%s", txHash)
+	privTxApiUrl := fmt.Sprintf("%s/tx/%s", ProtectTxApiHost, txHash)
 	resp, err := http.Get(privTxApiUrl)
 	if err != nil {
 		r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)

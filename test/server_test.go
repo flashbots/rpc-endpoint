@@ -34,20 +34,23 @@ func init() {
 	}
 }
 
-func setServerTimeNowOffset(td time.Duration) {
-	server.Now = func() time.Time {
-		return time.Now().Add(td)
-	}
-}
+// func setServerTimeNowOffset(td time.Duration) {
+// 	server.Now = func() time.Time {
+// 		return time.Now().Add(td)
+// 	}
+// }
 
 // Reset the RPC endpoint and mock backend servers
-func resetTestServers(useRelay bool) {
+func resetTestServers() {
 	// Create a fresh mock backend server (covers for both eth node and relay)
 	rpcBackendServer := httptest.NewServer(http.HandlerFunc(RpcBackendHandler))
 	RpcBackendServerUrl = rpcBackendServer.URL
 	MockBackendLastRawRequest = nil
 	MockBackendLastJsonRpcRequest = nil
 	MockBackendLastJsonRpcRequestTimestamp = time.Time{}
+
+	txApiServer := httptest.NewServer(http.HandlerFunc(TxApiHandler))
+	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
 	s := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey)
@@ -56,10 +59,11 @@ func resetTestServers(useRelay bool) {
 
 	// Reset the metamask fixer
 	server.MetaMaskFix = server.NewMetaMaskFixer()
+	server.State = server.NewGlobalState()
 }
 
 func init() {
-	resetTestServers(false)
+	resetTestServers()
 }
 
 /*
@@ -67,7 +71,7 @@ func init() {
  */
 // Check headers: status and content-type
 func TestStandardHeaders(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 
 	rpcRequest := server.NewJsonRpcRequest(1, "null", nil)
 	jsonData, err := json.Marshal(rpcRequest)
@@ -86,7 +90,7 @@ func TestStandardHeaders(t *testing.T) {
 
 // Check json-rpc id and version
 func TestJsonRpc(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 
 	_id1 := float64(84363)
 	rpcRequest := server.NewJsonRpcRequest(_id1, "null", nil)
@@ -103,46 +107,46 @@ func TestJsonRpc(t *testing.T) {
 /*
  * REQUEST TESTS
  */
-// Test intercepting eth_call for Flashbots RPC contract
-func TestMetamaskEthGetTransactionCount(t *testing.T) {
-	resetTestServers(false)
+// // Test intercepting eth_call for Flashbots RPC contract
+// func TestMetamaskEthGetTransactionCount(t *testing.T) {
+// 	resetTestServers()
 
-	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_BundleFailedTooManyTimes_From, "latest"})
-	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_BundleFailedTooManyTimes_From, "latest"})
+// 	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 
-	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
-	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
-	r1 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-	require.NotNil(t, r1.Error)
-	require.Equal(t, "Bundle submitted has already failed too many times", r1.Error.Message)
+// 	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+// 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
+// 	r1 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
+// 	require.NotNil(t, r1.Error)
+// 	require.Equal(t, "Bundle submitted has already failed too many times", r1.Error.Message)
 
-	// second sendRawTransaction call: is blocked because it's in MM cache
-	r2 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-	require.NotNil(t, r2.Error)
-	require.Equal(t, "rawTx blocked", r2.Error.Message)
+// 	// second sendRawTransaction call: is blocked because it's in MM cache
+// 	r2 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
+// 	require.NotNil(t, r2.Error)
+// 	require.Equal(t, "rawTx blocked", r2.Error.Message)
 
-	// Next 4 getTransactionCount calls should return wrong result (to make MM fail the tx)
-	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
-	require.Equal(t, "0x3b9aca01", valueAfter1, "getTxCount #1")
+// 	// Next 4 getTransactionCount calls should return wrong result (to make MM fail the tx)
+// 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
+// 	require.Equal(t, "0x3b9aca01", valueAfter1, "getTxCount #1")
 
-	valueAfter2 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	assert.Equal(t, valueAfter1, valueAfter2, "getTxCount #2")
+// 	valueAfter2 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	assert.Equal(t, valueAfter1, valueAfter2, "getTxCount #2")
 
-	valueAfter3 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	assert.Equal(t, valueAfter1, valueAfter3, "getTxCount #3")
+// 	valueAfter3 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	assert.Equal(t, valueAfter1, valueAfter3, "getTxCount #3")
 
-	valueAfter4 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	assert.Equal(t, valueAfter1, valueAfter4, "getTxCount #4")
+// 	valueAfter4 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	assert.Equal(t, valueAfter1, valueAfter4, "getTxCount #4")
 
-	// 5th getTransactionCount should be correct again
-	valueAfter5 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	assert.Equal(t, txCountBefore, valueAfter5, "call #5")
-}
+// 	// 5th getTransactionCount should be correct again
+// 	valueAfter5 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+// 	assert.Equal(t, txCountBefore, valueAfter5, "call #5")
+// }
 
 // Test intercepting eth_call for Flashbots RPC contract
 func TestEthCallIntercept(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 	var rpcResult string
 
 	// eth_call intercept
@@ -163,7 +167,7 @@ func TestEthCallIntercept(t *testing.T) {
 }
 
 func TestNetVersionIntercept(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 	var rpcResult string
 
 	// eth_call intercept
@@ -180,7 +184,7 @@ func TestNetVersionIntercept(t *testing.T) {
 
 // Ensure bundle response is the tx hash, not the bundle id
 func TestSendBundleResponse(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 
 	// should be tx hash
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
@@ -189,7 +193,7 @@ func TestSendBundleResponse(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 	expectedResultRaw := `{"id":1,"result":null,"jsonrpc":"2.0"}` + "\n"
 
 	// Build and do RPC call: "null"
@@ -218,7 +222,7 @@ func TestNull(t *testing.T) {
 }
 
 func TestGetTxReceiptNull(t *testing.T) {
-	resetTestServers(false)
+	resetTestServers()
 
 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_BundleFailedTooManyTimes_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionCount)
@@ -232,41 +236,11 @@ func TestGetTxReceiptNull(t *testing.T) {
 	require.Equal(t, "null", string(jsonResp.Result))
 }
 
-func TestMetamaskFix2WithBlacklist(t *testing.T) {
-	resetTestServers(false)
+func TestMetamaskFix(t *testing.T) {
+	resetTestServers()
 
 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_MM2_From, "latest"})
 	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-
-	// set the clock back 14 min, to predate entries
-	setServerTimeNowOffset(-14 * time.Minute)
-
-	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
-	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_MM2_RawTx})
-	r1 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-	require.Nil(t, r1.Error)
-	fmt.Printf("\n\n\n")
-
-	// Set the clock to normal, so that more than 16 minutes have passed and we can trigger the codepath for RPC to query the backend
-	setServerTimeNowOffset(0)
-	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
-	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
-	require.Equal(t, "null", string(jsonResp.Result))
-	fmt.Printf("\n\n\n")
-
-	// At this point, too high a nonce should be returned
-	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
-}
-
-// If getTxReceipt call is made within 16 minutes, no blacklisting occurs
-func TestMetamaskFix2WithoutBlacklist(t *testing.T) {
-	resetTestServers(false)
-
-	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_MM2_From, "latest"})
-	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-
-	setServerTimeNowOffset(-13 * time.Minute)
 
 	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_MM2_RawTx})
@@ -274,9 +248,7 @@ func TestMetamaskFix2WithoutBlacklist(t *testing.T) {
 	require.Nil(t, r1.Error, r1.Error)
 	fmt.Printf("\n\n\n\n\n")
 
-	// Set the clock to normal, so that more than 16 minutes have passed and we can trigger
-	setServerTimeNowOffset(0)
-
+	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
 	_ = jsonResp
@@ -284,11 +256,12 @@ func TestMetamaskFix2WithoutBlacklist(t *testing.T) {
 
 	// At this point, the tx hash should be blacklisted and too high a nonce is returned
 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-	require.Equal(t, txCountBefore, valueAfter1, "getTxCount #1")
+	require.NotEqual(t, txCountBefore, valueAfter1)
+	require.Equal(t, "0x3b9aca01", valueAfter1)
 }
 
 func TestRelayTx(t *testing.T) {
-	resetTestServers(true)
+	resetTestServers()
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
