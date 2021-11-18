@@ -1,10 +1,7 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 )
 
@@ -23,48 +20,46 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
 
-	// Make sure transaction was submitted before
+	// Abort if transaction wasn't submitted before
 	txFrom, txFound := State.txToUser[txHashLower]
 	if !txFound {
 		return
 	}
-
-	// Only check state on latest transaction by user
 	txFromLower := txFrom.s
+
+	// Abort if not the latest transaction by user
 	latestTxHash, latestFound := State.userLatestTx[txFromLower]
 	if latestFound && latestTxHash.s != txHashLower {
 		return
 	}
 
+	// Remove any nonce fix for an earlier tx
+	nonceFix, nonceFixAlreadyInPlace := State.accountWithNonceFix[txFromLower]
+	if nonceFixAlreadyInPlace && nonceFix.txHash != txHashLower {
+		delete(State.accountWithNonceFix, txFromLower)
+	}
+
+	if _, nonceFixAlreadyInPlace = State.accountWithNonceFix[txFromLower]; nonceFixAlreadyInPlace {
+		// r.log("[MM2] eth_getTransactionReceipt already in progress")
+		return
+	}
+
 	r.log("[MM2] eth_getTransactionReceipt is null for latest user tx %s", txHashLower)
 
-	// call private-tx-api
-	privTxApiUrl := fmt.Sprintf("%s/tx/%s", ProtectTxApiHost, txHashLower)
-	resp, err := http.Get(privTxApiUrl)
+	// get tx status from private-tx-api
+	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
-		r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHashLower, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		r.logError("[MM2] privTxApi call body-read failed for %s (BE error): %s", txHashLower, err)
+		r.logError("[MM2] privateTxApi failed: %s", err)
 		return
 	}
 
-	respObj := new(PrivateTxApiResponse)
-	err = json.Unmarshal(bodyBytes, respObj)
-	if err != nil {
-		r.log("[MM2] priv-tx-api response: %s", string(bodyBytes))
-		r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHashLower, err)
-		return
-	}
-
-	r.log("[MM2] priv-tx-api status: %s", respObj.Status)
-	if respObj.Status == "FAILED" {
-		r.log("[MM2] blacklisted tx hash, will receive too high of a nonce")
-		State.accountWithNonceFix[txFromLower] = Now()
+	r.log("[MM2] priv-tx-api status: %s", statusApiResponse.Status)
+	if statusApiResponse.Status == "FAILED" || (DebugDontSendTx && statusApiResponse.Status == "UNKNOWN") {
+		r.log("[MM2] failed tx, will receive too high of a nonce")
+		State.accountWithNonceFix[txFromLower] = NewNonceFix(txHashLower)
+	} else {
+		// healthy response, remove any nonce fix
+		delete(State.accountWithNonceFix, txFromLower)
 	}
 }
 
@@ -74,18 +69,20 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	}
 
 	addr := strings.ToLower(r.jsonReq.Params[0].(string))
-	_, shouldInterceptNonce := State.accountWithNonceFix[addr]
+
+	// Check if nonceFix is in place for this user
+	nonceFix, shouldInterceptNonce := State.accountWithNonceFix[addr]
 	if !shouldInterceptNonce {
 		return false
 	}
 
-	// Cleanup (send wrong nonce at most 1x)
-	delete(State.accountWithNonceFix, addr)
+	// Intercept max 4 times (after which Metamask marks it as dropped)
+	nonceFix.numTries += 1
+	if nonceFix.numTries > 4 {
+		return
+	}
 
-	// Do nothing if older than 1h
-	// if time.Since(timeAdded).Hours() >= 1 {
-	// 	return false
-	// }
+	r.log("eth_getTransactionCount intercept: #%d", nonceFix.numTries)
 
 	// Return invalid nonce
 	var wrongNonce uint64 = 1e9 + 1

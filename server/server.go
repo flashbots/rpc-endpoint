@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -16,6 +17,10 @@ var blacklistedIps = []string{"127.0.0.2"}
 
 // Metamask fix helper
 var State = NewGlobalState()
+
+func init() {
+	log.SetOutput(os.Stdout)
+}
 
 type RpcEndPointServer struct {
 	version         string

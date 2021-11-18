@@ -195,8 +195,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	txHashLower := strings.ToLower(r.tx.Hash().Hex())
-
 	// Get tx from address
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
@@ -205,15 +203,17 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
+	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
 		r.log("tx rejected - nonce too high: %d", r.tx.Nonce())
+		delete(State.accountWithNonceFix, txFromLower)
 		r.writeRpcError("tx rejected - nonce too high")
 		return
 	}
 
 	// Remember time when tx was received
-	txFromLower := strings.ToLower(r.txFrom)
+	txHashLower := strings.ToLower(r.tx.Hash().Hex())
 	State.txToUser[txHashLower] = NewStringWithTime(txFromLower)
 	State.userLatestTx[txFromLower] = NewStringWithTime(txHashLower)
 
@@ -232,6 +232,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if needsProtection {
 		r.sendTxToRelay()
+		return
+	}
+
+	if DebugDontSendTx {
+		r.log("faked sending tx to mempool, did nothing")
+		r.writeRpcResult(r.tx.Hash().Hex())
 		return
 	}
 
@@ -265,8 +271,12 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	// Proxy request
 	proxyResp, err := ProxyRequest(proxyUrl, r.body)
 	if err != nil {
-		r.logError("failed to make proxy request: %v", err)
-		return false, proxyResp.StatusCode, jsonResp
+		r.logError("failed to make proxy request: %v / resp: %v", err, proxyResp)
+		if proxyResp == nil {
+			return false, http.StatusInternalServerError, jsonResp
+		} else {
+			return false, proxyResp.StatusCode, jsonResp
+		}
 	}
 
 	// Afterwards, check time and result
@@ -371,14 +381,22 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 func (r *RpcRequest) sendTxToRelay() {
 	// Check if tx was already forwarded and should be blocked now
 	txHash := strings.ToLower(r.tx.Hash().Hex())
-	if _, wasAlreadyForwarded := State.txForwardedToRelay[txHash]; wasAlreadyForwarded {
-		r.log("[sendTxToRelay] already sent %s", txHash)
+	if !ShouldSendTxToRelay(txHash) {
+		r.log("[sendTxToRelay] shouldn't send %s", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}
 
-	r.log("[sendTxToRelay] sending %s...", txHash)
-	State.txForwardedToRelay[txHash] = Now()
+	r.log("[sendTxToRelay] sending %s ...", txHash)
+
+	State.txForwardedToRelay[txHash] = Now() // remember tx was forwarded to relay
+	delete(State.txStatus, txHash)           // remove any previous tx status
+
+	if DebugDontSendTx {
+		r.log("faked sending tx to relay, did nothing")
+		r.writeRpcResult(r.tx.Hash().Hex())
+		return
+	}
 
 	param := make(map[string]string)
 	param["tx"] = r.rawTxHex

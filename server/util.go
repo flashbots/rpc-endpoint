@@ -5,9 +5,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -182,4 +184,43 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 	}
 
 	return jsonRpcResp, &respData, nil
+}
+
+func GetTxStatus(txHash string) (*PrivateTxApiResponse, error) {
+	privTxApiUrl := fmt.Sprintf("%s/tx/%s", ProtectTxApiHost, txHash)
+	resp, err := http.Get(privTxApiUrl)
+	if err != nil {
+		return nil, errors.Wrap(err, "privTxApi call failed for "+txHash)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "privTxApi body-read failed for "+txHash)
+	}
+
+	respObj := new(PrivateTxApiResponse)
+	err = json.Unmarshal(bodyBytes, respObj)
+	if err != nil {
+		return nil, errors.Wrap(err, "privTxApi jsonUnmarshal failed for "+txHash)
+	}
+
+	State.txStatus[strings.ToLower(txHash)] = NewStringWithTime(respObj.Status)
+	return respObj, nil
+}
+
+func ShouldSendTxToRelay(txHash string) bool {
+	// send again if tx is failed
+	txStatus, ok := State.txStatus[strings.ToLower(txHash)]
+	if ok && txStatus.s == "FAILED" {
+		return true
+	}
+
+	// don't send again tx again for 20 minutes (unless it's failed)
+	txSentToRelayAt, ok := State.txForwardedToRelay[strings.ToLower(txHash)]
+	if ok && time.Since(txSentToRelayAt).Minutes() < 20 {
+		return false
+	}
+
+	return true
 }
