@@ -1,45 +1,71 @@
 package server
 
 import (
-	"fmt"
-	"io"
+	"crypto/ecdsa"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
+var Now = time.Now // used to mock time in tests
+
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
-type RpcEndPointServer struct {
-	listenAddress string
-	proxyUrl      string
-	txManagerUrl  string
-}
+// Transactions should only be sent once to the relay
+var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
 
-func NewRpcEndPointServer(listenAddress, proxyUrl, txManagerUrl string) *RpcEndPointServer {
-	return &RpcEndPointServer{
-		listenAddress: listenAddress,
-		proxyUrl:      proxyUrl,
-		txManagerUrl:  txManagerUrl,
+func cleanupOldRelayForwardings() {
+	for txHash, t := range txForwardedToRelay {
+		if time.Since(t).Minutes() > 20 {
+			delete(txForwardedToRelay, txHash)
+		}
 	}
 }
 
-func (r *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint at %v...", r.listenAddress)
+// Metamask fix helper
+var MetaMaskFix = NewMetaMaskFixer()
+
+type RpcEndPointServer struct {
+	version         string
+	startTime       time.Time
+	listenAddress   string
+	proxyUrl        string
+	txManagerUrl    string
+	relayUrl        string
+	useRelay        bool
+	relaySigningKey *ecdsa.PrivateKey
+}
+
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+	return &RpcEndPointServer{
+		startTime:       Now(),
+		version:         version,
+		listenAddress:   listenAddress,
+		proxyUrl:        proxyUrl,
+		txManagerUrl:    txManagerUrl,
+		relayUrl:        relayUrl,
+		useRelay:        useRelay,
+		relaySigningKey: relaySigningKey,
+	}
+}
+
+func (s *RpcEndPointServer) Start() {
+	log.Printf("Starting rpc endpoint %s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", http.HandlerFunc(r.HandleHttpRequest))
-	http.HandleFunc("/health", http.HandlerFunc(r.handleHealthRequest))
+	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
+	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
 
 	// Start serving
-	if err := http.ListenAndServe(r.listenAddress, nil); err != nil {
+	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
 		log.Fatalf("Failed to start rpc endpoint: %v", err)
 	}
 }
 
-func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
+func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 
@@ -53,14 +79,32 @@ func (r *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, r.proxyUrl, r.txManagerUrl)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.txManagerUrl, s.relayUrl, s.useRelay, s.relaySigningKey)
 	request.process()
 }
 
-func (r *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+type HealthResponse struct {
+	Now       time.Time `json:"time"`
+	StartTime time.Time `json:"startTime"`
+	Version   string    `json:"version"`
+}
+
+func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	res := HealthResponse{
+		Now:       Now(),
+		StartTime: s.startTime,
+		Version:   s.version,
+	}
+
+	jsonResp, err := json.Marshal(res)
+	if err != nil {
+		log.Panicln("healthCheck json error:", err)
+		respw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	respw.WriteHeader(http.StatusOK)
-	msg := fmt.Sprintf("All systems OK: %s", time.Now().UTC())
-	io.WriteString(respw, msg)
+	respw.Write(jsonResp)
 }
 
 func IsBlacklisted(ip string) bool {

@@ -4,6 +4,7 @@ Request represents an incoming client request
 package server
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,10 +19,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var Now = time.Now // used to mock time in tests
-
-var MetaMaskFix = NewMetaMaskFixer()
-
 // RPC request for a single client JSON-RPC request
 type RpcRequest struct {
 	respw *http.ResponseWriter
@@ -31,6 +28,9 @@ type RpcRequest struct {
 	timeStarted     time.Time
 	defaultProxyUrl string
 	txManagerUrl    string
+	relayUrl        string
+	useRelay        bool
+	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
 	body     []byte
@@ -46,7 +46,7 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
@@ -54,6 +54,9 @@ func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl strin
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		txManagerUrl:    txManagerUrl,
+		relayUrl:        relayUrl,
+		useRelay:        useRelay,
+		relaySigningKey: relaySigningKey,
 	}
 }
 
@@ -103,7 +106,7 @@ func (r *RpcRequest) process() {
 	r.log("POST request from ip: %s - goroutines: %d", r.ip, runtime.NumGoroutine())
 
 	if IsBlacklisted(r.ip) {
-		r.log("Blocked: IP=%s", r.ip)
+		r.log("Blocked IP: %s", r.ip)
 		r.writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
@@ -144,7 +147,7 @@ func (r *RpcRequest) process() {
 			return
 		} else if r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract() { // intercept if Flashbots isRPC contract
 			return
-		} else if r.jsonReq.Method == "net_version" {
+		} else if r.jsonReq.Method == "net_version" { // don't need to proxy to node, it's always 1 (mainnet)
 			r.writeRpcResult("1")
 			return
 		}
@@ -196,10 +199,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[strings.ToLower(r.tx.Hash().Hex())]; isBlacklistedTx {
-		msg := "rawTx blocked because bundle failed too many times"
-		r.log(msg)
-		r.writeRpcError(msg)
+	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+
+	if _, isBlacklistedTx := MetaMaskFix.blacklistedRawTx[txHashLower]; isBlacklistedTx {
+		r.log("tx blocked - is on metamask-fix-blacklist")
+		r.writeRpcError("rawTx blocked")
 		return
 	}
 
@@ -212,11 +216,19 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
 
-	// Remember time when tx was received and cleanup old entries
-	MetaMaskFix.rawTransactionSubmission[strings.ToLower(r.tx.Hash().Hex())] = &mmRawTxTracker{
-		submittedAt: Now(),
-		tx:          r.tx,
-		txFrom:      r.txFrom,
+	if r.tx.Nonce() >= 1e9 {
+		r.log("tx blocked - nonce too high: %d", r.tx.Nonce())
+		r.writeRpcError("tx rejected - nonce too high")
+		return
+	}
+
+	// Remember time when tx was received
+	if _, found := MetaMaskFix.rawTransactionSubmission[txHashLower]; !found {
+		MetaMaskFix.rawTransactionSubmission[txHashLower] = &mmRawTxTracker{
+			submittedAt: Now(),
+			tx:          r.tx,
+			txFrom:      r.txFrom,
+		}
 	}
 
 	if isOnOFACList(r.txFrom) {
@@ -235,7 +247,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	target := "mempool"
 	url := r.defaultProxyUrl
 	if needsProtection {
-		target = "Flashbots"
+		if r.useRelay {
+			r.sendTxToRelay()
+			return
+		}
+
+		target = "TxManager"
 		url = r.txManagerUrl
 	}
 
@@ -394,4 +411,38 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 	}
 
 	r.respBodyWritten = true
+}
+
+// Send tx to relay and finish request (write response)
+func (r *RpcRequest) sendTxToRelay() {
+	cleanupOldRelayForwardings() // forwards should only be blocked for a specific time
+
+	// Check if tx was already forwarded and should be blocked now
+	txHash := r.tx.Hash().Hex()
+	if _, wasAlreadyForwarded := txForwardedToRelay[txHash]; wasAlreadyForwarded {
+		r.log("[sendTxToRelay] already sent %s", txHash)
+		r.writeRpcResult(txHash)
+		return
+	}
+
+	r.log("[sendTxToRelay] sending %s", txHash)
+	txForwardedToRelay[txHash] = Now()
+
+	param := make(map[string]string)
+	param["tx"] = r.rawTxHex
+	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
+	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
+	if err != nil {
+		r.logError("[sendTxToRelay] failed for %s: %s - data: %s", txHash, err, *respBytes)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+
+	if backendResp.Error != nil {
+		r.logError("[sendTxToRelay] failed for %s (BE error): %s", txHash, backendResp.Error.Message)
+		r.handleProxyError(backendResp.Error)
+	}
+
+	r._writeRpcResponse(backendResp)
+	r.log("[sendTxToRelay] done")
 }

@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/flashbots/rpc-endpoint/server"
 )
@@ -18,7 +19,13 @@ var getBundleStatusByTransactionHash_Response = server.GetBundleStatusByTransact
 	Status: "FAILED_BUNDLE",
 }
 
+var MockBackendLastRawRequest *http.Request
+var MockBackendLastJsonRpcRequest *server.JsonRpcRequest
+var MockBackendLastJsonRpcRequestTimestamp time.Time
+
 func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error) {
+	MockBackendLastJsonRpcRequest = req
+
 	switch req.Method {
 	case "eth_getTransactionCount":
 		return "0x22", nil
@@ -41,6 +48,15 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 			return "bundle-id-from-BE", nil
 		}
 
+	case "eth_sendPrivateTransaction":
+		param := req.Params[0].(map[string]interface{})
+		fmt.Println("BE eth_sendPrivateTransaction", param)
+		if param["tx"] == TestTx_BundleFailedTooManyTimes_RawTx {
+			return TestTx_BundleFailedTooManyTimes_Hash, nil
+		} else {
+			return "some-tx-hash", nil
+		}
+
 	case "net_version":
 		return "3", nil
 
@@ -57,6 +73,9 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 
 func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
+	MockBackendLastRawRequest = req
+	MockBackendLastJsonRpcRequestTimestamp = server.Now()
+
 	log.Printf("%s %s %s\n", req.RemoteAddr, req.Method, req.URL)
 
 	w.Header().Set("Content-Type", "application/json")

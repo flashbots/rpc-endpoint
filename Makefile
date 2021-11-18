@@ -1,7 +1,7 @@
 .PHONY: all build test clean lint
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
-GIT_VER := $(shell git describe --tags)
+GIT_VER := $(shell git describe --tags --always --dirty="-dev")
 
 all: clean build
 
