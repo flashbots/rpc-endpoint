@@ -106,42 +106,6 @@ func TestJsonRpc(t *testing.T) {
 /*
  * REQUEST TESTS
  */
-// // Test intercepting eth_call for Flashbots RPC contract
-// func TestMetamaskEthGetTransactionCount(t *testing.T) {
-// 	resetTestServers()
-
-// 	req_getTransactionCount := server.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{TestTx_BundleFailedTooManyTimes_From, "latest"})
-// 	txCountBefore := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-
-// 	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
-// 	req_sendRawTransaction := server.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{TestTx_BundleFailedTooManyTimes_RawTx})
-// 	r1 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-// 	require.NotNil(t, r1.Error)
-// 	require.Equal(t, "Bundle submitted has already failed too many times", r1.Error.Message)
-
-// 	// second sendRawTransaction call: is blocked because it's in MM cache
-// 	r2 := sendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-// 	require.NotNil(t, r2.Error)
-// 	require.Equal(t, "rawTx blocked", r2.Error.Message)
-
-// 	// Next 4 getTransactionCount calls should return wrong result (to make MM fail the tx)
-// 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-// 	require.NotEqual(t, txCountBefore, valueAfter1, "getTxCount #1")
-// 	require.Equal(t, "0x3b9aca01", valueAfter1, "getTxCount #1")
-
-// 	valueAfter2 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-// 	assert.Equal(t, valueAfter1, valueAfter2, "getTxCount #2")
-
-// 	valueAfter3 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-// 	assert.Equal(t, valueAfter1, valueAfter3, "getTxCount #3")
-
-// 	valueAfter4 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-// 	assert.Equal(t, valueAfter1, valueAfter4, "getTxCount #4")
-
-// 	// 5th getTransactionCount should be correct again
-// 	valueAfter5 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
-// 	assert.Equal(t, txCountBefore, valueAfter5, "call #5")
-// }
 
 // Test intercepting eth_call for Flashbots RPC contract
 func TestEthCallIntercept(t *testing.T) {
@@ -257,6 +221,22 @@ func TestMetamaskFix(t *testing.T) {
 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 	require.NotEqual(t, txCountBefore, valueAfter1)
 	require.Equal(t, "0x3b9aca01", valueAfter1)
+
+	// getTransactionCount 2/4 should return the same (fixed) value
+	valueAfter2 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+	require.Equal(t, valueAfter1, valueAfter2)
+
+	// getTransactionCount 3/4 should return the same (fixed) value
+	valueAfter3 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+	require.Equal(t, valueAfter1, valueAfter3)
+
+	// getTransactionCount 4/4 should return the same (fixed) value
+	valueAfter4 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+	require.Equal(t, valueAfter1, valueAfter4)
+
+	// getTransactionCount 5 should return the initial value
+	valueAfter5 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
+	require.Equal(t, txCountBefore, valueAfter5)
 }
 
 func TestRelayTx(t *testing.T) {
