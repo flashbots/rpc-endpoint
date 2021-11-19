@@ -99,6 +99,10 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 	}
 
 	ethCallReq := r.jsonReq.Params[0].(map[string]interface{})
+	if ethCallReq["to"] == nil {
+		return false
+	}
+
 	addressTo := strings.ToLower(ethCallReq["to"].(string))
 
 	// Only handle calls to the Flashbots RPC check contract

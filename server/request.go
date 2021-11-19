@@ -124,6 +124,11 @@ func (r *RpcRequest) process() {
 		return
 	}
 
+	if len(r.body) == 0 {
+		r.writeHeaderStatus(http.StatusBadRequest)
+		return
+	}
+
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
 		r.logError("failed to parse JSON RPC request: %v - body: %s", err, r.body)
