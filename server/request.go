@@ -202,7 +202,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
-	r.log("txHash: %s - from: %s", r.tx.Hash(), r.txFrom)
+	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, r.tx.To().Hex(), r.tx.Nonce(), r.tx.GasPrice().String())
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
@@ -228,6 +228,20 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.logError("failed to evaluate transaction: %v", err)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
+	}
+
+	// Special check for cancellation tx
+	if len(r.tx.Data()) == 0 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
+		wasSentToRelay, found := State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", txFromLower, r.tx.Nonce())]
+		if found && wasSentToRelay.v {
+			// original tx was sent to relay
+			r.log("[cancel-tx] sending to relay")
+			needsProtection = true
+		} else {
+			// original tx was sent to mempool, or not seen in rpc-endpoint
+			r.log("[cancel-tx] sending to mempool")
+			needsProtection = false
+		}
 	}
 
 	if needsProtection {
@@ -316,10 +330,6 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bo
 
 	data := hex.EncodeToString(tx.Data())
 	r.log("[protect-check] tx-data: %v", data)
-	if len(data) == 0 {
-		r.log("[protect-check] data had a length of 0, but a gas greater than 21000. Sending cancellation tx to mempool.")
-		return false, nil
-	}
 
 	if isOnFunctionWhiteList(data[0:8]) {
 		return false, nil // function being called is on our whitelist and no protection needed
@@ -389,8 +399,11 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	r.log("[sendTxToRelay] sending %s ...", txHash)
 
-	State.txForwardedToRelay[txHash] = Now() // remember tx was forwarded to relay
 	delete(State.txStatus, txHash)           // remove any previous tx status
+	State.txForwardedToRelay[txHash] = Now() // remember tx was forwarded to relay
+
+	// for cancellation, remember that this tx was sent to relay
+	State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", strings.ToLower(r.txFrom), r.tx.Nonce())] = NewBoolWithTime(true)
 
 	if DebugDontSendTx {
 		r.log("faked sending tx to relay, did nothing")

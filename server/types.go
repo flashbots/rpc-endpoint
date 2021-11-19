@@ -12,10 +12,16 @@ type StringWithTime struct {
 }
 
 func NewStringWithTime(s string) StringWithTime {
-	return StringWithTime{
-		s: s,
-		t: Now(),
-	}
+	return StringWithTime{s, Now()}
+}
+
+type BoolWithTime struct {
+	v bool
+	t time.Time
+}
+
+func NewBoolWithTime(v bool) BoolWithTime {
+	return BoolWithTime{v, Now()}
 }
 
 type JsonRpcRequest struct {
