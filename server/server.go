@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
+
+	_ "net/http/pprof"
 )
 
 var Now = time.Now // used to mock time in tests
@@ -14,46 +17,35 @@ var Now = time.Now // used to mock time in tests
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
-// Transactions should only be sent once to the relay
-var txForwardedToRelay map[string]time.Time = make(map[string]time.Time)
-
-func cleanupOldRelayForwardings() {
-	for txHash, t := range txForwardedToRelay {
-		if time.Since(t).Minutes() > 20 {
-			delete(txForwardedToRelay, txHash)
-		}
-	}
-}
-
 // Metamask fix helper
-var MetaMaskFix = NewMetaMaskFixer()
+var State = NewGlobalState()
+
+func init() {
+	log.SetOutput(os.Stdout)
+}
 
 type RpcEndPointServer struct {
 	version         string
 	startTime       time.Time
 	listenAddress   string
 	proxyUrl        string
-	txManagerUrl    string
 	relayUrl        string
-	useRelay        bool
 	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, txManagerUrl string, relayUrl string, useRelay bool, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
 	return &RpcEndPointServer{
 		startTime:       Now(),
 		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
-		txManagerUrl:    txManagerUrl,
 		relayUrl:        relayUrl,
-		useRelay:        useRelay,
 		relaySigningKey: relaySigningKey,
 	}
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint %s at %v (using relay: %v)...", s.version, s.listenAddress, s.useRelay)
+	log.Printf("Starting rpc endpoint %s at %v...", s.version, s.listenAddress)
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
@@ -79,14 +71,8 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, s.proxyUrl, s.txManagerUrl, s.relayUrl, s.useRelay, s.relaySigningKey)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relayUrl, s.relaySigningKey)
 	request.process()
-}
-
-type HealthResponse struct {
-	Now       time.Time `json:"time"`
-	StartTime time.Time `json:"startTime"`
-	Version   string    `json:"version"`
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
@@ -103,6 +89,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 		return
 	}
 
+	respw.Header().Set("Content-Type", "application/json")
 	respw.WriteHeader(http.StatusOK)
 	respw.Write(jsonResp)
 }

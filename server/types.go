@@ -3,7 +3,26 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
+
+type StringWithTime struct {
+	s string
+	t time.Time
+}
+
+func NewStringWithTime(s string) StringWithTime {
+	return StringWithTime{s, Now()}
+}
+
+type BoolWithTime struct {
+	v bool
+	t time.Time
+}
+
+func NewBoolWithTime(v bool) BoolWithTime {
+	return BoolWithTime{v, Now()}
+}
 
 type JsonRpcRequest struct {
 	Id      interface{}   `json:"id"`
@@ -64,4 +83,10 @@ type PrivateTxApiResponse struct {
 	Status         string `json:"status"`
 	Hash           string `json:"hash"`
 	MaxBlockNumber int    `json:"maxBlockNumber"`
+}
+
+type HealthResponse struct {
+	Now       time.Time `json:"time"`
+	StartTime time.Time `json:"startTime"`
+	Version   string    `json:"version"`
 }

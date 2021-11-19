@@ -1,15 +1,13 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
-	"time"
 )
 
-// Check if getTransactionReceipt of a submitted tx is null. If submitted longer than time threshold ago, query TxManager BE to see if tx failed.
+var ProtectTxApiHost = "https://protect.flashbots.net"
+
+// If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
@@ -20,97 +18,48 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 		return
 	}
 
-	txHash := r.jsonReq.Params[0].(string)
+	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
 
-	// Make sure transaction was submitted before
-	rawTxSubmission, txFound := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
+	// Abort if transaction wasn't submitted before
+	txFrom, txFound := State.txHashToUser[txHashLower]
 	if !txFound {
 		return
 	}
+	txFromLower := txFrom.s
 
-	td := time.Since(rawTxSubmission.submittedAt)
-	minutesSinceSubmission := td.Minutes()
-	r.log("[MM2] check_post_getTransactionReceipt for tx %s - submittedAt %.2f min ago", txHash, minutesSinceSubmission)
-
-	maxTime := 14
-	if r.useRelay {
-		maxTime = 1 // for relay, can query the status API immediately
-	}
-
-	if minutesSinceSubmission < float64(maxTime) { // do nothing until `maxTime` minutes passed
+	// Abort if not the latest transaction by user
+	latestTxHash, latestFound := State.userLatestTxHash[txFromLower]
+	if latestFound && latestTxHash.s != txHashLower {
 		return
 	}
 
-	r.log("[MM2] eth_getTransactionReceipt result came back empty and > time threshold: tx %s", txHash)
-
-	setMmNonceFix := func(txHash string) {
-		r.log("[MM2] blacklisted tx hash, will receive too high of a nonce")
-		mmRawTxTrack, found := MetaMaskFix.rawTransactionSubmission[strings.ToLower(txHash)]
-		if !found {
-			r.logError("[MM2] couldn't find previous transaction")
-			return
-		}
-
-		MetaMaskFix.blacklistedRawTx[strings.ToLower(txHash)] = Now()
-		MetaMaskFix.accountAndNonce[strings.ToLower(mmRawTxTrack.txFrom)] = &mmNonceHelper{
-			Nonce: 1e9,
-		}
+	// Remove any nonce fix for an earlier tx
+	nonceFix, nonceFixAlreadyInPlace := State.accountWithNonceFix[txFromLower]
+	if nonceFixAlreadyInPlace && nonceFix.txHash != txHashLower {
+		delete(State.accountWithNonceFix, txFromLower)
 	}
 
-	if r.useRelay {
-		// call private-tx-api
-		privTxApiUrl := fmt.Sprintf("https://protect.flashbots.net/tx/%s", txHash)
-		resp, err := http.Get(privTxApiUrl)
-		if err != nil {
-			r.logError("[MM2] privTxApi call failed for %s (BE error): %s", txHash, err)
-			return
-		}
-		defer resp.Body.Close()
+	if _, nonceFixAlreadyInPlace = State.accountWithNonceFix[txFromLower]; nonceFixAlreadyInPlace {
+		// r.log("[MM2] eth_getTransactionReceipt already in progress")
+		return
+	}
 
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			r.logError("[MM2] privTxApi call body-read failed for %s (BE error): %s", txHash, err)
-			return
-		}
+	r.log("[MM2] eth_getTransactionReceipt is null for latest user tx %s", txHashLower)
 
-		respObj := new(PrivateTxApiResponse)
-		err = json.Unmarshal(bodyBytes, respObj)
-		if err != nil {
-			r.log("[MM2] priv-tx-api response: %s", string(bodyBytes))
-			r.logError("[MM2] privTxApi call json-unmarshal failed for %s (BE error): %s", txHash, err)
-			return
-		}
+	// get tx status from private-tx-api
+	statusApiResponse, err := GetTxStatus(txHashLower)
+	if err != nil {
+		r.logError("[MM2] privateTxApi failed: %s", err)
+		return
+	}
 
-		r.log("[MM2] priv-tx-api status: %s", respObj.Status)
-		if respObj.Status == "FAILED" {
-			setMmNonceFix(txHash)
-		}
-
+	r.log("[MM2] priv-tx-api status: %s", statusApiResponse.Status)
+	if statusApiResponse.Status == "FAILED" || (DebugDontSendTx && statusApiResponse.Status == "UNKNOWN") {
+		r.log("[MM2] failed tx, will receive too high of a nonce")
+		State.accountWithNonceFix[txFromLower] = NewNonceFix(txHashLower)
 	} else {
-		// call TxManager:eth_getBundleStatusByTransactionHash
-		req := NewJsonRpcRequest1(1, "eth_getBundleStatusByTransactionHash", txHash)
-		backendResp, err := SendRpcAndParseResponseTo(r.txManagerUrl, req)
-		if err != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s: %s", txHash, err)
-			return
-		}
-		if backendResp.Error != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed for %s (BE error): %s", txHash, backendResp.Error.Message)
-			return
-		}
-		r.log("[MM2] BE response: %s", string(backendResp.Result))
-
-		statusResponse := new(GetBundleStatusByTransactionHashResponse)
-		err = json.Unmarshal(backendResp.Result, &statusResponse)
-		if err != nil {
-			r.logError("[MM2] eth_getBundleStatusByTransactionHash failed unmarshal rpc result for %s: %s - %s", txHash, jsonResp.Result, err)
-			return
-		}
-
-		// r.log("[MM2] BE response: %d, %v", statusResponse)
-		if statusResponse.Status == "FAILED_BUNDLE" {
-			setMmNonceFix(txHash)
-		}
+		// healthy response, remove any nonce fix
+		delete(State.accountWithNonceFix, txFromLower)
 	}
 }
 
@@ -120,19 +69,24 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	}
 
 	addr := strings.ToLower(r.jsonReq.Params[0].(string))
-	mmHelperBlacklistEntry, mmHelperBlacklistEntryFound := MetaMaskFix.accountAndNonce[addr]
-	if !mmHelperBlacklistEntryFound {
+
+	// Check if nonceFix is in place for this user
+	nonceFix, shouldInterceptNonce := State.accountWithNonceFix[addr]
+	if !shouldInterceptNonce {
 		return false
 	}
 
-	// MM should get nonce+1 four times to stop resending
-	MetaMaskFix.accountAndNonce[addr].NumTries += 1
-	if MetaMaskFix.accountAndNonce[addr].NumTries == 4 {
-		delete(MetaMaskFix.accountAndNonce, addr)
+	// Intercept max 4 times (after which Metamask marks it as dropped)
+	nonceFix.numTries += 1
+	if nonceFix.numTries > 4 {
+		return
 	}
 
-	// Prepare custom JSON-RPC response
-	resp := fmt.Sprintf("0x%x", mmHelperBlacklistEntry.Nonce+1)
+	r.log("eth_getTransactionCount intercept: #%d", nonceFix.numTries)
+
+	// Return invalid nonce
+	var wrongNonce uint64 = 1e9 + 1
+	resp := fmt.Sprintf("0x%x", wrongNonce)
 	r.writeRpcResult(resp)
 	r.log("Intercepted eth_getTransactionCount for %s", addr)
 	return true

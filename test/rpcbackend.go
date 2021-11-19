@@ -42,19 +42,14 @@ func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error
 		}
 
 	case "eth_sendRawTransaction":
-		if req.Params[0] == TestTx_BundleFailedTooManyTimes_RawTx {
-			return "", fmt.Errorf("Bundle submitted has already failed too many times") //lint:ignore ST1005 we mimic the error from the protect tx manager
-		} else {
-			return "bundle-id-from-BE", nil
-		}
+		return "tx-hash1", nil
 
 	case "eth_sendPrivateTransaction":
 		param := req.Params[0].(map[string]interface{})
-		fmt.Println("BE eth_sendPrivateTransaction", param)
 		if param["tx"] == TestTx_BundleFailedTooManyTimes_RawTx {
 			return TestTx_BundleFailedTooManyTimes_Hash, nil
 		} else {
-			return "some-tx-hash", nil
+			return "tx-hash2", nil
 		}
 
 	case "net_version":

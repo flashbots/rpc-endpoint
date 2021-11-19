@@ -1,3 +1,4 @@
 /build
 /rpc-endpoint
 /tmp
+/log*.txt
