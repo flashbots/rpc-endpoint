@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	_ "net/http/pprof"
 )
 
 var Now = time.Now // used to mock time in tests
