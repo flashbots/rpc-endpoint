@@ -223,12 +223,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	needsProtection, err := r.doesTxNeedFrontrunningProtection(r.tx)
-	if err != nil {
-		r.logError("failed to evaluate transaction: %v", err)
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
+	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
 	// Special check for cancellation tx
 	if len(r.tx.Data()) == 0 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
@@ -318,23 +313,27 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 
 // Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
 // for example simple ERC20 transfers.
-func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) (bool, error) {
+func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) bool {
 	gas := tx.Gas()
 	r.log("[protect-check] gas: %v", gas)
 
 	// Flashbots Relay will reject anything less than 42000 gas, so we just send those to the mempool
 	// Anyway things with that low of gas probably don't need frontrunning protection regardless
 	if gas < 42000 {
-		return false, nil
+		return false
 	}
 
 	data := hex.EncodeToString(tx.Data())
 	r.log("[protect-check] tx-data: %v", data)
 
+	if len(data) < 8 {
+		return false
+	}
+
 	if isOnFunctionWhiteList(data[0:8]) {
-		return false, nil // function being called is on our whitelist and no protection needed
+		return false // function being called is on our whitelist and no protection needed
 	} else {
-		return true, nil // needs protection if not on whitelist
+		return true // needs protection if not on whitelist
 	}
 }
 
