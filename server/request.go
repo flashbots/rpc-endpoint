@@ -132,9 +132,9 @@ func (r *RpcRequest) process() {
 	}
 
 	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
-	State.cleanup()
 
 	if r.jsonReq.Method == "eth_sendRawTransaction" {
+		State.cleanup()
 		r.handle_sendRawTransaction()
 
 	} else {
@@ -206,7 +206,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.log("tx rejected - nonce too high: %d", r.tx.Nonce())
+		r.log("tx rejected - nonce too high: %d - %s", r.tx.Nonce(), r.tx.Hash())
 		delete(State.accountWithNonceFix, txFromLower)
 		r.writeRpcError("tx rejected - nonce too high")
 		return
@@ -214,8 +214,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Remember time when tx was received
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
-	State.txToUser[txHashLower] = NewStringWithTime(txFromLower)
-	State.userLatestTx[txFromLower] = NewStringWithTime(txHashLower)
+	State.txHashToUser[txHashLower] = NewStringWithTime(txFromLower)
+	State.userLatestTxHash[txFromLower] = NewStringWithTime(txHashLower)
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")

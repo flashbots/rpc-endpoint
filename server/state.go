@@ -22,8 +22,8 @@ func NewNonceFix(txHash string) *nonceFix {
 type GlobalState struct {
 	txForwardedToRelay  map[string]time.Time      // key: txHash
 	accountWithNonceFix map[string]*nonceFix      // key: txFrom
-	userLatestTx        map[string]StringWithTime // key: txFrom, value: txHash
-	txToUser            map[string]StringWithTime // key: txHash, value: txFrom
+	userLatestTxHash    map[string]StringWithTime // key: txFrom, value: txHash
+	txHashToUser        map[string]StringWithTime // key: txHash, value: txFrom
 	txStatus            map[string]StringWithTime // key: txHash, value: txStatus
 
 	userTxWithNonceSentToRelay map[string]BoolWithTime // key: txFrom_nonce
@@ -33,8 +33,8 @@ func NewGlobalState() *GlobalState {
 	return &GlobalState{
 		txForwardedToRelay:  make(map[string]time.Time),
 		accountWithNonceFix: make(map[string]*nonceFix),
-		userLatestTx:        make(map[string]StringWithTime),
-		txToUser:            make(map[string]StringWithTime),
+		userLatestTxHash:    make(map[string]StringWithTime),
+		txHashToUser:        make(map[string]StringWithTime),
 		txStatus:            make(map[string]StringWithTime),
 
 		userTxWithNonceSentToRelay: make(map[string]BoolWithTime),
@@ -57,16 +57,16 @@ func (s *GlobalState) cleanup() {
 	}
 
 	// txHistory should expire after 4h
-	for txHash, entry := range s.txToUser {
+	for txHash, entry := range s.txHashToUser {
 		if time.Since(entry.t).Hours() >= 4 {
-			delete(s.txToUser, txHash)
+			delete(s.txHashToUser, txHash)
 		}
 	}
 
 	// userLatestTx should expire after 4h
-	for txFrom, entry := range s.userLatestTx {
+	for txFrom, entry := range s.userLatestTxHash {
 		if time.Since(entry.t).Hours() >= 4 {
-			delete(s.userLatestTx, txFrom)
+			delete(s.userLatestTxHash, txFrom)
 		}
 	}
 

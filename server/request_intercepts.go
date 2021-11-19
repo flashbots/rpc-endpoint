@@ -21,14 +21,14 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
 
 	// Abort if transaction wasn't submitted before
-	txFrom, txFound := State.txToUser[txHashLower]
+	txFrom, txFound := State.txHashToUser[txHashLower]
 	if !txFound {
 		return
 	}
 	txFromLower := txFrom.s
 
 	// Abort if not the latest transaction by user
-	latestTxHash, latestFound := State.userLatestTx[txFromLower]
+	latestTxHash, latestFound := State.userLatestTxHash[txFromLower]
 	if latestFound && latestTxHash.s != txHashLower {
 		return
 	}

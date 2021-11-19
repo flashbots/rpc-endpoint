@@ -87,6 +87,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 		return
 	}
 
+	respw.Header().Set("Content-Type", "application/json")
 	respw.WriteHeader(http.StatusOK)
 	respw.Write(jsonResp)
 }
