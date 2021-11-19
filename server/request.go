@@ -156,9 +156,12 @@ func (r *RpcRequest) process() {
 		// Proxy the request to a node
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
-		// After proxy, perhaps check backend [MM fix #3 step 2]
 		if r.jsonReq.Method == "eth_getTransactionReceipt" {
-			r.check_post_getTransactionReceipt(jsonResp)
+			// Perhaps enable the nonce fix after proxying to the node
+			requestFinished := r.check_post_getTransactionReceipt(jsonResp)
+			if requestFinished {
+				return
+			}
 		}
 
 		// Write the response to user

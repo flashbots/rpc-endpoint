@@ -214,7 +214,6 @@ func TestMetamaskFix(t *testing.T) {
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
-	_ = jsonResp
 	require.Equal(t, "null", string(jsonResp.Result))
 
 	// At this point, the tx hash should be blacklisted and too high a nonce is returned
@@ -230,9 +229,17 @@ func TestMetamaskFix(t *testing.T) {
 	valueAfter3 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 	require.Equal(t, valueAfter1, valueAfter3)
 
+	// getTransactionsReceipt should return null, until 4x receiving the wrong nonce
+	txReceiptResp1 := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
+	require.Equal(t, "null", string(txReceiptResp1.Result))
+
 	// getTransactionCount 4/4 should return the same (fixed) value
 	valueAfter4 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 	require.Equal(t, valueAfter1, valueAfter4)
+
+	// getTransactionsReceipt should return an error after 4x receiving the wrong nonce
+	txReceiptResp2, _ := sendRpcAndParseResponse(req_getTransactionReceipt)
+	require.Equal(t, "private tx failed", txReceiptResp2.Error.Message)
 
 	// getTransactionCount 5 should return the initial value
 	valueAfter5 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)

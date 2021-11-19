@@ -8,7 +8,7 @@ import (
 var ProtectTxApiHost = "https://protect.flashbots.net"
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
-func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
 		return
@@ -35,13 +35,18 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 
 	// Remove any nonce fix for an earlier tx
 	nonceFix, nonceFixAlreadyInPlace := State.accountWithNonceFix[txFromLower]
-	if nonceFixAlreadyInPlace && nonceFix.txHash != txHashLower {
-		delete(State.accountWithNonceFix, txFromLower)
-	}
-
-	if _, nonceFixAlreadyInPlace = State.accountWithNonceFix[txFromLower]; nonceFixAlreadyInPlace {
-		// r.log("[MM2] eth_getTransactionReceipt already in progress")
-		return
+	if nonceFixAlreadyInPlace {
+		if nonceFix.txHash != txHashLower {
+			// nonce fix for a different tx: delete state and proceed
+			delete(State.accountWithNonceFix, txFromLower)
+		} else {
+			// nonce fix for the latest tx. do nothing until user has received 4x the fixed nonce, then reject with error
+			if nonceFix.numTries >= 4 {
+				r.writeRpcError("private tx failed")
+				return true
+			}
+			return false
+		}
 	}
 
 	r.log("[MM2] eth_getTransactionReceipt is null for latest user tx %s", txHashLower)
@@ -61,6 +66,8 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 		// healthy response, remove any nonce fix
 		delete(State.accountWithNonceFix, txFromLower)
 	}
+
+	return false
 }
 
 func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished bool) {
