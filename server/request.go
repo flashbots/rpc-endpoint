@@ -131,7 +131,7 @@ func (r *RpcRequest) process() {
 
 	// Parse JSON RPC
 	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.logError("failed to parse JSON RPC request: %v - body: %s", err, r.body)
+		r.log("failed to parse JSON RPC request: %v - body: %s", err, r.body)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
@@ -211,7 +211,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.log("tx rejected - nonce too high: %d - %s", r.tx.Nonce(), r.tx.Hash())
+		r.log("tx rejected - nonce too high: %d - %s from %s", r.tx.Nonce(), r.tx.Hash(), txFromLower)
 		delete(State.accountWithNonceFix, txFromLower)
 		r.writeRpcError("tx rejected - nonce too high")
 		return
