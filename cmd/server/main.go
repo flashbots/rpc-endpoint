@@ -16,6 +16,7 @@ var (
 	defaultListenAddress = "127.0.0.1:9000"
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
+	defaultRedisUrl      = "localhost:6379"
 
 	version = "dev" // is set during build process
 )
@@ -23,6 +24,7 @@ var (
 var versionPtr = flag.Bool("version", false, "just print the program version")
 var listenAddress = flag.String("listen", getEnvOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
 var proxyUrl = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
+var redisUrl = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis")
 
 // Flags for using the relay
 var relayUrl = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
@@ -56,7 +58,10 @@ func main() {
 	}
 
 	// Start the endpoint
-	s := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key)
+	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl)
+	if err != nil {
+		log.Fatal("Server init error:", err)
+	}
 	s.Start()
 }
 

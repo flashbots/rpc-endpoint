@@ -10,6 +10,8 @@ import (
 	"time"
 
 	_ "net/http/pprof"
+
+	"github.com/pkg/errors"
 )
 
 var Now = time.Now // used to mock time in tests
@@ -19,6 +21,7 @@ var blacklistedIps = []string{"127.0.0.2"}
 
 // Metamask fix helper
 var State = NewGlobalState()
+var RState *RedisState
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -33,7 +36,15 @@ type RpcEndPointServer struct {
 	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
+	var err error
+
+	// Setup redis connection
+	RState, err = NewRedisState(redisUrl)
+	if err != nil {
+		return nil, errors.Wrap(err, "Redis init error")
+	}
+
 	return &RpcEndPointServer{
 		startTime:       Now(),
 		version:         version,
@@ -41,7 +52,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		proxyUrl:        proxyUrl,
 		relayUrl:        relayUrl,
 		relaySigningKey: relaySigningKey,
-	}
+	}, nil
 }
 
 func (s *RpcEndPointServer) Start() {

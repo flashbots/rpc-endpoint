@@ -20,7 +20,6 @@ func NewNonceFix(txHash string) *nonceFix {
 
 // todo: put into redis
 type GlobalState struct {
-	txForwardedToRelay  map[string]time.Time      // key: txHash
 	accountWithNonceFix map[string]*nonceFix      // key: txFrom
 	userLatestTxHash    map[string]StringWithTime // key: txFrom, value: txHash
 	txHashToUser        map[string]StringWithTime // key: txHash, value: txFrom
@@ -31,7 +30,6 @@ type GlobalState struct {
 
 func NewGlobalState() *GlobalState {
 	return &GlobalState{
-		txForwardedToRelay:  make(map[string]time.Time),
 		accountWithNonceFix: make(map[string]*nonceFix),
 		userLatestTxHash:    make(map[string]StringWithTime),
 		txHashToUser:        make(map[string]StringWithTime),
@@ -42,13 +40,6 @@ func NewGlobalState() *GlobalState {
 }
 
 func (s *GlobalState) cleanup() {
-	// txForwardedToRelay should be kept around for 20 minutes, after which a user can resubmit
-	for txHash, t := range s.txForwardedToRelay {
-		if time.Since(t).Minutes() > 20 {
-			delete(s.txForwardedToRelay, txHash)
-		}
-	}
-
 	// invalid nonce should be sent for 1h max
 	for txFrom, nonceFix := range s.accountWithNonceFix {
 		if time.Since(nonceFix.createdAt).Hours() >= 1 {

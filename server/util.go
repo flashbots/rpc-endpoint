@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -219,8 +220,12 @@ func ShouldSendTxToRelay(txHash string) bool {
 	}
 
 	// don't send again tx again for 20 minutes (unless it's failed)
-	txSentToRelayAt, ok := State.txForwardedToRelay[strings.ToLower(txHash)]
-	if ok && time.Since(txSentToRelayAt).Minutes() < 20 {
+	timeSent, found, err := RState.GetTxSentToRelay(txHash)
+	if err != nil {
+		log.Println("error at ShouldSendTxToRelay:redis", err)
+	}
+
+	if found && time.Since(timeSent).Minutes() < 20 {
 		return false
 	}
 

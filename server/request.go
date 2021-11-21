@@ -394,6 +394,10 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
+	// Improve should-send check:
+	// - if sent before, then check API and resend only if not pending
+	// - if not sent before then send now
+
 	// Check if tx was already forwarded and should be blocked now
 	txHash := strings.ToLower(r.tx.Hash().Hex())
 	if !ShouldSendTxToRelay(txHash) {
@@ -404,8 +408,8 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	r.log("[sendTxToRelay] sending %s ...", txHash)
 
-	delete(State.txStatus, txHash)           // remove any previous tx status
-	State.txForwardedToRelay[txHash] = Now() // remember tx was forwarded to relay
+	delete(State.txStatus, txHash)  // remove any previous tx status
+	RState.SetTxSentToRelay(txHash) // mark tx as sent to relay
 
 	// for cancellation, remember that this tx was sent to relay
 	State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", strings.ToLower(r.txFrom), r.tx.Nonce())] = NewBoolWithTime(true)
