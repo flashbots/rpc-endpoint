@@ -207,7 +207,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
-	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, r.tx.To().Hex(), r.tx.Nonce(), r.tx.GasPrice().String())
+
+	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, AddressPtrToStr(r.tx.To()), r.tx.Nonce(), BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
