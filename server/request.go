@@ -236,11 +236,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		wasSentToRelay, found := State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", txFromLower, r.tx.Nonce())]
 		if found && wasSentToRelay.v {
 			// original tx was sent to relay
-			r.log("[cancel-tx] sending to relay")
+			r.log("[cancel-tx] sending to relay for %s", txFromLower)
 			needsProtection = true
 		} else {
 			// original tx was sent to mempool, or not seen in rpc-endpoint
-			r.log("[cancel-tx] sending to mempool")
+			r.log("[cancel-tx] sending to mempool for %s", txFromLower)
 			needsProtection = false
 		}
 	}
