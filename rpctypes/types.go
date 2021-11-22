@@ -6,24 +6,6 @@ import (
 	"time"
 )
 
-type StringWithTime struct {
-	S string
-	T time.Time
-}
-
-func NewStringWithTime(s string) StringWithTime {
-	return StringWithTime{s, time.Now()}
-}
-
-// type BoolWithTime struct {
-// 	v bool
-// 	t time.Time
-// }
-
-// func NewBoolWithTime(v bool) BoolWithTime {
-// 	return BoolWithTime{v, time.Now()}
-// }
-
 type JsonRpcRequest struct {
 	Id      interface{}   `json:"id"`
 	Method  string        `json:"method"`

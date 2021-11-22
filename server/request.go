@@ -237,41 +237,19 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
+	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
-	cancelTxIsForPrivateTx := func() bool {
-		// Get original tx hash by sender+nonce
-		txHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
-		if err != nil {
-			r.logError("Redis error on isCancelTx: %s", err)
-			return false
+	// Check for cancellation-tx
+	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
+		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
+		if requestDone {
+			return
 		}
 
-		// Check if tx was sent to relay
-		if !txHashFound {
-			return false
-		}
-
-		_, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
-		if err != nil {
-			r.logError("Redis error on isCancelTx: %s", err)
-			return false
-		}
-
-		if txWasSentToRelay {
-			r.log("[cancel-tx] sending to relay for %s", txFromLower)
-			return true
-		}
-
-		r.log("[cancel-tx] sending to mempool for %s", txFromLower)
-		return false
-	}
-
-	// Special check for cancellation tx
-	isCancelTx := len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex())
-	if isCancelTx && cancelTxIsForPrivateTx() {
-		// TODO: convert cancel-tx to cancelPrivateTransaction
-		return
+		// It's a cancel-tx for the mempool
+		needsProtection = false
+		r.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
 	}
 
 	if needsProtection {
@@ -506,4 +484,39 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	r._writeRpcResponse(backendResp)
 	r.log("[sendTxToRelay] sent %s", txHash)
+}
+
+func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
+	txFromLower := strings.ToLower(r.txFrom)
+
+	// Get original tx hash by sender+nonce
+	txHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
+	if err != nil {
+		r.logError("Redis error on isCancelTx: %s", err)
+		return false
+	}
+
+	if !txHashFound {
+		return false
+	}
+
+	// Check if tx was sent to relay
+	_, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
+	if err != nil {
+		r.logError("Redis error on isCancelTx: %s", err)
+		return false
+	}
+
+	if !txWasSentToRelay {
+		return false
+	}
+
+	r.log("[cancel-tx] sending to relay for %s/%d", txFromLower, r.tx.Nonce())
+
+	// TODO: convert cancel-tx to cancelPrivateTransaction
+	panic("not implemented")
+
+	// All done, write response
+	// r.writeRpcResult(txHash)
+	// return true
 }
