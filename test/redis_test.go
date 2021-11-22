@@ -161,3 +161,24 @@ func TestSenderOfTxHash(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, strings.ToLower(txFrom), val)
 }
+
+func TestLastTxHashOfAccount(t *testing.T) {
+	var err error
+	resetRedis()
+
+	txFrom := "0x0Sender"
+	txHash := "0xDeadBeef"
+
+	val, found, err := redisState.GetLastTxHashOfAccount(txFrom)
+	require.Nil(t, err, err)
+	require.False(t, found)
+	require.Equal(t, "", val)
+
+	err = redisState.SetLastTxHashOfAccount(txFrom, txHash)
+	require.Nil(t, err, err)
+
+	val, found, err = redisState.GetLastTxHashOfAccount(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, strings.ToLower(txHash), val)
+}
