@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -223,4 +225,18 @@ func ShouldSendTxToRelay(txHash string) bool {
 	}
 
 	return true
+}
+
+func BigIntPtrToStr(i *big.Int) string {
+	if i == nil {
+		return ""
+	}
+	return i.String()
+}
+
+func AddressPtrToStr(a *common.Address) string {
+	if a == nil {
+		return ""
+	}
+	return a.Hex()
 }
