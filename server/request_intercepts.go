@@ -30,14 +30,14 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 		return
 	}
 
-	// Get the user of this transaction
-	txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
-	if err != nil {
-		r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
-		return
-	}
-
 	ensureAccountFixIsInPlace := func() {
+		// Get the sender of this transaction
+		txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
+			return
+		}
+
 		if !txFromFound { // cannot sent nonce-fix if we don't have the sender
 			return
 		}
@@ -71,24 +71,10 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 		return true
 
 	} else if statusApiResponse.Status == rpctypes.TxStatusIncluded {
-		// If latest tx of this user was a successful, then we should remove the nonce fix
-		userLatestTxHashLower, found, err := RState.GetLastPrivTxHashOfAccount(txFromLower)
-		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis:GetLastTxHashOfAccount failed: %s", err)
-			return
-		}
-
-		if !found {
-			return
-		}
-
-		if userLatestTxHashLower == txHashLower { // is latest user tx, and is included: delete any nonce fix
-			err = RState.DelNonceFixForAccount(txFromLower)
-			if err != nil {
-				r.logError("[post_getTransactionReceipt] redis:DelNonceFixForAccount failed: %s", err)
-				return
-			}
-		}
+		// TODO? If latest tx of this user was a successful, then we should remove the nonce fix
+		// This could lead to a ping-pong between checking 2 tx, with one check adding and another removing the nonce fix
+		// See also the branch tmp-check_post_getTransactionReceipt-removeNonceFix
+		_ = 1
 	}
 
 	return
