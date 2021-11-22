@@ -3,12 +3,14 @@ package server
 import (
 	"fmt"
 	"strings"
+
+	"github.com/flashbots/rpc-endpoint/rpctypes"
 )
 
 var ProtectTxApiHost = "https://protect.flashbots.net"
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
-func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) (requestFinished bool) {
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
 		return
@@ -25,7 +27,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	if !txFound {
 		return
 	}
-	txFromLower := txFrom.s
+	txFromLower := txFrom.S
 
 	r.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
 

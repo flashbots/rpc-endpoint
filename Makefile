@@ -12,7 +12,7 @@ clean:
 	rm -rf rpc-endpoint build/
 
 test:
-	go test test/*
+	go test ./...
 
 lint:
 	gofmt -d ./

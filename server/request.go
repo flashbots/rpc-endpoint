@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/flashbots/rpc-endpoint/rpctypes"
 	"github.com/google/uuid"
 )
 
@@ -32,7 +33,7 @@ type RpcRequest struct {
 
 	// extracted during request lifecycle:
 	body     []byte
-	jsonReq  *JsonRpcRequest
+	jsonReq  *rpctypes.JsonRpcRequest
 	ip       string
 	rawTxHex string
 	tx       *types.Transaction
@@ -226,7 +227,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Remember time when tx was received
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
-	State.txHashToUser[txHashLower] = NewStringWithTime(txFromLower)
+	State.txHashToUser[txHashLower] = rpctypes.NewStringWithTime(txFromLower)
 	// State.userLatestTxHash[txFromLower] = NewStringWithTime(txHashLower)
 
 	if isOnOFACList(r.txFrom) {
@@ -306,7 +307,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 }
 
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
-func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *JsonRpcResponse) {
+func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *rpctypes.JsonRpcResponse) {
 	timeProxyStart := Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -335,7 +336,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
-	jsonRpcResp := new(JsonRpcResponse)
+	jsonRpcResp := new(rpctypes.JsonRpcResponse)
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v", err)
 		return false, proxyResp.StatusCode, jsonResp
@@ -371,10 +372,10 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) boo
 }
 
 func (r *RpcRequest) writeRpcError(msg string) {
-	res := JsonRpcResponse{
+	res := rpctypes.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
-		Error: &JsonRpcError{
+		Error: &rpctypes.JsonRpcError{
 			Code:    -32603,
 			Message: msg,
 		},
@@ -389,7 +390,7 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
-	res := JsonRpcResponse{
+	res := rpctypes.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
 		Result:  resBytes,
@@ -397,7 +398,7 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 	r._writeRpcResponse(&res)
 }
 
-func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
+func (r *RpcRequest) _writeRpcResponse(res *rpctypes.JsonRpcResponse) {
 	if r.respBodyWritten {
 		r.logError("_writeRpcResponse: response already written")
 		return
@@ -419,24 +420,51 @@ func (r *RpcRequest) _writeRpcResponse(res *JsonRpcResponse) {
 	r.respBodyWritten = true
 }
 
+// - if sent before, then check API and resend only if not pending
+// - if not sent before then send now
+func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
+	timeSent, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
+	if err != nil {
+		r.logError("[shouldSendTxToRelay] redis:GetTxSentToRelay error: %v", err)
+		return true
+	}
+
+	if !txWasSentToRelay {
+		return true
+	}
+
+	// was sent before. check status and time
+	txStatusApiResponse, err := GetTxStatus(txHash)
+	if err != nil {
+		r.logError("[shouldSendTxToRelay] GetTxStatus error: %v", err)
+		return true
+	}
+
+	// Allow sending to relay if tx has failed, or if it's still unknown after a while
+	txStatus := rpctypes.PrivateTxStatus(txStatusApiResponse.Status)
+	if txStatus == rpctypes.TxStatusFailed {
+		return true
+	} else if txStatus == rpctypes.TxStatusUnknown && time.Since(timeSent).Minutes() > 5 {
+		return true
+	} else {
+		// If tx is still pending, or included then don't send it again
+		return false
+	}
+}
+
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	// Improve should-send check:
-	// - if sent before, then check API and resend only if not pending
-	// - if not sent before then send now
+	txHash := strings.ToLower(r.tx.Hash().Hex())
 
 	// Check if tx was already forwarded and should be blocked now
-	txHash := strings.ToLower(r.tx.Hash().Hex())
-	if !ShouldSendTxToRelay(txHash) {
+	if !r.shouldSendTxToRelay(txHash) {
 		r.log("[sendTxToRelay] shouldn't send %s", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}
 
 	r.log("[sendTxToRelay] sending %s ...", txHash)
-
-	// remove any previous tx status
-	delete(State.txStatus, txHash)
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
@@ -458,7 +486,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	param := make(map[string]string)
 	param["tx"] = r.rawTxHex
-	jsonRpcReq := NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
+	jsonRpcReq := rpctypes.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
 	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
 	if err != nil {
 		r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err, *respBytes)

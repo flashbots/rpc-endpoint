@@ -11,19 +11,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/flashbots/rpc-endpoint/rpctypes"
 	"github.com/flashbots/rpc-endpoint/server"
 )
 
-var getBundleStatusByTransactionHash_Response = server.GetBundleStatusByTransactionHashResponse{
+var getBundleStatusByTransactionHash_Response = rpctypes.GetBundleStatusByTransactionHashResponse{
 	TxHash: TestTx_BundleFailedTooManyTimes_Hash,
 	Status: "FAILED_BUNDLE",
 }
 
 var MockBackendLastRawRequest *http.Request
-var MockBackendLastJsonRpcRequest *server.JsonRpcRequest
+var MockBackendLastJsonRpcRequest *rpctypes.JsonRpcRequest
 var MockBackendLastJsonRpcRequestTimestamp time.Time
 
-func handleRpcRequest(req *server.JsonRpcRequest) (result interface{}, err error) {
+func handleRpcRequest(req *rpctypes.JsonRpcRequest) (result interface{}, err error) {
 	MockBackendLastJsonRpcRequest = req
 
 	switch req.Method {
@@ -79,9 +80,9 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 
 	returnError := func(id interface{}, msg string) {
 		log.Println("returnError:", msg)
-		res := server.JsonRpcResponse{
+		res := rpctypes.JsonRpcResponse{
 			Id: id,
-			Error: &server.JsonRpcError{
+			Error: &rpctypes.JsonRpcError{
 				Code:    -32603,
 				Message: msg,
 			},
@@ -99,7 +100,7 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Parse JSON RPC
-	jsonReq := new(server.JsonRpcRequest)
+	jsonReq := new(rpctypes.JsonRpcRequest)
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
 		returnError(-1, fmt.Sprintf("failed to parse JSON RPC request: %v", err))
 		return
@@ -117,7 +118,7 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("error mashalling rawRes:", rawRes, err)
 	}
 
-	res := server.NewJsonRpcResponse(jsonReq.Id, resBytes)
+	res := rpctypes.NewJsonRpcResponse(jsonReq.Id, resBytes)
 
 	// Write to client request
 	if err := json.NewEncoder(w).Encode(res); err != nil {

@@ -7,11 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/big"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -19,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flashbots/rpc-endpoint/rpctypes"
 	"github.com/pkg/errors"
 )
 
@@ -105,7 +104,7 @@ func TruncateText(s string, max int) string {
 	return s
 }
 
-func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcResponse, error) {
+func SendRpcAndParseResponseTo(url string, req *rpctypes.JsonRpcRequest) (*rpctypes.JsonRpcResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal")
@@ -122,13 +121,13 @@ func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcRespons
 		return nil, errors.Wrap(err, "read")
 	}
 
-	jsonRpcResp := new(JsonRpcResponse)
+	jsonRpcResp := new(rpctypes.JsonRpcResponse)
 
 	// Check if returned an error, if so then convert to standard JSON-RPC error
 	errorResp := new(RelayErrorResponse)
 	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error, convert to standard JSON-RPC error now
-		jsonRpcResp.Error = &JsonRpcError{Message: errorResp.Error}
+		jsonRpcResp.Error = &rpctypes.JsonRpcError{Message: errorResp.Error}
 		return jsonRpcResp, nil
 	}
 
@@ -144,7 +143,7 @@ type RelayErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *JsonRpcRequest) (jsonRpcResponse *JsonRpcResponse, responseBytes *[]byte, err error) {
+func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *rpctypes.JsonRpcRequest) (jsonRpcResponse *rpctypes.JsonRpcResponse, responseBytes *[]byte, err error) {
 	body, err := json.Marshal(jsonRpcReq)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "marshal")
@@ -181,11 +180,11 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 		return nil, nil, errors.Wrap(err, "read")
 	}
 
-	jsonRpcResp := new(JsonRpcResponse)
+	jsonRpcResp := new(rpctypes.JsonRpcResponse)
 	errorResp := new(RelayErrorResponse)
 	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error. Convert to standard JSON-RPC error
-		jsonRpcResp.Error = &JsonRpcError{Message: errorResp.Error}
+		jsonRpcResp.Error = &rpctypes.JsonRpcError{Message: errorResp.Error}
 		return jsonRpcResp, &respData, nil
 	}
 
@@ -198,7 +197,7 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 	return jsonRpcResp, &respData, nil
 }
 
-func GetTxStatus(txHash string) (*PrivateTxApiResponse, error) {
+func GetTxStatus(txHash string) (*rpctypes.PrivateTxApiResponse, error) {
 	privTxApiUrl := fmt.Sprintf("%s/tx/%s", ProtectTxApiHost, txHash)
 	resp, err := http.Get(privTxApiUrl)
 	if err != nil {
@@ -211,34 +210,13 @@ func GetTxStatus(txHash string) (*PrivateTxApiResponse, error) {
 		return nil, errors.Wrap(err, "privTxApi body-read failed for "+txHash)
 	}
 
-	respObj := new(PrivateTxApiResponse)
+	respObj := new(rpctypes.PrivateTxApiResponse)
 	err = json.Unmarshal(bodyBytes, respObj)
 	if err != nil {
 		return nil, errors.Wrap(err, "privTxApi jsonUnmarshal failed for "+txHash)
 	}
 
-	State.txStatus[strings.ToLower(txHash)] = NewStringWithTime(respObj.Status)
 	return respObj, nil
-}
-
-func ShouldSendTxToRelay(txHash string) bool {
-	// send again if tx is failed
-	txStatus, ok := State.txStatus[strings.ToLower(txHash)]
-	if ok && txStatus.s == "FAILED" {
-		return true
-	}
-
-	// don't send again tx again for 20 minutes (unless it's failed)
-	timeSent, found, err := RState.GetTxSentToRelay(txHash)
-	if err != nil {
-		log.Println("error at ShouldSendTxToRelay:redis", err)
-	}
-
-	if found && time.Since(timeSent).Minutes() < 20 {
-		return false
-	}
-
-	return true
 }
 
 func BigIntPtrToStr(i *big.Int) string {
