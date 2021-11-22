@@ -21,7 +21,6 @@ var Now = time.Now // used to mock time in tests
 var blacklistedIps = []string{"127.0.0.2"}
 
 // Metamask fix helper
-var State = NewGlobalState()
 var RState *RedisState
 
 func init() {

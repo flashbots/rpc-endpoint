@@ -45,7 +45,7 @@ func init() {
 
 // Reset the RPC endpoint and mock backend servers
 func resetTestServers() {
-	s, err := miniredis.Run()
+	redisServer, err := miniredis.Run()
 	if err != nil {
 		panic(err)
 	}
@@ -62,15 +62,12 @@ func resetTestServers() {
 	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, s.Addr())
+	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, redisServer.Addr())
 	if err != nil {
 		panic(err)
 	}
 	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(rpcServer.HandleHttpRequest))
 	RpcEndpointUrl = rpcEndpointServer.URL
-
-	// Reset the metamask fixer
-	server.State = server.NewGlobalState()
 }
 
 func init() {

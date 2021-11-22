@@ -140,3 +140,24 @@ func TestNonceFixForAccount(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, uint64(17), numTimesSent)
 }
+
+func TestSenderOfTxHash(t *testing.T) {
+	var err error
+	resetRedis()
+
+	txFrom := "0x0Sender"
+	txHash := "0xDeadBeef"
+
+	val, found, err := redisState.GetSenderOfTxHash(txHash)
+	require.Nil(t, err, err)
+	require.False(t, found)
+	require.Equal(t, "", val)
+
+	err = redisState.SetSenderOfTxHash(txHash, txFrom)
+	require.Nil(t, err, err)
+
+	val, found, err = redisState.GetSenderOfTxHash(txHash)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, strings.ToLower(txFrom), val)
+}

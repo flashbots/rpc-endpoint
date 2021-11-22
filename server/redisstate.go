@@ -12,6 +12,7 @@ import (
 )
 
 var RedisPrefix = "rpc-endpoint:"
+
 var RedisPrefixTxSentToRelay = RedisPrefix + "tx-sent-to-relay:"
 var RedisExpiryTxSentToRelay = time.Duration(24 * time.Hour) // 1 day
 
@@ -20,6 +21,9 @@ var RedisExpiryTxHashForSenderAndNonce = time.Duration(24 * time.Hour) // 1 day
 
 var RedisPrefixNonceFixForAccount = RedisPrefix + "txsender-with-nonce-fix:"
 var RedisExpiryNonceFixForAccount = time.Duration(2 * time.Hour)
+
+var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
+var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 
 func RedisKeyTxSentToRelay(txHash string) string {
 	return RedisPrefixTxSentToRelay + strings.ToLower(txHash)
@@ -31,6 +35,10 @@ func RedisKeyTxHashForSenderAndNonce(txFrom string, nonce uint64) string {
 
 func RedisKeyNonceFixForAccount(txFrom string) string {
 	return RedisPrefixNonceFixForAccount + strings.ToLower(txFrom)
+}
+
+func RedisKeySenderOfTxHash(txHash string) string {
+	return RedisPrefixSenderOfTxHash + strings.ToLower(txHash)
 }
 
 type RedisState struct {
@@ -52,6 +60,9 @@ func NewRedisState(redisUrl string) (*RedisState, error) {
 	}, nil
 }
 
+//
+// Enable lookup of timeSentToRelay by txHash
+//
 func (s *RedisState) SetTxSentToRelay(txHash string) error {
 	key := RedisKeyTxSentToRelay(txHash)
 	err := s.RedisClient.Set(context.Background(), key, Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
@@ -76,6 +87,9 @@ func (s *RedisState) GetTxSentToRelay(txHash string) (timeSent time.Time, found 
 	return t, true, nil
 }
 
+//
+// Enable lookup of txFrom by txFrom+nonce
+//
 func (s *RedisState) SetTxHashForSenderAndNonce(txFrom string, nonce uint64, txHash string) error {
 	key := RedisKeyTxHashForSenderAndNonce(txFrom, nonce)
 	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txHash), RedisExpiryTxHashForSenderAndNonce).Err()
@@ -94,6 +108,9 @@ func (s *RedisState) GetTxHashForSenderAndNonce(txFrom string, nonce uint64) (va
 	return val, true, nil
 }
 
+//
+// nonce-fix per account
+//
 func (s *RedisState) SetNonceFixForAccount(txFrom string, numTimesSent uint64) error {
 	key := RedisKeyNonceFixForAccount(txFrom)
 	err := s.RedisClient.Set(context.Background(), key, numTimesSent, RedisExpiryNonceFixForAccount).Err()
@@ -120,4 +137,25 @@ func (s *RedisState) GetNonceFixForAccount(txFrom string) (numTimesSent uint64, 
 		return 0, true, err
 	}
 	return numTimesSent, true, nil
+}
+
+//
+// Enable lookup of txFrom by txHash
+//
+func (s *RedisState) SetSenderOfTxHash(txHash string, txFrom string) error {
+	key := RedisKeySenderOfTxHash(txHash)
+	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txFrom), RedisExpirySenderOfTxHash).Err()
+	return err
+}
+
+func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bool, err error) {
+	key := RedisKeySenderOfTxHash(txHash)
+	txSender, err = s.RedisClient.Get(context.Background(), key).Result()
+	if err == redis.Nil { // not found
+		return "", false, nil
+	} else if err != nil {
+		return "", false, err
+	}
+
+	return txSender, true, nil
 }

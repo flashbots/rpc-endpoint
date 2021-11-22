@@ -21,14 +21,6 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 	}
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
-
-	// Abort if transaction wasn't submitted before
-	txFrom, txFound := State.txHashToUser[txHashLower]
-	if !txFound {
-		return
-	}
-	txFromLower := txFrom.S
-
 	r.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
 
 	// get tx status from private-tx-api
@@ -39,14 +31,26 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 	}
 
 	ensureAccountFixIsInPlace := func() {
-		// Check if nonceFix is already in place for this user
-		_, nonceFixInPlace, err := RState.GetNonceFixForAccount(txFromLower)
+		// Get the user of this transaction
+		txFrom, found, err := RState.GetSenderOfTxHash(txHashLower)
 		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis error: %s", err)
+			r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
 			return
 		}
 
-		if nonceFixInPlace {
+		if !found {
+			return
+		}
+
+		// Check if nonceFix is already in place for this user
+		txFromLower := strings.ToLower(txFrom)
+		_, nonceFixAlreadyExists, err := RState.GetNonceFixForAccount(txFromLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis:GetNonceFixForAccount failed: %s", err)
+			return
+		}
+
+		if nonceFixAlreadyExists {
 			return
 		}
 
@@ -56,6 +60,8 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 			r.logError("[post_getTransactionReceipt] redis error: %s", err)
 			return
 		}
+
+		r.logError("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
 	}
 
 	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
@@ -66,7 +72,6 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 		return true
 
 	} else {
-		// healthy response, remove any nonce fix
 		// TODO: if latest tx of this user was a successful, then we should remove the nonce fix
 		_ = 1
 	}
