@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/flashbots/rpc-endpoint/rpctypes"
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
-var MockTxApiStatusForHash map[string]rpctypes.PrivateTxStatus = make(map[string]rpctypes.PrivateTxStatus)
+var MockTxApiStatusForHash map[string]types.PrivateTxStatus = make(map[string]types.PrivateTxStatus)
 
 func MockTxApiReset() {
-	MockTxApiStatusForHash = make(map[string]rpctypes.PrivateTxStatus)
+	MockTxApiStatusForHash = make(map[string]types.PrivateTxStatus)
 }
 
 func MockTxApiHandler(w http.ResponseWriter, req *http.Request) {
@@ -27,7 +27,7 @@ func MockTxApiHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	txHash := req.URL.Path[4:] // by default, the first 4 characters are "/tx/"
-	resp := rpctypes.PrivateTxApiResponse{Status: rpctypes.TxStatusUnknown}
+	resp := types.PrivateTxApiResponse{Status: types.TxStatusUnknown}
 
 	if status, found := MockTxApiStatusForHash[txHash]; found {
 		resp.Status = status

@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/flashbots/rpc-endpoint/rpctypes"
 	"github.com/flashbots/rpc-endpoint/server"
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 // Test tx for bundle-failed-too-many-times MM1 fix
@@ -23,11 +23,11 @@ var TestTx_MM2_Hash = "0xc543e2ad05cffdee95b984df20edd2e38e124c54461faa1276adc36
 
 var RpcEndpointUrl string // set by test init()
 
-func sendRpcAndParseResponse(req *rpctypes.JsonRpcRequest) (*rpctypes.JsonRpcResponse, error) {
+func sendRpcAndParseResponse(req *types.JsonRpcRequest) (*types.JsonRpcResponse, error) {
 	return server.SendRpcAndParseResponseTo(RpcEndpointUrl, req)
 }
 
-func sendRpcAndParseResponseOrFailNow(t *testing.T, req *rpctypes.JsonRpcRequest) *rpctypes.JsonRpcResponse {
+func sendRpcAndParseResponseOrFailNow(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
 	res, err := sendRpcAndParseResponse(req)
 	if err != nil {
 		t.Fatal("sendRpcAndParseResponse error:", err)
@@ -35,14 +35,14 @@ func sendRpcAndParseResponseOrFailNow(t *testing.T, req *rpctypes.JsonRpcRequest
 	return res
 }
 
-func sendRpcAndParseResponseOrFailNowString(t *testing.T, req *rpctypes.JsonRpcRequest) string {
+func sendRpcAndParseResponseOrFailNowString(t *testing.T, req *types.JsonRpcRequest) string {
 	var rpcResult string
 	resp := sendRpcAndParseResponseOrFailNow(t, req)
 	json.Unmarshal(resp.Result, &rpcResult)
 	return rpcResult
 }
 
-func sendRpcAndParseResponseOrFailNowAllowRpcError(t *testing.T, req *rpctypes.JsonRpcRequest) *rpctypes.JsonRpcResponse {
+func sendRpcAndParseResponseOrFailNowAllowRpcError(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
 	res, err := sendRpcAndParseResponse(req)
 	if err != nil {
 		t.Fatal(err)

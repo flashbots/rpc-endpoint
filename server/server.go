@@ -11,7 +11,7 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/flashbots/rpc-endpoint/rpctypes"
+	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
 )
 
@@ -87,7 +87,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
-	res := rpctypes.HealthResponse{
+	res := types.HealthResponse{
 		Now:       Now(),
 		StartTime: s.startTime,
 		Version:   s.version,

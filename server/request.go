@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/flashbots/rpc-endpoint/rpctypes"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
 )
 
@@ -33,10 +33,10 @@ type RpcRequest struct {
 
 	// extracted during request lifecycle:
 	body     []byte
-	jsonReq  *rpctypes.JsonRpcRequest
+	jsonReq  *types.JsonRpcRequest
 	ip       string
 	rawTxHex string
-	tx       *types.Transaction
+	tx       *ethtypes.Transaction
 	txFrom   string
 
 	// response flags
@@ -286,7 +286,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 }
 
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
-func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *rpctypes.JsonRpcResponse) {
+func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *types.JsonRpcResponse) {
 	timeProxyStart := Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
@@ -315,7 +315,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
-	jsonRpcResp := new(rpctypes.JsonRpcResponse)
+	jsonRpcResp := new(types.JsonRpcResponse)
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v", err)
 		return false, proxyResp.StatusCode, jsonResp
@@ -326,7 +326,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 
 // Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
 // for example simple ERC20 transfers.
-func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) bool {
+func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) bool {
 	gas := tx.Gas()
 	r.log("[protect-check] gas: %v", gas)
 
@@ -351,10 +351,10 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *types.Transaction) boo
 }
 
 func (r *RpcRequest) writeRpcError(msg string) {
-	res := rpctypes.JsonRpcResponse{
+	res := types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
-		Error: &rpctypes.JsonRpcError{
+		Error: &types.JsonRpcError{
 			Code:    -32603,
 			Message: msg,
 		},
@@ -369,7 +369,7 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
-	res := rpctypes.JsonRpcResponse{
+	res := types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
 		Result:  resBytes,
@@ -377,7 +377,7 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 	r._writeRpcResponse(&res)
 }
 
-func (r *RpcRequest) _writeRpcResponse(res *rpctypes.JsonRpcResponse) {
+func (r *RpcRequest) _writeRpcResponse(res *types.JsonRpcResponse) {
 	if r.respBodyWritten {
 		r.logError("_writeRpcResponse: response already written")
 		return
@@ -399,8 +399,7 @@ func (r *RpcRequest) _writeRpcResponse(res *rpctypes.JsonRpcResponse) {
 	r.respBodyWritten = true
 }
 
-// - if sent before, then check API and resend only if not pending
-// - if not sent before then send now
+// send if (a) not sent before then send now, (b) privTx failed, (c) unknown and 5 min passed
 func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
 	timeSent, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
 	if err != nil {
@@ -420,10 +419,10 @@ func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
 	}
 
 	// Allow sending to relay if tx has failed, or if it's still unknown after a while
-	txStatus := rpctypes.PrivateTxStatus(txStatusApiResponse.Status)
-	if txStatus == rpctypes.TxStatusFailed {
+	txStatus := types.PrivateTxStatus(txStatusApiResponse.Status)
+	if txStatus == types.TxStatusFailed {
 		return true
-	} else if txStatus == rpctypes.TxStatusUnknown && time.Since(timeSent).Minutes() >= 5 {
+	} else if txStatus == types.TxStatusUnknown && time.Since(timeSent).Minutes() >= 5 {
 		return true
 	} else {
 		// If tx is still pending, or included then don't send it again
@@ -433,7 +432,6 @@ func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
 
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
-	// Improve should-send check:
 	txHash := strings.ToLower(r.tx.Hash().Hex())
 
 	// Check if tx was already forwarded and should be blocked now
@@ -470,7 +468,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	param := make(map[string]string)
 	param["tx"] = r.rawTxHex
-	jsonRpcReq := rpctypes.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
+	jsonRpcReq := types.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
 	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
 	if err != nil {
 		r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err, *respBytes)
@@ -488,11 +486,12 @@ func (r *RpcRequest) sendTxToRelay() {
 
 func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	txFromLower := strings.ToLower(r.txFrom)
+	r.log("[cancel-tx] check %s/%d", txFromLower, r.tx.Nonce())
 
 	// Get original tx hash by sender+nonce
 	txHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
 	if err != nil {
-		r.logError("Redis error on isCancelTx: %s", err)
+		r.logError("[cancel-tx] redis:GetTxHashForSenderAndNonce failed %v", err)
 		return false
 	}
 
@@ -503,7 +502,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	// Check if tx was sent to relay
 	_, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
 	if err != nil {
-		r.logError("Redis error on isCancelTx: %s", err)
+		r.logError("[cancel-tx] redis:GetTxSentToRelay failed: %s", err)
 		return false
 	}
 
@@ -511,7 +510,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 		return false
 	}
 
-	r.log("[cancel-tx] sending to relay for %s/%d", txFromLower, r.tx.Nonce())
+	r.log("[cancel-tx] sending to relay: %s for %s/%d", txHash, txFromLower, r.tx.Nonce())
 
 	// TODO: convert cancel-tx to cancelPrivateTransaction
 	panic("not implemented")

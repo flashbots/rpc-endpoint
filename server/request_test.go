@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis"
-	"github.com/flashbots/rpc-endpoint/rpctypes"
 	"github.com/flashbots/rpc-endpoint/testutils"
+	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,27 +55,27 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	// Ensure tx status is UNKNOWN
 	txStatusApiResponse, err := GetTxStatus(txHash)
 	require.Nil(t, err, err)
-	require.Equal(t, rpctypes.TxStatusUnknown, txStatusApiResponse.Status)
+	require.Equal(t, types.TxStatusUnknown, txStatusApiResponse.Status)
 
 	// Should NOT SEND when known, but state is unknown and time since sent < 5 min
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.False(t, shouldSend)
 
 	// Set tx status to Failed
-	testutils.MockTxApiStatusForHash[txHash] = rpctypes.TxStatusFailed
+	testutils.MockTxApiStatusForHash[txHash] = types.TxStatusFailed
 	txStatusApiResponse, err = GetTxStatus(txHash)
 	require.Nil(t, err, err)
-	require.Equal(t, rpctypes.TxStatusFailed, txStatusApiResponse.Status)
+	require.Equal(t, types.TxStatusFailed, txStatusApiResponse.Status)
 
 	// Should send again if failed
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.True(t, shouldSend)
 
 	// Set tx status to pending
-	testutils.MockTxApiStatusForHash[txHash] = rpctypes.TxStatusPending
+	testutils.MockTxApiStatusForHash[txHash] = types.TxStatusPending
 	txStatusApiResponse, err = GetTxStatus(txHash)
 	require.Nil(t, err, err)
-	require.Equal(t, rpctypes.TxStatusPending, txStatusApiResponse.Status)
+	require.Equal(t, types.TxStatusPending, txStatusApiResponse.Status)
 
 	// Shouldn't send again if pending
 	shouldSend = request.shouldSendTxToRelay(txHash)
@@ -99,7 +99,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	// Ensure tx status is UNKNOWN
 	txStatusApiResponse, err = GetTxStatus(txHash)
 	require.Nil(t, err, err)
-	require.Equal(t, rpctypes.TxStatusUnknown, txStatusApiResponse.Status)
+	require.Equal(t, types.TxStatusUnknown, txStatusApiResponse.Status)
 
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.True(t, shouldSend)

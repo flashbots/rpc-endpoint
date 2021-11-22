@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flashbots/rpc-endpoint/rpctypes"
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 var ProtectTxApiHost = "https://protect.flashbots.net"
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
-func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpcResponse) (requestFinished bool) {
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
 		return
@@ -64,13 +64,13 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 	}
 
 	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
-	if statusApiResponse.Status == rpctypes.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == rpctypes.TxStatusUnknown) {
+	if statusApiResponse.Status == types.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == types.TxStatusUnknown) {
 		r.log("[post_getTransactionReceipt] failed private tx")
 		ensureAccountFixIsInPlace()
 		r.writeRpcError("Transaction failed") // TODO: return standard failed tx payload?
 		return true
 
-	} else if statusApiResponse.Status == rpctypes.TxStatusIncluded {
+	} else if statusApiResponse.Status == types.TxStatusIncluded {
 		// TODO? If latest tx of this user was a successful, then we should remove the nonce fix
 		// This could lead to a ping-pong between checking 2 tx, with one check adding and another removing the nonce fix
 		// See also the branch tmp-check_post_getTransactionReceipt-removeNonceFix

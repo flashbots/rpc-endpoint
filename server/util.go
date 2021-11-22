@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flashbots/rpc-endpoint/rpctypes"
+	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
 )
 
@@ -55,7 +55,7 @@ func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	return client.Do(req)
 }
 
-func GetTx(rawTxHex string) (*types.Transaction, error) {
+func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
 	if len(rawTxHex) < 2 {
 		return nil, errors.New("invalid raw transaction")
 	}
@@ -65,7 +65,7 @@ func GetTx(rawTxHex string) (*types.Transaction, error) {
 		return nil, errors.New("invalid raw transaction")
 	}
 
-	tx := new(types.Transaction)
+	tx := new(ethtypes.Transaction)
 	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
 		return nil, errors.New("error unmarshalling")
 	}
@@ -73,16 +73,16 @@ func GetTx(rawTxHex string) (*types.Transaction, error) {
 	return tx, nil
 }
 
-func GetSenderFromTx(tx *types.Transaction) (string, error) {
-	signer := types.LatestSignerForChainID(tx.ChainId())
-	sender, err := types.Sender(signer, tx)
+func GetSenderFromTx(tx *ethtypes.Transaction) (string, error) {
+	signer := ethtypes.LatestSignerForChainID(tx.ChainId())
+	sender, err := ethtypes.Sender(signer, tx)
 	if err != nil {
 		return "", err
 	}
 	return sender.Hex(), nil
 }
 
-func GetSenderFromRawTx(tx *types.Transaction) (string, error) {
+func GetSenderFromRawTx(tx *ethtypes.Transaction) (string, error) {
 	from, err := GetSenderFromTx(tx)
 	if err != nil {
 		return "", errors.New("error getting from")
@@ -104,7 +104,7 @@ func TruncateText(s string, max int) string {
 	return s
 }
 
-func SendRpcAndParseResponseTo(url string, req *rpctypes.JsonRpcRequest) (*rpctypes.JsonRpcResponse, error) {
+func SendRpcAndParseResponseTo(url string, req *types.JsonRpcRequest) (*types.JsonRpcResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal")
@@ -121,13 +121,13 @@ func SendRpcAndParseResponseTo(url string, req *rpctypes.JsonRpcRequest) (*rpcty
 		return nil, errors.Wrap(err, "read")
 	}
 
-	jsonRpcResp := new(rpctypes.JsonRpcResponse)
+	jsonRpcResp := new(types.JsonRpcResponse)
 
 	// Check if returned an error, if so then convert to standard JSON-RPC error
 	errorResp := new(RelayErrorResponse)
 	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error, convert to standard JSON-RPC error now
-		jsonRpcResp.Error = &rpctypes.JsonRpcError{Message: errorResp.Error}
+		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
 		return jsonRpcResp, nil
 	}
 
@@ -143,7 +143,7 @@ type RelayErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *rpctypes.JsonRpcRequest) (jsonRpcResponse *rpctypes.JsonRpcResponse, responseBytes *[]byte, err error) {
+func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *types.JsonRpcRequest) (jsonRpcResponse *types.JsonRpcResponse, responseBytes *[]byte, err error) {
 	body, err := json.Marshal(jsonRpcReq)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "marshal")
@@ -180,11 +180,11 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 		return nil, nil, errors.Wrap(err, "read")
 	}
 
-	jsonRpcResp := new(rpctypes.JsonRpcResponse)
+	jsonRpcResp := new(types.JsonRpcResponse)
 	errorResp := new(RelayErrorResponse)
 	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error. Convert to standard JSON-RPC error
-		jsonRpcResp.Error = &rpctypes.JsonRpcError{Message: errorResp.Error}
+		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
 		return jsonRpcResp, &respData, nil
 	}
 
@@ -197,7 +197,7 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 	return jsonRpcResp, &respData, nil
 }
 
-func GetTxStatus(txHash string) (*rpctypes.PrivateTxApiResponse, error) {
+func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	privTxApiUrl := fmt.Sprintf("%s/tx/%s", ProtectTxApiHost, txHash)
 	resp, err := http.Get(privTxApiUrl)
 	if err != nil {
@@ -210,7 +210,7 @@ func GetTxStatus(txHash string) (*rpctypes.PrivateTxApiResponse, error) {
 		return nil, errors.Wrap(err, "privTxApi body-read failed for "+txHash)
 	}
 
-	respObj := new(rpctypes.PrivateTxApiResponse)
+	respObj := new(types.PrivateTxApiResponse)
 	err = json.Unmarshal(bodyBytes, respObj)
 	if err != nil {
 		return nil, errors.Wrap(err, "privTxApi jsonUnmarshal failed for "+txHash)
