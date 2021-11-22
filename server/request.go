@@ -470,13 +470,18 @@ func (r *RpcRequest) sendTxToRelay() {
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
 	if err != nil {
-		r.logError("[sendTxToRelay] redis SetTxSentToRelay failed: %v", err)
+		r.logError("[sendTxToRelay] redis:SetTxSentToRelay failed: %v", err)
 	}
 
 	// remember that this tx based on from+nonce (for cancel-tx)
 	err = RState.SetTxHashForSenderAndNonce(r.txFrom, r.tx.Nonce(), txHash)
 	if err != nil {
-		r.logError("[sendTxToRelay] redis SetTxHashForSenderAndNonce failed: %v", err)
+		r.logError("[sendTxToRelay] redis:SetTxHashForSenderAndNonce failed: %v", err)
+	}
+
+	err = RState.SetLastPrivTxHashOfAccount(r.txFrom, txHash)
+	if err != nil {
+		r.logError("[sendTxToRelay] redis:SetLastTxHashOfAccount failed: %v", err)
 	}
 
 	if DebugDontSendTx {

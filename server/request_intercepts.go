@@ -30,20 +30,19 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 		return
 	}
 
-	ensureAccountFixIsInPlace := func() {
-		// Get the user of this transaction
-		txFrom, found, err := RState.GetSenderOfTxHash(txHashLower)
-		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
-			return
-		}
+	// Get the user of this transaction
+	txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
+	if err != nil {
+		r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
+		return
+	}
 
-		if !found {
+	ensureAccountFixIsInPlace := func() {
+		if !txFromFound { // cannot sent nonce-fix if we don't have the sender
 			return
 		}
 
 		// Check if nonceFix is already in place for this user
-		txFromLower := strings.ToLower(txFrom)
 		_, nonceFixAlreadyExists, err := RState.GetNonceFixForAccount(txFromLower)
 		if err != nil {
 			r.logError("[post_getTransactionReceipt] redis:GetNonceFixForAccount failed: %s", err)
@@ -65,15 +64,31 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *rpctypes.JsonRpc
 	}
 
 	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
-	if statusApiResponse.Status == "FAILED" || (DebugDontSendTx && statusApiResponse.Status == "UNKNOWN") {
+	if statusApiResponse.Status == rpctypes.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == rpctypes.TxStatusUnknown) {
 		r.log("[post_getTransactionReceipt] failed private tx")
 		ensureAccountFixIsInPlace()
 		r.writeRpcError("Transaction failed") // TODO: return standard failed tx payload?
 		return true
 
-	} else {
-		// TODO: if latest tx of this user was a successful, then we should remove the nonce fix
-		_ = 1
+	} else if statusApiResponse.Status == rpctypes.TxStatusIncluded {
+		// If latest tx of this user was a successful, then we should remove the nonce fix
+		userLatestTxHashLower, found, err := RState.GetLastPrivTxHashOfAccount(txFromLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis:GetLastTxHashOfAccount failed: %s", err)
+			return
+		}
+
+		if !found {
+			return
+		}
+
+		if userLatestTxHashLower == txHashLower { // is latest user tx, and is included: delete any nonce fix
+			err = RState.DelNonceFixForAccount(txFromLower)
+			if err != nil {
+				r.logError("[post_getTransactionReceipt] redis:DelNonceFixForAccount failed: %s", err)
+				return
+			}
+		}
 	}
 
 	return

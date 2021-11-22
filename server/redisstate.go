@@ -29,9 +29,9 @@ var RedisExpiryNonceFixForAccount = time.Duration(2 * time.Hour)
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
 var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 
-// Enable lookup of last txHash sent by txFrom
-var RedisPrefixLastTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
-var RedisExpiryLastTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
+// Enable lookup of last privateTransaction-txHash sent by txFrom
+var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
+var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
 
 func RedisKeyTxSentToRelay(txHash string) string {
 	return RedisPrefixTxSentToRelay + strings.ToLower(txHash)
@@ -49,8 +49,8 @@ func RedisKeySenderOfTxHash(txHash string) string {
 	return RedisPrefixSenderOfTxHash + strings.ToLower(txHash)
 }
 
-func RedisKeyLastTxHashOfAccount(txFrom string) string {
-	return RedisPrefixLastTxHashOfAccount + strings.ToLower(txFrom)
+func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
+	return RedisPrefixLastPrivTxHashOfAccount + strings.ToLower(txFrom)
 }
 
 type RedisState struct {
@@ -169,20 +169,20 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 		return "", false, err
 	}
 
-	return txSender, true, nil
+	return strings.ToLower(txSender), true, nil
 }
 
 //
 // Enable lookup of last txHash sent by txFrom
 //
-func (s *RedisState) SetLastTxHashOfAccount(txFrom string, txHash string) error {
-	key := RedisKeyLastTxHashOfAccount(txFrom)
-	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txHash), RedisExpiryLastTxHashOfAccount).Err()
+func (s *RedisState) SetLastPrivTxHashOfAccount(txFrom string, txHash string) error {
+	key := RedisKeyLastPrivTxHashOfAccount(txFrom)
+	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txHash), RedisExpiryLastPrivTxHashOfAccount).Err()
 	return err
 }
 
-func (s *RedisState) GetLastTxHashOfAccount(txFrom string) (txHash string, found bool, err error) {
-	key := RedisKeyLastTxHashOfAccount(txFrom)
+func (s *RedisState) GetLastPrivTxHashOfAccount(txFrom string) (txHash string, found bool, err error) {
+	key := RedisKeyLastPrivTxHashOfAccount(txFrom)
 	txHash, err = s.RedisClient.Get(context.Background(), key).Result()
 	if err == redis.Nil { // not found
 		return "", false, nil
@@ -190,5 +190,5 @@ func (s *RedisState) GetLastTxHashOfAccount(txFrom string) (txHash string, found
 		return "", false, err
 	}
 
-	return txHash, true, nil
+	return strings.ToLower(txHash), true, nil
 }

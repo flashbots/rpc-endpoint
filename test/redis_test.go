@@ -169,15 +169,15 @@ func TestLastTxHashOfAccount(t *testing.T) {
 	txFrom := "0x0Sender"
 	txHash := "0xDeadBeef"
 
-	val, found, err := redisState.GetLastTxHashOfAccount(txFrom)
+	val, found, err := redisState.GetLastPrivTxHashOfAccount(txFrom)
 	require.Nil(t, err, err)
 	require.False(t, found)
 	require.Equal(t, "", val)
 
-	err = redisState.SetLastTxHashOfAccount(txFrom, txHash)
+	err = redisState.SetLastPrivTxHashOfAccount(txFrom, txHash)
 	require.Nil(t, err, err)
 
-	val, found, err = redisState.GetLastTxHashOfAccount(txFrom)
+	val, found, err = redisState.GetLastPrivTxHashOfAccount(txFrom)
 	require.Nil(t, err, err)
 	require.True(t, found)
 	require.Equal(t, strings.ToLower(txHash), val)
