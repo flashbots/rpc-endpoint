@@ -223,8 +223,8 @@ func TestMetamaskFix(t *testing.T) {
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := server.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{TestTx_MM2_Hash})
 	jsonResp := sendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
-	_ = jsonResp
-	require.Equal(t, "null", string(jsonResp.Result))
+	require.NotNil(t, jsonResp.Error)
+	require.Equal(t, "Transaction failed", jsonResp.Error.Message)
 
 	// At this point, the tx hash should be blacklisted and too high a nonce is returned
 	valueAfter1 := sendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)

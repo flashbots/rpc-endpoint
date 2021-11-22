@@ -95,7 +95,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 
 	jsonResp, err := json.Marshal(res)
 	if err != nil {
-		log.Panicln("healthCheck json error:", err)
+		log.Println("healthCheck json error:", err)
 		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}

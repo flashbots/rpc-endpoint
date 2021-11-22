@@ -122,8 +122,17 @@ func SendRpcAndParseResponseTo(url string, req *JsonRpcRequest) (*JsonRpcRespons
 		return nil, errors.Wrap(err, "read")
 	}
 
-	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(JsonRpcResponse)
+
+	// Check if returned an error, if so then convert to standard JSON-RPC error
+	errorResp := new(RelayErrorResponse)
+	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
+		// relay returned an error, convert to standard JSON-RPC error now
+		jsonRpcResp.Error = &JsonRpcError{Message: errorResp.Error}
+		return jsonRpcResp, nil
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
 	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
 		return nil, errors.Wrap(err, "unmarshal")
 	}

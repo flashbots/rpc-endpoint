@@ -8,7 +8,7 @@ import (
 var ProtectTxApiHost = "https://protect.flashbots.net"
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
-func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
 		return
@@ -27,40 +27,49 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse)
 	}
 	txFromLower := txFrom.s
 
-	// Abort if not the latest transaction by user
-	latestTxHash, latestFound := State.userLatestTxHash[txFromLower]
-	if latestFound && latestTxHash.s != txHashLower {
-		return
-	}
-
-	// Remove any nonce fix for an earlier tx
-	nonceFix, nonceFixAlreadyInPlace := State.accountWithNonceFix[txFromLower]
-	if nonceFixAlreadyInPlace && nonceFix.txHash != txHashLower {
-		delete(State.accountWithNonceFix, txFromLower)
-	}
-
-	if _, nonceFixAlreadyInPlace = State.accountWithNonceFix[txFromLower]; nonceFixAlreadyInPlace {
-		// r.log("[MM2] eth_getTransactionReceipt already in progress")
-		return
-	}
-
-	r.log("[MM2] eth_getTransactionReceipt is null for latest user tx %s", txHashLower)
+	r.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
 
 	// get tx status from private-tx-api
 	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
-		r.logError("[MM2] privateTxApi failed: %s", err)
+		r.logError("[post_getTransactionReceipt] privateTxApi failed: %s", err)
 		return
 	}
 
-	r.log("[MM2] priv-tx-api status: %s", statusApiResponse.Status)
+	ensureAccountFixIsInPlace := func() {
+		// Check if nonceFix is already in place for this user
+		_, nonceFixInPlace, err := RState.GetNonceFixForAccount(txFromLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis error: %s", err)
+			return
+		}
+
+		if nonceFixInPlace {
+			return
+		}
+
+		// Setup a new nonce-fix for this user
+		err = RState.SetNonceFixForAccount(txFromLower, 0)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis error: %s", err)
+			return
+		}
+	}
+
+	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
 	if statusApiResponse.Status == "FAILED" || (DebugDontSendTx && statusApiResponse.Status == "UNKNOWN") {
-		r.log("[MM2] failed tx, will receive too high of a nonce")
-		State.accountWithNonceFix[txFromLower] = NewNonceFix(txHashLower)
+		r.log("[post_getTransactionReceipt] failed private tx")
+		ensureAccountFixIsInPlace()
+		r.writeRpcError("Transaction failed") // TODO: return standard failed tx payload?
+		return true
+
 	} else {
 		// healthy response, remove any nonce fix
-		delete(State.accountWithNonceFix, txFromLower)
+		// TODO: if latest tx of this user was a successful, then we should remove the nonce fix
+		_ = 1
 	}
+
+	return
 }
 
 func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished bool) {
@@ -71,18 +80,29 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	addr := strings.ToLower(r.jsonReq.Params[0].(string))
 
 	// Check if nonceFix is in place for this user
-	nonceFix, shouldInterceptNonce := State.accountWithNonceFix[addr]
-	if !shouldInterceptNonce {
+	numTimesSent, nonceFixInPlace, err := RState.GetNonceFixForAccount(addr)
+	if err != nil {
+		r.logError("redis:GetAccountWithNonceFix error:", err)
+		return false
+	}
+
+	if !nonceFixInPlace {
 		return false
 	}
 
 	// Intercept max 4 times (after which Metamask marks it as dropped)
-	nonceFix.numTries += 1
-	if nonceFix.numTries > 4 {
+	numTimesSent += 1
+	if numTimesSent > 4 {
 		return
 	}
 
-	r.log("eth_getTransactionCount intercept: #%d", nonceFix.numTries)
+	err = RState.SetNonceFixForAccount(addr, numTimesSent)
+	if err != nil {
+		r.logError("redis:SetAccountWithNonceFix error:", err)
+		return false
+	}
+
+	r.log("eth_getTransactionCount intercept: #%d", numTimesSent)
 
 	// Return invalid nonce
 	var wrongNonce uint64 = 1e9 + 1

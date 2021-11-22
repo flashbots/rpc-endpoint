@@ -90,3 +90,8 @@ type HealthResponse struct {
 	StartTime time.Time `json:"startTime"`
 	Version   string    `json:"version"`
 }
+
+type TransactionReceipt struct {
+	TransactionHash string
+	Status          string
+}

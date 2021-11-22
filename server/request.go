@@ -158,7 +158,10 @@ func (r *RpcRequest) process() {
 
 		// After proxy, perhaps check backend [MM fix #3 step 2]
 		if r.jsonReq.Method == "eth_getTransactionReceipt" {
-			r.check_post_getTransactionReceipt(jsonResp)
+			requestCompleted := r.check_post_getTransactionReceipt(jsonResp)
+			if requestCompleted {
+				return
+			}
 		}
 
 		// Write the response to user
@@ -213,15 +216,18 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if r.tx.Nonce() >= 1e9 {
 		r.log("tx rejected - nonce too high: %d - %s from %s", r.tx.Nonce(), r.tx.Hash(), txFromLower)
-		delete(State.accountWithNonceFix, txFromLower)
 		r.writeRpcError("tx rejected - nonce too high")
+		err = RState.DelNonceFixForAccount(txFromLower)
+		if err != nil {
+			r.logError("redis:DelAccountWithNonceFix failed: %v", err)
+		}
 		return
 	}
 
 	// Remember time when tx was received
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
 	State.txHashToUser[txHashLower] = NewStringWithTime(txFromLower)
-	State.userLatestTxHash[txFromLower] = NewStringWithTime(txHashLower)
+	// State.userLatestTxHash[txFromLower] = NewStringWithTime(txHashLower)
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")

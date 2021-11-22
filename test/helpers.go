@@ -31,9 +31,6 @@ func sendRpcAndParseResponseOrFailNow(t *testing.T, req *server.JsonRpcRequest) 
 	if err != nil {
 		t.Fatal("sendRpcAndParseResponse error:", err)
 	}
-	if res.Error != nil {
-		t.Fatal("json-rpc response error:", res.Error)
-	}
 	return res
 }
 

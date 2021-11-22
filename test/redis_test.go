@@ -98,3 +98,45 @@ func TestTxHashForSenderAndNonce(t *testing.T) {
 	require.NotEqual(t, txHash, txHashFromRedis)
 	require.Equal(t, strings.ToLower(txHash), txHashFromRedis)
 }
+
+func TestNonceFixForAccount(t *testing.T) {
+	var err error
+	resetRedis()
+
+	txFrom := "0x0Sender"
+
+	numTimesSent, found, err := redisState.GetNonceFixForAccount(txFrom)
+	require.Nil(t, err, err)
+	require.False(t, found)
+	require.Equal(t, uint64(0), numTimesSent)
+
+	err = redisState.SetNonceFixForAccount(txFrom, 0)
+	require.Nil(t, err, err)
+
+	numTimesSent, found, err = redisState.GetNonceFixForAccount(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(0), numTimesSent)
+
+	err = redisState.DelNonceFixForAccount(txFrom)
+	require.Nil(t, err, err)
+
+	numTimesSent, found, err = redisState.GetNonceFixForAccount(txFrom)
+	require.Nil(t, err, err)
+	require.False(t, found)
+	require.Equal(t, uint64(0), numTimesSent)
+
+	err = redisState.SetNonceFixForAccount(txFrom, 17)
+	require.Nil(t, err, err)
+
+	numTimesSent, found, err = redisState.GetNonceFixForAccount(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(17), numTimesSent)
+
+	// Ensure it matches txFrom case-insensitive
+	numTimesSent, found, err = redisState.GetNonceFixForAccount(strings.ToUpper(txFrom))
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(17), numTimesSent)
+}

@@ -18,12 +18,19 @@ var RedisExpiryTxSentToRelay = time.Duration(24 * time.Hour) // 1 day
 var RedisPrefixTxHashForSenderAndNonce = RedisPrefix + "txsender-and-nonce-to-txhash:"
 var RedisExpiryTxHashForSenderAndNonce = time.Duration(24 * time.Hour) // 1 day
 
+var RedisPrefixNonceFixForAccount = RedisPrefix + "txsender-with-nonce-fix:"
+var RedisExpiryNonceFixForAccount = time.Duration(2 * time.Hour)
+
 func RedisKeyTxSentToRelay(txHash string) string {
 	return RedisPrefixTxSentToRelay + strings.ToLower(txHash)
 }
 
 func RedisKeyTxHashForSenderAndNonce(txFrom string, nonce uint64) string {
 	return fmt.Sprintf("%s%s_%d", RedisPrefixTxHashForSenderAndNonce, strings.ToLower(txFrom), nonce)
+}
+
+func RedisKeyNonceFixForAccount(txFrom string) string {
+	return RedisPrefixNonceFixForAccount + strings.ToLower(txFrom)
 }
 
 type RedisState struct {
@@ -44,24 +51,6 @@ func NewRedisState(redisUrl string) (*RedisState, error) {
 		RedisClient: redisClient,
 	}, nil
 }
-
-// func (s *RedisState) RedisGetStr(key string) (string, error) {
-// 	val, err := s.RedisClient.Get(context.Background(), key).Result()
-// 	if err == redis.Nil {
-// 		return "", nil
-// 	} else if err != nil {
-// 		return "", err
-// 	}
-// 	return val, nil
-// }
-
-// func (s *RedisState) GetStrOrLogError(key string) string {
-// 	val, err := s.RedisGetStr(key)
-// 	if err != nil {
-// 		log.Printf("Redis error getting key %s: %s", key, err)
-// 	}
-// 	return val
-// }
 
 func (s *RedisState) SetTxSentToRelay(txHash string) error {
 	key := RedisKeyTxSentToRelay(txHash)
@@ -103,4 +92,32 @@ func (s *RedisState) GetTxHashForSenderAndNonce(txFrom string, nonce uint64) (va
 	}
 
 	return val, true, nil
+}
+
+func (s *RedisState) SetNonceFixForAccount(txFrom string, numTimesSent uint64) error {
+	key := RedisKeyNonceFixForAccount(txFrom)
+	err := s.RedisClient.Set(context.Background(), key, numTimesSent, RedisExpiryNonceFixForAccount).Err()
+	return err
+}
+
+func (s *RedisState) DelNonceFixForAccount(txFrom string) error {
+	key := RedisKeyNonceFixForAccount(txFrom)
+	err := s.RedisClient.Del(context.Background(), key).Err()
+	return err
+}
+
+func (s *RedisState) GetNonceFixForAccount(txFrom string) (numTimesSent uint64, found bool, err error) {
+	key := RedisKeyNonceFixForAccount(txFrom)
+	val, err := s.RedisClient.Get(context.Background(), key).Result()
+	if err == redis.Nil {
+		return 0, false, nil // not found
+	} else if err != nil {
+		return 0, false, err
+	}
+
+	numTimesSent, err = strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, true, err
+	}
+	return numTimesSent, true, nil
 }
