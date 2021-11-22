@@ -75,7 +75,7 @@ func (s *RedisState) GetTxSentToRelay(txHash string) (timeSent time.Time, found 
 	if err == redis.Nil {
 		return time.Time{}, false, nil // just not found
 	} else if err != nil {
-		return time.Time{}, true, err // found but error
+		return time.Time{}, false, err // found but error
 	}
 
 	timestampInt, err := strconv.Atoi(val)
@@ -97,9 +97,9 @@ func (s *RedisState) GetTxHashForSenderAndNonce(txFrom string, nonce uint64) (va
 	key := RedisKeyTxHashForSenderAndNonce(txFrom, nonce)
 	val, err = s.RedisClient.Get(context.Background(), key).Result()
 	if err == redis.Nil {
-		return "", false, nil // just not found
+		return "", false, nil // not found
 	} else if err != nil {
-		return "", true, err // found but error
+		return "", false, err
 	}
 
 	return val, true, nil

@@ -231,18 +231,39 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
-	// Special check for cancellation tx
-	if len(r.tx.Data()) == 0 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
-		wasSentToRelay, found := State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", txFromLower, r.tx.Nonce())]
-		if found && wasSentToRelay.v {
-			// original tx was sent to relay
-			r.log("[cancel-tx] sending to relay for %s", txFromLower)
-			needsProtection = true
-		} else {
-			// original tx was sent to mempool, or not seen in rpc-endpoint
-			r.log("[cancel-tx] sending to mempool for %s", txFromLower)
-			needsProtection = false
+	cancelTxIsForPrivateTx := func() bool {
+		// Get original tx hash by sender+nonce
+		txHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
+		if err != nil {
+			r.logError("Redis error on isCancelTx: %s", err)
+			return false
 		}
+
+		// Check if tx was sent to relay
+		if !txHashFound {
+			return false
+		}
+
+		_, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
+		if err != nil {
+			r.logError("Redis error on isCancelTx: %s", err)
+			return false
+		}
+
+		if txWasSentToRelay {
+			r.log("[cancel-tx] sending to relay for %s", txFromLower)
+			return true
+		}
+
+		r.log("[cancel-tx] sending to mempool for %s", txFromLower)
+		return false
+	}
+
+	// Special check for cancellation tx
+	isCancelTx := len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex())
+	if isCancelTx && cancelTxIsForPrivateTx() {
+		// TODO: convert cancel-tx to cancelPrivateTransaction
+		return
 	}
 
 	if needsProtection {
@@ -408,11 +429,20 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	r.log("[sendTxToRelay] sending %s ...", txHash)
 
-	delete(State.txStatus, txHash)  // remove any previous tx status
-	RState.SetTxSentToRelay(txHash) // mark tx as sent to relay
+	// remove any previous tx status
+	delete(State.txStatus, txHash)
 
-	// for cancellation, remember that this tx was sent to relay
-	State.userTxWithNonceSentToRelay[fmt.Sprintf("%s_%d", strings.ToLower(r.txFrom), r.tx.Nonce())] = NewBoolWithTime(true)
+	// mark tx as sent to relay
+	err := RState.SetTxSentToRelay(txHash)
+	if err != nil {
+		r.logError("[sendTxToRelay] redis SetTxSentToRelay failed: %v", err)
+	}
+
+	// remember that this tx based on from+nonce (for cancel-tx)
+	err = RState.SetTxHashForSenderAndNonce(r.txFrom, r.tx.Nonce(), txHash)
+	if err != nil {
+		r.logError("[sendTxToRelay] redis SetTxHashForSenderAndNonce failed: %v", err)
+	}
 
 	if DebugDontSendTx {
 		r.log("faked sending tx to relay, did nothing")
