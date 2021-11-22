@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/stretchr/testify/assert"
@@ -42,6 +43,11 @@ func init() {
 
 // Reset the RPC endpoint and mock backend servers
 func resetTestServers() {
+	s, err := miniredis.Run()
+	if err != nil {
+		panic(err)
+	}
+
 	// Create a fresh mock backend server (covers for both eth node and relay)
 	rpcBackendServer := httptest.NewServer(http.HandlerFunc(RpcBackendHandler))
 	RpcBackendServerUrl = rpcBackendServer.URL
@@ -53,8 +59,11 @@ func resetTestServers() {
 	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	s := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey)
-	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(s.HandleHttpRequest))
+	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, s.Addr())
+	if err != nil {
+		panic(err)
+	}
+	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(rpcServer.HandleHttpRequest))
 	RpcEndpointUrl = rpcEndpointServer.URL
 
 	// Reset the metamask fixer

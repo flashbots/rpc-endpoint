@@ -1,12 +1,13 @@
 package server
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 var RedisPrefix = "rpc-endpoint:request:"
@@ -24,7 +25,7 @@ type RedisState struct {
 func NewRedisState(redisUrl string) (*RedisState, error) {
 	// Setup redis client and check connection
 	redisClient := redis.NewClient(&redis.Options{Addr: redisUrl})
-	if err := redisClient.Info().Err(); err != nil {
+	if err := redisClient.Get(context.Background(), "foo").Err(); err != nil && err != redis.Nil {
 		return nil, err
 	}
 	return &RedisState{
@@ -33,7 +34,7 @@ func NewRedisState(redisUrl string) (*RedisState, error) {
 }
 
 func (s *RedisState) RedisGetStr(key string) (string, error) {
-	val, err := s.RedisClient.Get(key).Result()
+	val, err := s.RedisClient.Get(context.Background(), key).Result()
 	if err == redis.Nil {
 		return "", nil
 	} else if err != nil {
@@ -52,7 +53,7 @@ func (s *RedisState) GetStrOrLogError(key string) string {
 
 func (s *RedisState) SetTxSentToRelay(txHash string) error {
 	key := RedisKeyTxSentToRelay(strings.ToLower(txHash))
-	err := s.RedisClient.Set(key, time.Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
+	err := s.RedisClient.Set(context.Background(), key, time.Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
 	return err
 }
 
