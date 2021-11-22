@@ -444,7 +444,7 @@ func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
 	txStatus := rpctypes.PrivateTxStatus(txStatusApiResponse.Status)
 	if txStatus == rpctypes.TxStatusFailed {
 		return true
-	} else if txStatus == rpctypes.TxStatusUnknown && time.Since(timeSent).Minutes() > 5 {
+	} else if txStatus == rpctypes.TxStatusUnknown && time.Since(timeSent).Minutes() >= 5 {
 		return true
 	} else {
 		// If tx is still pending, or included then don't send it again

@@ -54,7 +54,7 @@ func NewRedisState(redisUrl string) (*RedisState, error) {
 
 func (s *RedisState) SetTxSentToRelay(txHash string) error {
 	key := RedisKeyTxSentToRelay(txHash)
-	err := s.RedisClient.Set(context.Background(), key, time.Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
+	err := s.RedisClient.Set(context.Background(), key, Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
 	return err
 }
 
