@@ -44,7 +44,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 
 	txHash := "0x0Foo"
 
-	// should be true on redis error (not yet connected)
+	// SEND when not seen before
 	shouldSend := request.shouldSendTxToRelay(txHash)
 	require.True(t, shouldSend)
 
@@ -57,7 +57,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, types.TxStatusUnknown, txStatusApiResponse.Status)
 
-	// Should NOT SEND when known, but state is unknown and time since sent < 5 min
+	// NOT SEND when unknown and time since sent < 5 min
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.False(t, shouldSend)
 
@@ -67,7 +67,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, types.TxStatusFailed, txStatusApiResponse.Status)
 
-	// Should send again if failed
+	// SEND if failed
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.True(t, shouldSend)
 
@@ -77,12 +77,12 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, types.TxStatusPending, txStatusApiResponse.Status)
 
-	// Shouldn't send again if pending
+	// NOT SEND if pending
 	shouldSend = request.shouldSendTxToRelay(txHash)
 	require.False(t, shouldSend)
 
 	//
-	// Should allow sending if tx-status is UNKNOWN and 5 minutes have passed
+	// SEND if UNKNOWN and 5 minutes have passed
 	//
 	txHash = "0x0DeadBeef"
 	setServerTimeNowOffset(time.Minute * -6)

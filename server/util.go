@@ -7,37 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
 )
-
-func GetIP(r *http.Request) string {
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		return forwarded
-	}
-	return r.RemoteAddr
-}
-
-// CHROME_ID: nkbihfbeogaeaoehlefnkodbefgpgknn
-func IsMetamask(r *http.Request) bool {
-	return r.Header.Get("Origin") == "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn"
-}
-
-// FIREFOX_ID: webextension@metamask.io
-func IsMetamaskMoz(r *http.Request) bool {
-	return r.Header.Get("Origin") == "moz-extension://57f9aaf6-270a-154f-9a8a-632d0db4128c"
-}
 
 func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	// Create new request:
@@ -91,58 +71,6 @@ func GetSenderFromRawTx(tx *ethtypes.Transaction) (string, error) {
 	return from, nil
 }
 
-func TruncateText(s string, max int) string {
-	if len(s) > max {
-		r := 0
-		for i := range s {
-			r++
-			if r > max {
-				return s[:i]
-			}
-		}
-	}
-	return s
-}
-
-func SendRpcAndParseResponseTo(url string, req *types.JsonRpcRequest) (*types.JsonRpcResponse, error) {
-	jsonData, err := json.Marshal(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "marshal")
-	}
-
-	// fmt.Printf("%s\n", jsonData)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errors.Wrap(err, "post")
-	}
-
-	respData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(err, "read")
-	}
-
-	jsonRpcResp := new(types.JsonRpcResponse)
-
-	// Check if returned an error, if so then convert to standard JSON-RPC error
-	errorResp := new(RelayErrorResponse)
-	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
-		// relay returned an error, convert to standard JSON-RPC error now
-		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
-		return jsonRpcResp, nil
-	}
-
-	// Unmarshall JSON-RPC response and check for error inside
-	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
-		return nil, errors.Wrap(err, "unmarshal")
-	}
-
-	return jsonRpcResp, nil
-}
-
-type RelayErrorResponse struct {
-	Error string `json:"error"`
-}
-
 func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *types.JsonRpcRequest) (jsonRpcResponse *types.JsonRpcResponse, responseBytes *[]byte, err error) {
 	body, err := json.Marshal(jsonRpcReq)
 	if err != nil {
@@ -181,7 +109,7 @@ func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey,
 	}
 
 	jsonRpcResp := new(types.JsonRpcResponse)
-	errorResp := new(RelayErrorResponse)
+	errorResp := new(types.RelayErrorResponse)
 	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error. Convert to standard JSON-RPC error
 		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
@@ -217,18 +145,4 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	}
 
 	return respObj, nil
-}
-
-func BigIntPtrToStr(i *big.Int) string {
-	if i == nil {
-		return ""
-	}
-	return i.String()
-}
-
-func AddressPtrToStr(a *common.Address) string {
-	if a == nil {
-		return ""
-	}
-	return a.Hex()
 }

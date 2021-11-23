@@ -1,4 +1,4 @@
-.PHONY: all build test clean lint
+.PHONY: all build test clean lint cover
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
@@ -16,3 +16,8 @@ test:
 
 lint:
 	gofmt -d ./
+
+cover:
+	go test -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
+	go tool cover -html=/tmp/go-rpcendpoint.cover.tmp
+	unlink /tmp/go-rpcendpoint.cover.tmp

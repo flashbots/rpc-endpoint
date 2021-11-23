@@ -1,7 +1,7 @@
 /*
  * Dummy RPC backend. Implements Ethereum JSON-RPC calls that the tests need.
  */
-package test
+package testutils
 
 import (
 	"encoding/json"
@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -70,7 +69,7 @@ func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error)
 func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	MockBackendLastRawRequest = req
-	MockBackendLastJsonRpcRequestTimestamp = server.Now()
+	MockBackendLastJsonRpcRequestTimestamp = time.Now()
 
 	log.Printf("%s %s %s\n", req.RemoteAddr, req.Method, req.URL)
 

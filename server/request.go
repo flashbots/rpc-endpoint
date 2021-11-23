@@ -17,6 +17,7 @@ import (
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/flashbots/rpc-endpoint/utils"
 	"github.com/google/uuid"
 )
 
@@ -99,7 +100,7 @@ func (r *RpcRequest) process() {
 		r.log("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
 
-	r.ip = GetIP(r.req)
+	r.ip = utils.GetIP(r.req)
 	r.log("POST request from ip: %s - goroutines: %d", r.ip, runtime.NumGoroutine())
 
 	if IsBlacklisted(r.ip) {
@@ -211,7 +212,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, AddressPtrToStr(r.tx.To()), r.tx.Nonce(), BigIntPtrToStr(r.tx.GasPrice()))
+	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {

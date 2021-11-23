@@ -1,4 +1,4 @@
-package test
+package server
 
 import (
 	"fmt"
@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis"
-	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/stretchr/testify/require"
 )
 
 var redisServer *miniredis.Miniredis
-var redisState *server.RedisState
+var redisState *RedisState
 
 func resetRedis() {
 	var err error
@@ -25,7 +24,7 @@ func resetRedis() {
 		panic(err)
 	}
 
-	redisState, err = server.NewRedisState(redisServer.Addr())
+	redisState, err = NewRedisState(redisServer.Addr())
 	// redisState, err = server.NewRedisState("localhost:6379")
 	if err != nil {
 		panic(err)
@@ -34,7 +33,7 @@ func resetRedis() {
 
 func TestRedisStateSetup(t *testing.T) {
 	var err error
-	redisState, err = server.NewRedisState("localhost:18279")
+	redisState, err = NewRedisState("localhost:18279")
 	require.NotNil(t, err, err)
 }
 
@@ -75,8 +74,8 @@ func TestTxHashForSenderAndNonce(t *testing.T) {
 	txHash := "0x0TxHash"
 
 	// Ensure key is correct
-	key := server.RedisKeyTxHashForSenderAndNonce(txFrom, nonce)
-	expectedKey := fmt.Sprintf("%s%s_%d", server.RedisPrefixTxHashForSenderAndNonce, strings.ToLower(txFrom), nonce)
+	key := RedisKeyTxHashForSenderAndNonce(txFrom, nonce)
+	expectedKey := fmt.Sprintf("%s%s_%d", RedisPrefixTxHashForSenderAndNonce, strings.ToLower(txFrom), nonce)
 	require.Equal(t, expectedKey, key)
 
 	// Get before set: should return not found

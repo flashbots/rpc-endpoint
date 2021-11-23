@@ -84,3 +84,7 @@ type PrivateTxApiResponse struct {
 	Hash           string          `json:"hash"`
 	MaxBlockNumber int             `json:"maxBlockNumber"`
 }
+
+type RelayErrorResponse struct {
+	Error string `json:"error"`
+}
