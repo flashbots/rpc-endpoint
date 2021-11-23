@@ -68,29 +68,6 @@ func (r *RpcRequest) logError(format string, v ...interface{}) {
 	log.Printf(prefix+format, v...)
 }
 
-func (r *RpcRequest) writeHeaderStatus(statusCode int) {
-	if r.respHeaderStatusCodeWritten {
-		return
-	}
-	r.respHeaderStatusCodeWritten = true
-	(*r.respw).WriteHeader(statusCode)
-}
-
-func (r *RpcRequest) writeHeaderContentType(contentType string) {
-	if r.respHeaderStatusCodeWritten {
-		r.logError("writeHeaderContentType failed because status code was already written")
-	}
-	if r.respHeaderContentTypeWritten {
-		return
-	}
-	r.respHeaderContentTypeWritten = true
-	(*r.respw).Header().Set("Content-Type", contentType)
-}
-
-func (r *RpcRequest) writeHeaderContentTypeJson() {
-	r.writeHeaderContentType("application/json")
-}
-
 func (r *RpcRequest) process() {
 	var err error
 
@@ -178,115 +155,6 @@ func (r *RpcRequest) process() {
 	}
 }
 
-func (r *RpcRequest) handle_sendRawTransaction() {
-	var err error
-
-	// JSON-RPC sanity checks
-	if len(r.jsonReq.Params) < 1 {
-		r.logError("no params for eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
-	r.rawTxHex = r.jsonReq.Params[0].(string)
-	if len(r.rawTxHex) < 2 {
-		r.logError("invalid raw transaction (wrong length)")
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
-	r.log("rawTx: %s", r.rawTxHex)
-
-	r.tx, err = GetTx(r.rawTxHex)
-	if err != nil {
-		r.logError("getting transaction object failed")
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
-	// Get tx from address
-	r.txFrom, err = GetSenderFromRawTx(r.tx)
-	if err != nil {
-		r.logError("couldn't get address from rawTx: %v", err)
-		r.writeHeaderStatus(http.StatusBadRequest)
-		return
-	}
-
-	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice()))
-	txFromLower := strings.ToLower(r.txFrom)
-
-	if r.tx.Nonce() >= 1e9 {
-		r.log("tx rejected - nonce too high: %d - %s from %s", r.tx.Nonce(), r.tx.Hash(), txFromLower)
-		r.writeRpcError("tx rejected - nonce too high")
-		err = RState.DelNonceFixForAccount(txFromLower)
-		if err != nil {
-			r.logError("redis:DelAccountWithNonceFix failed: %v", err)
-		}
-		return
-	}
-
-	txHashLower := strings.ToLower(r.tx.Hash().Hex())
-
-	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
-	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
-	if err != nil {
-		r.logError("redis:SetSenderOfTxHash failed: %v", err)
-	}
-
-	if isOnOFACList(r.txFrom) {
-		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
-		r.writeHeaderStatus(http.StatusUnauthorized)
-		return
-	}
-
-	// Check if transaction needs protection
-	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
-
-	// Check for cancellation-tx
-	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
-		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
-		if requestDone {
-			return
-		}
-
-		// It's a cancel-tx for the mempool
-		needsProtection = false
-		r.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
-	}
-
-	if needsProtection {
-		r.sendTxToRelay()
-		return
-	}
-
-	if DebugDontSendTx {
-		r.log("faked sending tx to mempool, did nothing")
-		r.writeRpcResult(r.tx.Hash().Hex())
-		return
-	}
-
-	// Proxy to public node now
-	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
-
-	// Log after proxying
-	if !readJsonRpcSuccess {
-		r.logError("Proxy to mempool failed: eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusInternalServerError)
-		return
-	}
-
-	// Write JSON-RPC response now
-	r.writeHeaderContentTypeJson()
-	r.writeHeaderStatus(proxyHttpStatus)
-	r._writeRpcResponse(jsonResp)
-
-	if jsonResp.Error != nil {
-		r.log("Proxied eth_sendRawTransaction to mempool - with JSON-RPC Error %s", jsonResp.Error.Message)
-	} else {
-		r.log("Proxied eth_sendRawTransaction to mempool")
-	}
-}
-
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
 func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *types.JsonRpcResponse) {
 	timeProxyStart := Now() // for measuring execution time
@@ -350,55 +218,6 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	} else {
 		return true // needs protection if not on whitelist
 	}
-}
-
-func (r *RpcRequest) writeRpcError(msg string) {
-	res := types.JsonRpcResponse{
-		Id:      r.jsonReq.Id,
-		Version: "2.0",
-		Error: &types.JsonRpcError{
-			Code:    -32603,
-			Message: msg,
-		},
-	}
-	r._writeRpcResponse(&res)
-}
-
-func (r *RpcRequest) writeRpcResult(result interface{}) {
-	resBytes, err := json.Marshal(result)
-	if err != nil {
-		r.logError("writeRpcResult error marshalling %s: %s", result, err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
-		return
-	}
-	res := types.JsonRpcResponse{
-		Id:      r.jsonReq.Id,
-		Version: "2.0",
-		Result:  resBytes,
-	}
-	r._writeRpcResponse(&res)
-}
-
-func (r *RpcRequest) _writeRpcResponse(res *types.JsonRpcResponse) {
-	if r.respBodyWritten {
-		r.logError("_writeRpcResponse: response already written")
-		return
-	}
-
-	if !r.respHeaderContentTypeWritten {
-		r.writeHeaderContentTypeJson() // set content type to json, if not yet set
-	}
-
-	if !r.respHeaderStatusCodeWritten {
-		r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
-	}
-
-	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
-		r.logError("failed writing rpc response: %v", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
-	}
-
-	r.respBodyWritten = true
 }
 
 // send if (a) not sent before, (b) sent and status=failed, (c) sent, status=unknown and sent at least 5 min ago
@@ -516,14 +335,14 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	}
 
 	// Should send cancel-tx to relay. Check if cancel-tx was already sent before
-	_, cancelTxWasSentToRelay, err := RState.GetTxSentToRelay(cancelTxHash)
+	_, cancelTxAlreadySentToRelay, err := RState.GetTxSentToRelay(cancelTxHash)
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxSentToRelay error: %v", err)
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return true
 	}
 
-	if cancelTxWasSentToRelay { // already sent
+	if cancelTxAlreadySentToRelay { // already sent
 		r.writeRpcResult(cancelTxHash)
 		return true
 	}
@@ -531,15 +350,16 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	r.log("[cancel-tx] sending to relay: %s for %s/%d", initialTxHash, txFromLower, r.tx.Nonce())
 
 	if DebugDontSendTx {
-		r.log("faked sending tx to relay, did nothing")
+		r.log("faked sending cancel-tx to relay, did nothing")
 		r.writeRpcResult(initialTxHash)
-		return
+		return true
 	}
 
 	cancelPrivTxArgs := flashbotsrpc.FlashbotsCancelPrivateTransactionRequest{TxHash: initialTxHash}
 	_, err = FlashbotsRPC.FlashbotsCancelPrivateTransaction(r.relaySigningKey, cancelPrivTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
+			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'
 			r.log("[sendTxToRelay] relay error response: %v - rawTx: %s", err, r.rawTxHex)
 			r.writeRpcError(err.Error())
 		} else {

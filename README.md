@@ -37,7 +37,7 @@ To send your transactions through the Flashbots Protect RPC please refer to the 
 To run the server, run the following command:
 
 ```bash
-go run main.go -proxy PROXY_URL -signingKey ETH_PRIVATE_KEY
+go run main.go -redis dev -proxy PROXY_URL -signingKey ETH_PRIVATE_KEY
 ```
 
 Example call:

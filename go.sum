@@ -286,6 +286,8 @@ github.com/metachris/flashbotsrpc v0.4.0-alpha1 h1:7cMFjCx/ZUPiZ+BX9QSTiV1HMv5Wt
 github.com/metachris/flashbotsrpc v0.4.0-alpha1/go.mod h1:Yvl6aDAGky5R8Pul7Z6PKftjnn8lhTYDhipfxkR7HYE=
 github.com/metachris/flashbotsrpc v0.4.0-alpha2 h1:Gl63f4q1PNOXhgmvLjI0LCYasohYLMt8rl84MFq81L0=
 github.com/metachris/flashbotsrpc v0.4.0-alpha2/go.mod h1:Yvl6aDAGky5R8Pul7Z6PKftjnn8lhTYDhipfxkR7HYE=
+github.com/metachris/flashbotsrpc v0.4.0-alpha3 h1:feu3qFuJLJiNlv2KZTU7v1Tsprxnym2RC4VfIyZm7YM=
+github.com/metachris/flashbotsrpc v0.4.0-alpha3/go.mod h1:Yvl6aDAGky5R8Pul7Z6PKftjnn8lhTYDhipfxkR7HYE=
 github.com/mitchellh/mapstructure v1.4.1/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mitchellh/pointerstructure v1.2.0/go.mod h1:BRAsLI5zgXmw97Lf6s25bs8ohIXc3tViBH44KcwB2g4=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

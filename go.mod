@@ -9,7 +9,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/gomodule/redigo v1.8.5 // indirect
 	github.com/google/uuid v1.3.0
-	github.com/metachris/flashbotsrpc v0.4.0-alpha2
+	github.com/metachris/flashbotsrpc v0.4.0-alpha3
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
