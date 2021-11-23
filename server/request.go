@@ -463,26 +463,19 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	if DebugDontSendTx {
 		r.log("faked sending tx to relay, did nothing")
-		r.writeRpcResult(r.tx.Hash().Hex())
+		r.writeRpcResult(txHash)
 		return
 	}
 
 	sendPrivTxArgs := flashbotsrpc.FlashbotsSendPrivateTransactionRequest{Tx: r.rawTxHex}
 	_, err = FlashbotsRPC.FlashbotsSendPrivateTransaction(r.relaySigningKey, sendPrivTxArgs)
-
-	// param := make(map[string]string)
-	// param["tx"] = r.rawTxHex
-	// jsonRpcReq := types.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
-	// _, _, err = utils.SendRpcWithSignatureAndParseResponse(Rel, r.relaySigningKey, jsonRpcReq)
-
 	if err != nil {
-		r.writeHeaderStatus(http.StatusInternalServerError)
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
-			r.log("[sendTxToRelay] relay error response %s: %s - data: %s", txHash, err)
+			r.log("[sendTxToRelay] relay error response: %v - rawTx: %s", err, r.rawTxHex)
 			r.writeRpcError(err.Error())
 		} else {
-			r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err)
-			r.writeRpcError("Internal Server Error")
+			r.logError("[sendTxToRelay] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
+			r.writeHeaderStatus(http.StatusInternalServerError)
 		}
 		return
 	}
@@ -491,38 +484,70 @@ func (r *RpcRequest) sendTxToRelay() {
 	r.log("[sendTxToRelay] sent %s", txHash)
 }
 
+// Sends cancel-tx to relay as cancelPrivateTransaction, if initial tx was sent there too.
 func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
+	cancelTxHash := strings.ToLower(r.tx.Hash().Hex())
 	txFromLower := strings.ToLower(r.txFrom)
-	r.log("[cancel-tx] check %s/%d", txFromLower, r.tx.Nonce())
+	r.log("[cancel-tx] %s - check %s/%d", cancelTxHash, txFromLower, r.tx.Nonce())
 
-	// Get original tx hash by sender+nonce
-	txHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
+	// Get initial txHash by sender+nonce
+	initialTxHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxHashForSenderAndNonce failed %v", err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return true
+	}
+
+	if !txHashFound { // not found, send to mempool
 		return false
 	}
 
-	if !txHashFound {
-		return false
-	}
-
-	// Check if tx was sent to relay
-	_, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
+	// Check if initial tx was sent to relay
+	_, txWasSentToRelay, err := RState.GetTxSentToRelay(initialTxHash)
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxSentToRelay failed: %s", err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return true
+	}
+
+	if !txWasSentToRelay { // was not sent to relay, send to mempool
 		return false
 	}
 
-	if !txWasSentToRelay {
-		return false
+	// Should send cancel-tx to relay. Check if cancel-tx was already sent before
+	_, cancelTxWasSentToRelay, err := RState.GetTxSentToRelay(cancelTxHash)
+	if err != nil {
+		r.logError("[cancel-tx] redis:GetTxSentToRelay error: %v", err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return true
 	}
 
-	r.log("[cancel-tx] sending to relay: %s for %s/%d", txHash, txFromLower, r.tx.Nonce())
+	if cancelTxWasSentToRelay { // already sent
+		r.writeRpcResult(cancelTxHash)
+		return true
+	}
 
-	// TODO: convert cancel-tx to cancelPrivateTransaction
-	panic("not implemented")
+	r.log("[cancel-tx] sending to relay: %s for %s/%d", initialTxHash, txFromLower, r.tx.Nonce())
 
-	// All done, write response
-	// r.writeRpcResult(txHash)
-	// return true
+	if DebugDontSendTx {
+		r.log("faked sending tx to relay, did nothing")
+		r.writeRpcResult(initialTxHash)
+		return
+	}
+
+	cancelPrivTxArgs := flashbotsrpc.FlashbotsCancelPrivateTransactionRequest{TxHash: initialTxHash}
+	_, err = FlashbotsRPC.FlashbotsCancelPrivateTransaction(r.relaySigningKey, cancelPrivTxArgs)
+	if err != nil {
+		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
+			r.log("[sendTxToRelay] relay error response: %v - rawTx: %s", err, r.rawTxHex)
+			r.writeRpcError(err.Error())
+		} else {
+			r.logError("[sendTxToRelay] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
+			r.writeHeaderStatus(http.StatusInternalServerError)
+		}
+		return true
+	}
+
+	r.writeRpcResult(cancelTxHash)
+	return true
 }
