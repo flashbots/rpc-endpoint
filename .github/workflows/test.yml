@@ -13,5 +13,5 @@ jobs:
     - name: Lint
       run: gofmt -d ./
 
-    - name: Test
-      run: make test
+    - name: Test & print coverage
+      run: make cover

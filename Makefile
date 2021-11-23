@@ -18,11 +18,11 @@ lint:
 	gofmt -d ./
 
 cover:
-	go test -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
+	go test -coverpkg=github.com/flashbots/rpc-endpoint/server,github.com/flashbots/rpc-endpoint/types,github.com/flashbots/rpc-endpoint/utils -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
 	go tool cover -func /tmp/go-rpcendpoint.cover.tmp
 	unlink /tmp/go-rpcendpoint.cover.tmp
 
 cover-html:
-	go test -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
+	go test -coverpkg=github.com/flashbots/rpc-endpoint/server,github.com/flashbots/rpc-endpoint/types,github.com/flashbots/rpc-endpoint/utils -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
 	go tool cover -html=/tmp/go-rpcendpoint.cover.tmp
 	unlink /tmp/go-rpcendpoint.cover.tmp
