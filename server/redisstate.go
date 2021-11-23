@@ -17,13 +17,13 @@ var RedisPrefix = "rpc-endpoint:"
 var RedisPrefixTxSentToRelay = RedisPrefix + "tx-sent-to-relay:"
 var RedisExpiryTxSentToRelay = time.Duration(24 * time.Hour) // 1 day
 
-// Enable lookup of txHash by txFrom+nonce
+// Enable lookup of txHash by txFrom+nonce (only if sent to relay)
 var RedisPrefixTxHashForSenderAndNonce = RedisPrefix + "txsender-and-nonce-to-txhash:"
 var RedisExpiryTxHashForSenderAndNonce = time.Duration(24 * time.Hour) // 1 day
 
 // nonce-fix of an account (with number of times sent)
 var RedisPrefixNonceFixForAccount = RedisPrefix + "txsender-with-nonce-fix:"
-var RedisExpiryNonceFixForAccount = time.Duration(2 * time.Hour)
+var RedisExpiryNonceFixForAccount = time.Duration(24 * time.Hour)
 
 // Enable lookup of txFrom by txHash
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"

@@ -225,8 +225,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	// Remember time when tx was received
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+
+	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
 	if err != nil {
 		r.logError("redis:SetSenderOfTxHash failed: %v", err)
@@ -400,7 +401,7 @@ func (r *RpcRequest) _writeRpcResponse(res *types.JsonRpcResponse) {
 	r.respBodyWritten = true
 }
 
-// send if (a) not sent before then send now, (b) privTx failed, (c) unknown and 5 min passed
+// send if (a) not sent before, (b) sent and status=failed, (c) sent, status=unknown and sent at least 5 min ago
 func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
 	timeSent, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
 	if err != nil {

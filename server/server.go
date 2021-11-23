@@ -11,6 +11,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/alicebob/miniredis"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/metachris/flashbotsrpc"
 	"github.com/pkg/errors"
@@ -40,6 +41,15 @@ type RpcEndPointServer struct {
 
 func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
 	var err error
+
+	if redisUrl == "dev" {
+		log.Println("Using integrated in-memory Redis instance")
+		redisServer, err := miniredis.Run()
+		if err != nil {
+			return nil, err
+		}
+		redisUrl = redisServer.Addr()
+	}
 
 	// Setup redis connection
 	RState, err = NewRedisState(redisUrl)
