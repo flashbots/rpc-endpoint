@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,10 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
 )
@@ -69,60 +65,6 @@ func GetSenderFromRawTx(tx *ethtypes.Transaction) (string, error) {
 	}
 
 	return from, nil
-}
-
-func SendRpcWithSignatureAndParseResponse(url string, privKey *ecdsa.PrivateKey, jsonRpcReq *types.JsonRpcRequest) (jsonRpcResponse *types.JsonRpcResponse, responseBytes *[]byte, err error) {
-	body, err := json.Marshal(jsonRpcReq)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "marshal")
-	}
-
-	// fmt.Printf("body: %s\n", body)
-	hashedBody := crypto.Keccak256Hash([]byte(body)).Hex()
-	sig, err := crypto.Sign(accounts.TextHash([]byte(hashedBody)), privKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	signature := crypto.PubkeyToAddress(privKey.PublicKey).Hex() + ":" + hexutil.Encode(sig)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("X-Flashbots-Signature", signature)
-	httpClient := &http.Client{
-		Timeout: time.Second * 30,
-	}
-
-	response, err := httpClient.Do(req)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "post")
-	}
-	defer response.Body.Close()
-
-	respData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "read")
-	}
-
-	jsonRpcResp := new(types.JsonRpcResponse)
-	errorResp := new(types.RelayErrorResponse)
-	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
-		// relay returned an error. Convert to standard JSON-RPC error
-		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
-		return jsonRpcResp, &respData, nil
-	}
-
-	// Unmarshall JSON-RPC response and check for error inside
-	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
-		// fmt.Printf("unmarshal error. data: %s\n", respData)
-		return nil, &respData, errors.Wrap(err, "unmarshal")
-	}
-
-	return jsonRpcResp, &respData, nil
 }
 
 func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {

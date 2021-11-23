@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/flashbots/rpc-endpoint/utils"
 	"github.com/google/uuid"
+	"github.com/metachris/flashbotsrpc"
 )
 
 // RPC request for a single client JSON-RPC request
@@ -29,7 +31,6 @@ type RpcRequest struct {
 	uid             string
 	timeStarted     time.Time
 	defaultProxyUrl string
-	relayUrl        string
 	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
@@ -46,14 +47,13 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
 		uid:             uuid.New().String(),
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
-		relayUrl:        relayUrl,
 		relaySigningKey: relaySigningKey,
 	}
 }
@@ -467,21 +467,27 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	param := make(map[string]string)
-	param["tx"] = r.rawTxHex
-	jsonRpcReq := types.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
-	backendResp, respBytes, err := SendRpcWithSignatureAndParseResponse(r.relayUrl, r.relaySigningKey, jsonRpcReq)
+	sendPrivTxArgs := flashbotsrpc.FlashbotsSendPrivateTransactionRequest{Tx: r.rawTxHex}
+	_, err = FlashbotsRPC.FlashbotsSendPrivateTransaction(r.relaySigningKey, sendPrivTxArgs)
+
+	// param := make(map[string]string)
+	// param["tx"] = r.rawTxHex
+	// jsonRpcReq := types.NewJsonRpcRequest1(1, "eth_sendPrivateTransaction", param)
+	// _, _, err = utils.SendRpcWithSignatureAndParseResponse(Rel, r.relaySigningKey, jsonRpcReq)
+
 	if err != nil {
-		r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err, *respBytes)
 		r.writeHeaderStatus(http.StatusInternalServerError)
+		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
+			r.log("[sendTxToRelay] relay error response %s: %s - data: %s", txHash, err)
+			r.writeRpcError(err.Error())
+		} else {
+			r.logError("[sendTxToRelay] relay call failed for %s: %s - data: %s", txHash, err)
+			r.writeRpcError("Internal Server Error")
+		}
 		return
 	}
 
-	if backendResp.Error != nil {
-		r.logError("[sendTxToRelay] relay returned an error for %s: %s", txHash, backendResp.Error.Message)
-	}
-
-	r._writeRpcResponse(backendResp)
+	r.writeRpcResult(txHash)
 	r.log("[sendTxToRelay] sent %s", txHash)
 }
 

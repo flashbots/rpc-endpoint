@@ -12,6 +12,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/metachris/flashbotsrpc"
 	"github.com/pkg/errors"
 )
 
@@ -23,6 +24,8 @@ var blacklistedIps = []string{"127.0.0.2"}
 // Metamask fix helper
 var RState *RedisState
 
+var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
+
 func init() {
 	log.SetOutput(os.Stdout)
 }
@@ -32,7 +35,6 @@ type RpcEndPointServer struct {
 	startTime       time.Time
 	listenAddress   string
 	proxyUrl        string
-	relayUrl        string
 	relaySigningKey *ecdsa.PrivateKey
 }
 
@@ -45,12 +47,14 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		return nil, errors.Wrap(err, "Redis init error")
 	}
 
+	FlashbotsRPC = flashbotsrpc.New(relayUrl)
+	FlashbotsRPC.Debug = true
+
 	return &RpcEndPointServer{
 		startTime:       Now(),
 		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
-		relayUrl:        relayUrl,
 		relaySigningKey: relaySigningKey,
 	}, nil
 }
@@ -82,7 +86,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relayUrl, s.relaySigningKey)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relaySigningKey)
 	request.process()
 }
 

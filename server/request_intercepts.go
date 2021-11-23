@@ -70,11 +70,12 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		r.writeRpcError("Transaction failed") // TODO: return standard failed tx payload?
 		return true
 
-	} else if statusApiResponse.Status == types.TxStatusIncluded {
-		// TODO? If latest tx of this user was a successful, then we should remove the nonce fix
-		// This could lead to a ping-pong between checking 2 tx, with one check adding and another removing the nonce fix
-		// See also the branch tmp-check_post_getTransactionReceipt-removeNonceFix
-		_ = 1
+		// } else if statusApiResponse.Status == types.TxStatusIncluded {
+		// 	// NOTE: This branch can never happen, because if tx is included then Receipt will not return null
+		// 	// TODO? If latest tx of this user was a successful, then we should remove the nonce fix
+		// 	// This could lead to a ping-pong between checking 2 tx, with one check adding and another removing the nonce fix
+		// 	// See also the branch tmp-check_post_getTransactionReceipt-removeNonceFix
+		// 	_ = 1
 	}
 
 	return

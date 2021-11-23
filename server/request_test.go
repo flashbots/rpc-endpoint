@@ -40,7 +40,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	setupRedis()
 	setupMockTxApi()
 
-	request := NewRpcRequest(nil, nil, "", "", nil)
+	request := NewRpcRequest(nil, nil, "", nil)
 
 	txHash := "0x0Foo"
 
