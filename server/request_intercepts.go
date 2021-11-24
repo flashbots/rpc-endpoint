@@ -13,11 +13,11 @@ var ProtectTxApiHost = "https://protect.flashbots.net"
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
-		return
+		return false
 	}
 
 	if len(r.jsonReq.Params) < 1 {
-		return
+		return false
 	}
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
@@ -27,7 +27,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
 		r.logError("[post_getTransactionReceipt] privateTxApi failed: %s", err)
-		return
+		return false
 	}
 
 	ensureAccountFixIsInPlace := func() {
@@ -78,7 +78,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// 	_ = 1
 	}
 
-	return
+	return false
 }
 
 func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished bool) {
@@ -102,7 +102,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	// Intercept max 4 times (after which Metamask marks it as dropped)
 	numTimesSent += 1
 	if numTimesSent > 4 {
-		return
+		return false
 	}
 
 	err = RState.SetNonceFixForAccount(addr, numTimesSent)
