@@ -198,7 +198,7 @@ func TestGetTxReceiptNull(t *testing.T) {
 
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_Hash})
 	jsonResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_getTransactionCount)
-	fmt.Println(jsonResp)
+	// fmt.Println(jsonResp)
 	require.Equal(t, "null", string(jsonResp.Result))
 
 	jsonResp, err := utils.SendRpcAndParseResponseTo(RpcBackendServerUrl, req_getTransactionCount)
@@ -224,8 +224,9 @@ func TestMetamaskFix(t *testing.T) {
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
 	jsonResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_getTransactionReceipt)
-	require.NotNil(t, jsonResp.Error)
-	require.Equal(t, "Transaction failed", jsonResp.Error.Message)
+	require.Nil(t, jsonResp.Error)
+	require.Equal(t, "null", string(jsonResp.Result))
+	// require.Equal(t, "Transaction failed", jsonResp.Error.Message)
 
 	// At this point, the tx hash should be blacklisted and too high a nonce is returned
 	valueAfter1 := testutils.SendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
