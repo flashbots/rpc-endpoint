@@ -45,7 +45,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	var err error
 
 	if DebugDontSendTx {
-		log.Println("DEBUG: NOT SENDING RAWTX!")
+		log.Println("DEBUG MODE: raw transactions will not be sent out!")
 	}
 
 	if redisUrl == "dev" {
@@ -58,6 +58,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	}
 
 	// Setup redis connection
+	log.Println("Connecting to redis at", redisUrl, "...")
 	RState, err = NewRedisState(redisUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")

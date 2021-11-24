@@ -1,5 +1,6 @@
 /*
- * Dummy RPC backend. Implements Ethereum JSON-RPC calls that the tests need.
+ * Dummy RPC backend for both Ethereum node and Flashbots Relay.
+ * Implements JSON-RPC calls that the tests need.
  */
 package testutils
 

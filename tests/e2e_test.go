@@ -1,7 +1,7 @@
 /*
  * RPC endpoint E2E tests.
  */
-package server
+package tests
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/alicebob/miniredis"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/flashbots/rpc-endpoint/testutils"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/flashbots/rpc-endpoint/utils"
@@ -59,10 +60,10 @@ func resetTestServers() {
 
 	testutils.MockTxApiReset()
 	txApiServer := httptest.NewServer(http.HandlerFunc(testutils.MockTxApiHandler))
-	ProtectTxApiHost = txApiServer.URL
+	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	rpcServer, err := NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, redisServer.Addr())
+	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, redisServer.Addr())
 	if err != nil {
 		panic(err)
 	}
