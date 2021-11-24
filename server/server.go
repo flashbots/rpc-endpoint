@@ -19,6 +19,8 @@ import (
 
 var Now = time.Now // used to mock time in tests
 
+var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
+
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
@@ -41,6 +43,10 @@ type RpcEndPointServer struct {
 
 func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
 	var err error
+
+	if DebugDontSendTx {
+		log.Println("DEBUG: NOT SENDING RAWTX!")
+	}
 
 	if redisUrl == "dev" {
 		log.Println("Using integrated in-memory Redis instance")
