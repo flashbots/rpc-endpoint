@@ -65,10 +65,11 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 
 	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
 	if statusApiResponse.Status == types.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == types.TxStatusUnknown) {
-		r.log("[post_getTransactionReceipt] failed private tx")
+		r.log("[post_getTransactionReceipt] failed private tx, ensure account fix is in place")
 		ensureAccountFixIsInPlace()
-		r.writeRpcError("Transaction failed") // TODO: return standard failed tx payload?
-		return true
+		// r.writeRpcError("Transaction failed") // If this is sent before metamask dropped the tx (received 4x invalid nonce), then it doesn't call getTransactionCount anymore
+		// TODO: return standard failed tx payload?
+		return false
 
 		// } else if statusApiResponse.Status == types.TxStatusIncluded {
 		// 	// NOTE: This branch can never happen, because if tx is included then Receipt will not return null
