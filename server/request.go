@@ -401,34 +401,34 @@ func (r *RpcRequest) _writeRpcResponse(res *types.JsonRpcResponse) {
 	r.respBodyWritten = true
 }
 
-// send if (a) not sent before, (b) sent and status=failed, (c) sent, status=unknown and sent at least 5 min ago
-func (r *RpcRequest) shouldSendTxToRelay(txHash string) bool {
+// Check whether to block resending this tx. Send only if (a) not sent before, (b) sent and status=failed, (c) sent, status=unknown and sent at least 5 min ago
+func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 	timeSent, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
 	if err != nil {
 		r.logError("[shouldSendTxToRelay] redis:GetTxSentToRelay error: %v", err)
-		return true
+		return false // don't block on redis error
 	}
 
 	if !txWasSentToRelay {
-		return true
+		return false // don't block if not sent before
 	}
 
 	// was sent before. check status and time
 	txStatusApiResponse, err := GetTxStatus(txHash)
 	if err != nil {
 		r.logError("[shouldSendTxToRelay] GetTxStatus error: %v", err)
-		return true
+		return false // don't block on redis error
 	}
 
 	// Allow sending to relay if tx has failed, or if it's still unknown after a while
 	txStatus := types.PrivateTxStatus(txStatusApiResponse.Status)
 	if txStatus == types.TxStatusFailed {
-		return true
+		return false // don't block if tx failed
 	} else if txStatus == types.TxStatusUnknown && time.Since(timeSent).Minutes() >= 5 {
-		return true
+		return false // don't block if unknown and sent at least 5 min ago
 	} else {
-		// Don't send if tx is pending or included
-		return false
+		// block tx if pending or already included
+		return true
 	}
 }
 
@@ -437,8 +437,8 @@ func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
 
 	// Check if tx was already forwarded and should be blocked now
-	if !r.shouldSendTxToRelay(txHash) {
-		r.log("[sendTxToRelay] shouldn't send %s", txHash)
+	if r.blockResendingTxToRelay(txHash) {
+		r.log("[sendTxToRelay] blocked %s", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}

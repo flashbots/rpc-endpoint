@@ -45,7 +45,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	txHash := "0x0Foo"
 
 	// SEND when not seen before
-	shouldSend := request.shouldSendTxToRelay(txHash)
+	shouldSend := !request.blockResendingTxToRelay(txHash)
 	require.True(t, shouldSend)
 
 	// Fake a previous send
@@ -58,7 +58,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Equal(t, types.TxStatusUnknown, txStatusApiResponse.Status)
 
 	// NOT SEND when unknown and time since sent < 5 min
-	shouldSend = request.shouldSendTxToRelay(txHash)
+	shouldSend = !request.blockResendingTxToRelay(txHash)
 	require.False(t, shouldSend)
 
 	// Set tx status to Failed
@@ -68,7 +68,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Equal(t, types.TxStatusFailed, txStatusApiResponse.Status)
 
 	// SEND if failed
-	shouldSend = request.shouldSendTxToRelay(txHash)
+	shouldSend = !request.blockResendingTxToRelay(txHash)
 	require.True(t, shouldSend)
 
 	// Set tx status to pending
@@ -78,7 +78,7 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Equal(t, types.TxStatusPending, txStatusApiResponse.Status)
 
 	// NOT SEND if pending
-	shouldSend = request.shouldSendTxToRelay(txHash)
+	shouldSend = !request.blockResendingTxToRelay(txHash)
 	require.False(t, shouldSend)
 
 	//
@@ -101,6 +101,6 @@ func TestRequestshouldSendTxToRelay(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, types.TxStatusUnknown, txStatusApiResponse.Status)
 
-	shouldSend = request.shouldSendTxToRelay(txHash)
+	shouldSend = !request.blockResendingTxToRelay(txHash)
 	require.True(t, shouldSend)
 }
