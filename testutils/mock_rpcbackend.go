@@ -43,8 +43,19 @@ func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error)
 		}
 
 	case "eth_sendRawTransaction":
+		txHash := req.Params[0].(string)
+		if txHash == TestTx_CancelAtRelay_Cancel_RawTx {
+			return TestTx_CancelAtRelay_Cancel_Hash, nil
+		}
 		return "tx-hash1", nil
 
+	case "net_version":
+		return "3", nil
+
+	case "null":
+		return nil, nil
+
+		// Relay calls
 	case "eth_sendPrivateTransaction":
 		param := req.Params[0].(map[string]interface{})
 		if param["tx"] == TestTx_BundleFailedTooManyTimes_RawTx {
@@ -53,15 +64,13 @@ func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error)
 			return "tx-hash2", nil
 		}
 
-	case "net_version":
-		return "3", nil
-
-	case "null":
-		return nil, nil
-
-	case "eth_getBundleStatusByTransactionHash":
-		return getBundleStatusByTransactionHash_Response, nil
-
+	case "eth_cancelPrivateTransaction":
+		param := req.Params[0].(map[string]interface{})
+		if param["txHash"] == TestTx_CancelAtRelay_Cancel_Hash {
+			return true, nil
+		} else {
+			return false, nil
+		}
 	}
 
 	return "", fmt.Errorf("no RPC method handler implemented for %s", req.Method)

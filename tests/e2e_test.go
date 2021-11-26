@@ -281,3 +281,48 @@ func TestRelayTx(t *testing.T) {
 	require.Nil(t, r1.Error)
 	require.Equal(t, timeStampFirstRequest, testutils.MockBackendLastJsonRpcRequestTimestamp)
 }
+
+func TestRelayCancelTx(t *testing.T) {
+	resetTestServers()
+
+	// sendRawTransaction of the initial TX
+	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Initial_RawTx})
+	testutils.SendRpcAndParseResponseOrFailNow(t, req_sendRawTransaction)
+
+	// Ensure that request called eth_sendPrivateTransaction on the Relay
+	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+
+	// Ensure that the RPC backend sent the rawTx to the relay
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
+	require.Equal(t, testutils.TestTx_CancelAtRelay_Initial_RawTx, resp["tx"])
+
+	// Send cancel-tx to the RPC backend
+	req_cancelTx := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
+	cancelResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_cancelTx)
+
+	// Ensure that request called eth_sendPrivateTransaction on the Relay
+	require.Equal(t, "eth_cancelPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+	var res string
+	json.Unmarshal(cancelResp.Result, &res)
+
+	// Ensure the response is the tx hash
+	require.Equal(t, testutils.TestTx_CancelAtRelay_Cancel_Hash, res)
+}
+
+// cancel-tx without initial related tx would just go to mempool
+func TestRelayCancelTxWithoutInitialTx(t *testing.T) {
+	resetTestServers()
+
+	// Send cancel-tx to the RPC backend
+	req_cancelTx := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
+	cancelResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_cancelTx)
+
+	// Ensure that request called eth_sendRawTransaction on the mempool node, instead of eth_sendPrivateTransaction on the Relay
+	// (since no valid initial tx was found)
+	require.Equal(t, "eth_sendRawTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+	var res string
+	json.Unmarshal(cancelResp.Result, &res)
+
+	// Ensure the response is the tx hash
+	require.Equal(t, testutils.TestTx_CancelAtRelay_Cancel_Hash, res)
+}
