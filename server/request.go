@@ -444,7 +444,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.log("[sendTxToRelay] sending %s ...", txHash)
+	r.log("[sendTxToRelay] sending %s ... -- from ip: %s / address: %s", txHash, r.ip, r.txFrom)
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
