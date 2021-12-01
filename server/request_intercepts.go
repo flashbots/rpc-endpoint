@@ -60,7 +60,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 			return
 		}
 
-		r.logError("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
+		r.log("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
 	}
 
 	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)

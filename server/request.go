@@ -473,7 +473,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	_, err = FlashbotsRPC.FlashbotsSendPrivateTransaction(r.relaySigningKey, sendPrivTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
-			r.log("[sendTxToRelay] relay error response: %v - rawTx: %s", err, r.rawTxHex)
+			r.log("[sendTxToRelay] %v - rawTx: %s", err, r.rawTxHex)
 			r.writeRpcError(err.Error())
 		} else {
 			r.logError("[sendTxToRelay] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
@@ -542,10 +542,10 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'
-			r.log("[sendTxToRelay] relay error response: %v - rawTx: %s", err, r.rawTxHex)
+			r.log("[cancel-tx] %v - rawTx: %s", err, r.rawTxHex)
 			r.writeRpcError(err.Error())
 		} else {
-			r.logError("[sendTxToRelay] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
+			r.logError("[cancel-tx] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
 			r.writeHeaderStatus(http.StatusInternalServerError)
 		}
 		return true
