@@ -1,28 +1,10 @@
-package server
+package types
 
 import (
 	"encoding/json"
 	"fmt"
 	"time"
 )
-
-type StringWithTime struct {
-	s string
-	t time.Time
-}
-
-func NewStringWithTime(s string) StringWithTime {
-	return StringWithTime{s, Now()}
-}
-
-type BoolWithTime struct {
-	v bool
-	t time.Time
-}
-
-func NewBoolWithTime(v bool) BoolWithTime {
-	return BoolWithTime{v, Now()}
-}
 
 type JsonRpcRequest struct {
 	Id      interface{}   `json:"id"`
@@ -79,14 +61,30 @@ type GetBundleStatusByTransactionHashResponse struct {
 	StatusTimestamp   int    `json:"statusTimestamp"`   // 1634568873862
 }
 
-type PrivateTxApiResponse struct {
-	Status         string `json:"status"`
-	Hash           string `json:"hash"`
-	MaxBlockNumber int    `json:"maxBlockNumber"`
-}
-
 type HealthResponse struct {
 	Now       time.Time `json:"time"`
 	StartTime time.Time `json:"startTime"`
 	Version   string    `json:"version"`
+}
+
+type TransactionReceipt struct {
+	TransactionHash string
+	Status          string
+}
+
+type PrivateTxStatus string
+
+var TxStatusUnknown PrivateTxStatus = "UNKNOWN"
+var TxStatusPending PrivateTxStatus = "PENDING"
+var TxStatusIncluded PrivateTxStatus = "INCLUDED"
+var TxStatusFailed PrivateTxStatus = "FAILED"
+
+type PrivateTxApiResponse struct {
+	Status         PrivateTxStatus `json:"status"`
+	Hash           string          `json:"hash"`
+	MaxBlockNumber int             `json:"maxBlockNumber"`
+}
+
+type RelayErrorResponse struct {
+	Error string `json:"error"`
 }

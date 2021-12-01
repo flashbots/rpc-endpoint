@@ -10,15 +10,24 @@ import (
 	"time"
 
 	_ "net/http/pprof"
+
+	"github.com/alicebob/miniredis"
+	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/metachris/flashbotsrpc"
+	"github.com/pkg/errors"
 )
 
 var Now = time.Now // used to mock time in tests
+
+var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
 
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
 // Metamask fix helper
-var State = NewGlobalState()
+var RState *RedisState
+
+var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -29,19 +38,42 @@ type RpcEndPointServer struct {
 	startTime       time.Time
 	listenAddress   string
 	proxyUrl        string
-	relayUrl        string
 	relaySigningKey *ecdsa.PrivateKey
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcEndPointServer {
+func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
+	var err error
+
+	if DebugDontSendTx {
+		log.Println("DEBUG MODE: raw transactions will not be sent out!")
+	}
+
+	if redisUrl == "dev" {
+		log.Println("Using integrated in-memory Redis instance")
+		redisServer, err := miniredis.Run()
+		if err != nil {
+			return nil, err
+		}
+		redisUrl = redisServer.Addr()
+	}
+
+	// Setup redis connection
+	log.Println("Connecting to redis at", redisUrl, "...")
+	RState, err = NewRedisState(redisUrl)
+	if err != nil {
+		return nil, errors.Wrap(err, "Redis init error")
+	}
+
+	FlashbotsRPC = flashbotsrpc.New(relayUrl)
+	FlashbotsRPC.Debug = true
+
 	return &RpcEndPointServer{
 		startTime:       Now(),
 		version:         version,
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
-		relayUrl:        relayUrl,
 		relaySigningKey: relaySigningKey,
-	}
+	}, nil
 }
 
 func (s *RpcEndPointServer) Start() {
@@ -71,12 +103,12 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relayUrl, s.relaySigningKey)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relaySigningKey)
 	request.process()
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
-	res := HealthResponse{
+	res := types.HealthResponse{
 		Now:       Now(),
 		StartTime: s.startTime,
 		Version:   s.version,
@@ -84,7 +116,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 
 	jsonResp, err := json.Marshal(res)
 	if err != nil {
-		log.Panicln("healthCheck json error:", err)
+		log.Println("healthCheck json error:", err)
 		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}

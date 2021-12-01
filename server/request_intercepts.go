@@ -3,64 +3,83 @@ package server
 import (
 	"fmt"
 	"strings"
+
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 var ProtectTxApiHost = "https://protect.flashbots.net"
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
-func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *JsonRpcResponse) {
+func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcResponse) (requestFinished bool) {
 	resultStr := string(jsonResp.Result)
 	if resultStr != "null" {
-		return
+		return false
 	}
 
 	if len(r.jsonReq.Params) < 1 {
-		return
+		return false
 	}
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
-
-	// Abort if transaction wasn't submitted before
-	txFrom, txFound := State.txHashToUser[txHashLower]
-	if !txFound {
-		return
-	}
-	txFromLower := txFrom.s
-
-	// Abort if not the latest transaction by user
-	latestTxHash, latestFound := State.userLatestTxHash[txFromLower]
-	if latestFound && latestTxHash.s != txHashLower {
-		return
-	}
-
-	// Remove any nonce fix for an earlier tx
-	nonceFix, nonceFixAlreadyInPlace := State.accountWithNonceFix[txFromLower]
-	if nonceFixAlreadyInPlace && nonceFix.txHash != txHashLower {
-		delete(State.accountWithNonceFix, txFromLower)
-	}
-
-	if _, nonceFixAlreadyInPlace = State.accountWithNonceFix[txFromLower]; nonceFixAlreadyInPlace {
-		// r.log("[MM2] eth_getTransactionReceipt already in progress")
-		return
-	}
-
-	r.log("[MM2] eth_getTransactionReceipt is null for latest user tx %s", txHashLower)
+	r.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
 
 	// get tx status from private-tx-api
 	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
-		r.logError("[MM2] privateTxApi failed: %s", err)
-		return
+		r.logError("[post_getTransactionReceipt] privateTxApi failed: %s", err)
+		return false
 	}
 
-	r.log("[MM2] priv-tx-api status: %s", statusApiResponse.Status)
-	if statusApiResponse.Status == "FAILED" || (DebugDontSendTx && statusApiResponse.Status == "UNKNOWN") {
-		r.log("[MM2] failed tx, will receive too high of a nonce")
-		State.accountWithNonceFix[txFromLower] = NewNonceFix(txHashLower)
-	} else {
-		// healthy response, remove any nonce fix
-		delete(State.accountWithNonceFix, txFromLower)
+	ensureAccountFixIsInPlace := func() {
+		// Get the sender of this transaction
+		txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
+			return
+		}
+
+		if !txFromFound { // cannot sent nonce-fix if we don't have the sender
+			return
+		}
+
+		// Check if nonceFix is already in place for this user
+		_, nonceFixAlreadyExists, err := RState.GetNonceFixForAccount(txFromLower)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis:GetNonceFixForAccount failed: %s", err)
+			return
+		}
+
+		if nonceFixAlreadyExists {
+			return
+		}
+
+		// Setup a new nonce-fix for this user
+		err = RState.SetNonceFixForAccount(txFromLower, 0)
+		if err != nil {
+			r.logError("[post_getTransactionReceipt] redis error: %s", err)
+			return
+		}
+
+		r.log("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
 	}
+
+	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
+	if statusApiResponse.Status == types.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == types.TxStatusUnknown) {
+		r.log("[post_getTransactionReceipt] failed private tx, ensure account fix is in place")
+		ensureAccountFixIsInPlace()
+		// r.writeRpcError("Transaction failed") // If this is sent before metamask dropped the tx (received 4x invalid nonce), then it doesn't call getTransactionCount anymore
+		// TODO: return standard failed tx payload?
+		return false
+
+		// } else if statusApiResponse.Status == types.TxStatusIncluded {
+		// 	// NOTE: This branch can never happen, because if tx is included then Receipt will not return null
+		// 	// TODO? If latest tx of this user was a successful, then we should remove the nonce fix
+		// 	// This could lead to a ping-pong between checking 2 tx, with one check adding and another removing the nonce fix
+		// 	// See also the branch tmp-check_post_getTransactionReceipt-removeNonceFix
+		// 	_ = 1
+	}
+
+	return false
 }
 
 func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished bool) {
@@ -71,18 +90,29 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	addr := strings.ToLower(r.jsonReq.Params[0].(string))
 
 	// Check if nonceFix is in place for this user
-	nonceFix, shouldInterceptNonce := State.accountWithNonceFix[addr]
-	if !shouldInterceptNonce {
+	numTimesSent, nonceFixInPlace, err := RState.GetNonceFixForAccount(addr)
+	if err != nil {
+		r.logError("redis:GetAccountWithNonceFix error:", err)
+		return false
+	}
+
+	if !nonceFixInPlace {
 		return false
 	}
 
 	// Intercept max 4 times (after which Metamask marks it as dropped)
-	nonceFix.numTries += 1
-	if nonceFix.numTries > 4 {
-		return
+	numTimesSent += 1
+	if numTimesSent > 4 {
+		return false
 	}
 
-	r.log("eth_getTransactionCount intercept: #%d", nonceFix.numTries)
+	err = RState.SetNonceFixForAccount(addr, numTimesSent)
+	if err != nil {
+		r.logError("redis:SetAccountWithNonceFix error:", err)
+		return false
+	}
+
+	r.log("eth_getTransactionCount intercept: #%d", numTimesSent)
 
 	// Return invalid nonce
 	var wrongNonce uint64 = 1e9 + 1

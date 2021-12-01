@@ -2,3 +2,4 @@
 /rpc-endpoint
 /tmp
 /log*.txt
+/run*.sh
