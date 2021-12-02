@@ -199,7 +199,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.logError("getting transaction object failed")
+		r.logError("reading transaction object failed - rawTx: %s", r.rawTxHex)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
