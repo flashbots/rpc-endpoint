@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -78,6 +79,12 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 
 func (s *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint %s at %v...", s.version, s.listenAddress)
+
+	// Regularly log debug info
+	go func() {
+		log.Printf("num-goroutines: %d", runtime.NumGoroutine())
+		time.Sleep(10 * time.Second)
+	}()
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
