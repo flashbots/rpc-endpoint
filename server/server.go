@@ -82,8 +82,10 @@ func (s *RpcEndPointServer) Start() {
 
 	// Regularly log debug info
 	go func() {
-		log.Printf("num-goroutines: %d", runtime.NumGoroutine())
-		time.Sleep(10 * time.Second)
+		for {
+			log.Printf("num-goroutines: %d", runtime.NumGoroutine())
+			time.Sleep(10 * time.Second)
+		}
 	}()
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)

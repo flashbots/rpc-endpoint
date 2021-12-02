@@ -83,7 +83,7 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	respObj := new(types.PrivateTxApiResponse)
 	err = json.Unmarshal(bodyBytes, respObj)
 	if err != nil {
-		msg := fmt.Sprintf("privTxApi jsonUnmarshal failed for %s - body: %s", txHash, bodyBytes)
+		msg := fmt.Sprintf("privTxApi jsonUnmarshal failed for %s - status: %d / body: %s", txHash, resp.StatusCode, string(bodyBytes))
 		return nil, errors.Wrap(err, msg)
 	}
 
