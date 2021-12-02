@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"runtime"
 	"strings"
 	"time"
 
@@ -34,9 +33,10 @@ type RpcRequest struct {
 	relaySigningKey *ecdsa.PrivateKey
 
 	// extracted during request lifecycle:
+	origin   string
+	ip       string
 	body     []byte
 	jsonReq  *types.JsonRpcRequest
-	ip       string
 	rawTxHex string
 	tx       *ethtypes.Transaction
 	txFrom   string
@@ -101,7 +101,8 @@ func (r *RpcRequest) process() {
 	}()
 
 	r.ip = utils.GetIP(r.req)
-	r.log("POST request from ip: %s - goroutines: %d", r.ip, runtime.NumGoroutine())
+	r.origin = r.req.Header.Get("Origin")
+	r.log("POST request from ip: %s - origin: %s", r.ip, r.origin)
 
 	if IsBlacklisted(r.ip) {
 		r.log("Blocked IP: %s", r.ip)
@@ -199,7 +200,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.logError("getting transaction object failed")
+		r.logError("reading transaction object failed - rawTx: %s", r.rawTxHex)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
@@ -216,7 +217,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.log("tx rejected - nonce too high: %d - %s from %s", r.tx.Nonce(), r.tx.Hash(), txFromLower)
+		r.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
 		r.writeRpcError("tx rejected - nonce too high")
 		err = RState.DelNonceFixForAccount(txFromLower)
 		if err != nil {
