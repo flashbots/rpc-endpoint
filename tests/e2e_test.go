@@ -280,6 +280,12 @@ func TestRelayTx(t *testing.T) {
 	testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
 	require.Nil(t, r1.Error)
 	require.Equal(t, timeStampFirstRequest, testutils.MockBackendLastJsonRpcRequestTimestamp)
+
+	// Ensure nonce is saved to redis
+	nonce, found, err := server.RState.GetSenderMaxNonce(testutils.TestTx_BundleFailedTooManyTimes_From)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(30), nonce)
 }
 
 func TestRelayCancelTx(t *testing.T) {

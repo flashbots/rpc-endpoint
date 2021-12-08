@@ -161,6 +161,42 @@ func TestSenderOfTxHash(t *testing.T) {
 	require.Equal(t, strings.ToLower(txFrom), val)
 }
 
+func TestSenderMaxNonce(t *testing.T) {
+	var err error
+	resetRedis()
+
+	txFrom := "0x0Sender"
+
+	val, found, err := redisState.GetSenderMaxNonce(txFrom)
+	require.Nil(t, err, err)
+	require.False(t, found)
+	require.Equal(t, uint64(0), val)
+
+	err = redisState.SetSenderMaxNonce(txFrom, 17)
+	require.Nil(t, err, err)
+
+	val, found, err = redisState.GetSenderMaxNonce(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(17), val)
+
+	err = redisState.SetSenderMaxNonce(txFrom, 16)
+	require.Nil(t, err, err)
+
+	val, found, err = redisState.GetSenderMaxNonce(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(17), val)
+
+	err = redisState.SetSenderMaxNonce(txFrom, 18)
+	require.Nil(t, err, err)
+
+	val, found, err = redisState.GetSenderMaxNonce(txFrom)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, uint64(18), val)
+}
+
 // func TestLastTxHashOfAccount(t *testing.T) {
 // 	var err error
 // 	resetRedis()

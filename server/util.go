@@ -89,3 +89,17 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 
 	return respObj, nil
 }
+
+func Min(a uint64, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func Max(a uint64, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}

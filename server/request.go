@@ -237,7 +237,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.log("[sendTxToRelay] sending %s ... -- from ip: %s / address: %s", txHash, r.ip, r.txFrom)
+	r.log("[sendTxToRelay] sending %s ... -- from ip: %s / address: %s / to: %s", txHash, r.ip, r.txFrom, r.tx.To())
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
@@ -259,29 +259,37 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
-	_nonceStr := ""
-	err = json.Unmarshal(_res.Result, &_nonceStr)
+	_userNonceStr := ""
+	err = json.Unmarshal(_res.Result, &_userNonceStr)
 	if err != nil {
 		r.logError("[sendTxToRelay] eth_getTransactionCount unmarshall failed: %v - result: %s", err, _res.Result)
 		r.writeHeaderStatus(http.StatusInternalServerError)
 		return
 	}
-	_nonceStr = strings.Replace(_nonceStr, "0x", "", 1)
-	_nonceBigInt := new(big.Int)
-	_nonceBigInt.SetString(_nonceStr, 16)
-	if r.tx.Nonce() != _nonceBigInt.Uint64() {
-		r.log("[sendTxToRelay] invalid nonce. want: %d, have: %d", _nonceBigInt.Uint64(), r.tx.Nonce())
+	_userNonceStr = strings.Replace(_userNonceStr, "0x", "", 1)
+	_userNonceBigInt := new(big.Int)
+	_userNonceBigInt.SetString(_userNonceStr, 16)
+	_userNonceUint := _userNonceBigInt.Uint64()
+	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
+	_userHighestKnownNonce := Max(_userNonceUint, _redisMaxNonce)
+
+	if r.tx.Nonce() < _userNonceUint || r.tx.Nonce() > _userHighestKnownNonce+1 {
+		r.log("[sendTxToRelay] invalid nonce. want: %d..%d, got: %d", _userNonceUint, _userHighestKnownNonce, r.tx.Nonce())
 		r.writeRpcError("invalid nonce")
 		return
 	}
+
+	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce())
 
 	// only allow large transactions to certain addresses - default max tx size is 128KB
 	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
 	if r.tx.Size() > 131072 {
 		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
+			r.log("sendTxToRelay] large tx to not allowed target - hash: %s - target: %s", txHash, txTo)
 			r.writeRpcError("invalid target for large tx")
 			return
 		}
+		r.log("sendTxToRelay] allowed large tx - hash: %s - target: %s", txHash, txTo)
 	}
 
 	// remember this tx based on from+nonce (for cancel-tx)

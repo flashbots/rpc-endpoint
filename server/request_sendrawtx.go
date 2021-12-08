@@ -102,6 +102,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
+	// at the end, save the nonce for further spam protection checks
+	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
+
 	// Write JSON-RPC response now
 	r.writeHeaderContentTypeJson()
 	r.writeHeaderStatus(proxyHttpStatus)
