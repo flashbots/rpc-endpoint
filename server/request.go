@@ -133,6 +133,11 @@ func (r *RpcRequest) process() {
 
 		// Proxy the request to a node
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+		if !readJsonRpcSuccess {
+			r.log("Proxy to node failed: %s", r.jsonReq.Method)
+			r.writeHeaderStatus(http.StatusInternalServerError)
+			return
+		}
 
 		// After proxy, perhaps check backend [MM fix #3 step 2]
 		if r.jsonReq.Method == "eth_getTransactionReceipt" {
@@ -143,15 +148,10 @@ func (r *RpcRequest) process() {
 		}
 
 		// Write the response to user
-		if readJsonRpcSuccess {
-			r.writeHeaderContentTypeJson()
-			r.writeHeaderStatus(proxyHttpStatus)
-			r._writeRpcResponse(jsonResp)
-			r.log("Proxy to node successful: %s", r.jsonReq.Method)
-		} else {
-			r.writeHeaderStatus(http.StatusInternalServerError)
-			r.log("Proxy to node failed: %s", r.jsonReq.Method)
-		}
+		r.writeHeaderContentTypeJson()
+		r.writeHeaderStatus(proxyHttpStatus)
+		r._writeRpcResponse(jsonResp)
+		r.log("Proxy to node successful: %s", r.jsonReq.Method)
 	}
 }
 
@@ -180,14 +180,14 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	defer proxyResp.Body.Close()
 	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
 	if err != nil {
-		r.logError("failed to decode proxy request body: %v", err)
+		r.logError("failed to read proxy request body: %v", err)
 		return false, proxyResp.StatusCode, jsonResp
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(types.JsonRpcResponse)
 	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
-		r.logError("failed decoding proxy json-rpc response: %v", err)
+		r.logError("failed decoding proxy json-rpc response: %v - data: %s", err, proxyRespBody)
 		return false, proxyResp.StatusCode, jsonResp
 	}
 
