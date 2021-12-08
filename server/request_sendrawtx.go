@@ -49,10 +49,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	if r.tx.Nonce() >= 1e9 {
 		r.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
 		r.writeRpcError("tx rejected - nonce too high")
-		err = RState.DelNonceFixForAccount(txFromLower)
-		if err != nil {
-			r.logError("redis:DelAccountWithNonceFix failed: %v", err)
-		}
 		return
 	}
 
