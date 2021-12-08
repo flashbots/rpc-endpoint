@@ -133,6 +133,11 @@ func (r *RpcRequest) process() {
 
 		// Proxy the request to a node
 		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+		if !readJsonRpcSuccess {
+			r.log("Proxy to node failed: %s", r.jsonReq.Method)
+			r.writeHeaderStatus(http.StatusInternalServerError)
+			return
+		}
 
 		// After proxy, perhaps check backend [MM fix #3 step 2]
 		if r.jsonReq.Method == "eth_getTransactionReceipt" {
@@ -143,15 +148,10 @@ func (r *RpcRequest) process() {
 		}
 
 		// Write the response to user
-		if readJsonRpcSuccess {
-			r.writeHeaderContentTypeJson()
-			r.writeHeaderStatus(proxyHttpStatus)
-			r._writeRpcResponse(jsonResp)
-			r.log("Proxy to node successful: %s", r.jsonReq.Method)
-		} else {
-			r.writeHeaderStatus(http.StatusInternalServerError)
-			r.log("Proxy to node failed: %s", r.jsonReq.Method)
-		}
+		r.writeHeaderContentTypeJson()
+		r.writeHeaderStatus(proxyHttpStatus)
+		r._writeRpcResponse(jsonResp)
+		r.log("Proxy to node successful: %s", r.jsonReq.Method)
 	}
 }
 
