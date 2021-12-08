@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -244,7 +245,46 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.logError("[sendTxToRelay] redis:SetTxSentToRelay failed: %v", err)
 	}
 
-	// remember that this tx based on from+nonce (for cancel-tx)
+	txTo := r.tx.To()
+	if txTo == nil {
+		r.writeRpcError("invalid target")
+		return
+	}
+
+	// Check if nonce is correct (spam protection)
+	_req := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{r.txFrom, "latest"})
+	_res, err := utils.SendRpcAndParseResponseTo(r.defaultProxyUrl, _req)
+	if err != nil {
+		r.logError("[sendTxToRelay] eth_getTransactionCount failed: %v", err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+	_nonceStr := ""
+	err = json.Unmarshal(_res.Result, &_nonceStr)
+	if err != nil {
+		r.logError("[sendTxToRelay] eth_getTransactionCount unmarshall failed: %v - result: %s", err, _res.Result)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+	_nonceStr = strings.Replace(_nonceStr, "0x", "", 1)
+	_nonceBigInt := new(big.Int)
+	_nonceBigInt.SetString(_nonceStr, 16)
+	if r.tx.Nonce() != _nonceBigInt.Uint64() {
+		r.log("[sendTxToRelay] invalid nonce. want: %d, have: %d", _nonceBigInt.Uint64(), r.tx.Nonce())
+		r.writeRpcError("invalid nonce")
+		return
+	}
+
+	// only allow large transactions to certain addresses - default max tx size is 128KB
+	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
+	if r.tx.Size() > 131072 {
+		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
+			r.writeRpcError("invalid target for large tx")
+			return
+		}
+	}
+
+	// remember this tx based on from+nonce (for cancel-tx)
 	err = RState.SetTxHashForSenderAndNonce(r.txFrom, r.tx.Nonce(), txHash)
 	if err != nil {
 		r.logError("[sendTxToRelay] redis:SetTxHashForSenderAndNonce failed: %v", err)

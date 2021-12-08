@@ -21,3 +21,7 @@ func isOnFunctionWhiteList(data string) bool {
 		return false
 	}
 }
+
+var allowedLargeTxTargets = map[string]bool{
+	"0xtodo": true,
+}

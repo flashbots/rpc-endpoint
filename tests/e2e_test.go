@@ -326,3 +326,20 @@ func TestRelayCancelTxWithoutInitialTx(t *testing.T) {
 	// Ensure the response is the tx hash
 	require.Equal(t, testutils.TestTx_CancelAtRelay_Cancel_Hash, res)
 }
+
+// tx with wrong nonce should be rejected
+func TestRelayTxWithWrongNonce(t *testing.T) {
+	resetTestServers()
+
+	nonceOrig := testutils.TestTx_BundleFailedTooManyTimes_Nonce
+	testutils.TestTx_BundleFailedTooManyTimes_Nonce = "0x1f"
+	defer func() { testutils.TestTx_BundleFailedTooManyTimes_Nonce = nonceOrig }()
+
+	// Send cancel-tx to the RPC backend
+	req1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	resp1 := testutils.SendRpcAndParseResponseOrFailNow(t, req1)
+
+	// Ensure the response has an error
+	require.NotNil(t, resp1.Error)
+	require.Equal(t, "invalid nonce", resp1.Error.Message)
+}
