@@ -29,6 +29,10 @@ var RedisExpiryNonceFixForAccount = time.Duration(24 * time.Hour)
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
 var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 
+// Enable lookup of bundle txs by bundleId
+var RedisPrefixBundleTransactions = RedisPrefix + "bundle-id:"
+var RedisExpiryBundleTransactions = time.Duration(24 * time.Hour) // 1 day
+
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
 // var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
@@ -47,6 +51,10 @@ func RedisKeyNonceFixForAccount(txFrom string) string {
 
 func RedisKeySenderOfTxHash(txHash string) string {
 	return RedisPrefixSenderOfTxHash + strings.ToLower(txHash)
+}
+
+func RedisKeyBundleTransactions(bundleId string) string {
+	return RedisPrefixBundleTransactions + strings.ToLower(bundleId)
 }
 
 // func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
@@ -170,6 +178,20 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 	}
 
 	return strings.ToLower(txSender), true, nil
+}
+
+//
+// Enable lookup of tx bundles by bundle ID
+//
+func (s *RedisState) AddTxToBundle(bundleId string, signedTx string) error {
+
+	key := RedisKeyBundleTransactions(bundleId)
+	// TODO: get existing array if it exists
+	// append new tx if array exists, otherwise just create a new array
+	// txs := make([]string, 1)
+	// txs[0] = signedTx
+	err := s.RedisClient.Set(context.Background(), key, signedTx, RedisExpiryBundleTransactions).Err()
+	return err
 }
 
 //
