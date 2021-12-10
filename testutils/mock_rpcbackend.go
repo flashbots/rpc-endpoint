@@ -24,6 +24,12 @@ var MockBackendLastRawRequest *http.Request
 var MockBackendLastJsonRpcRequest *types.JsonRpcRequest
 var MockBackendLastJsonRpcRequestTimestamp time.Time
 
+func MockRpcBackendReset() {
+	MockBackendLastRawRequest = nil
+	MockBackendLastJsonRpcRequest = nil
+	MockBackendLastJsonRpcRequestTimestamp = time.Time{}
+}
+
 func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error) {
 	MockBackendLastJsonRpcRequest = req
 

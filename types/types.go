@@ -98,3 +98,8 @@ type PrivateTxApiResponse struct {
 type RelayErrorResponse struct {
 	Error string `json:"error"`
 }
+
+type BundleResponse struct {
+	BundleId string   `json:"bundleId"`
+	RawTxs   []string `json:"rawTxs"`
+}

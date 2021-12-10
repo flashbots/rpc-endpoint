@@ -33,6 +33,10 @@ var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 var RedisPrefixSenderMaxNonce = RedisPrefix + "txsender-pending-max-nonce:"
 var RedisExpirySenderMaxNonce = time.Duration(2 * time.Hour)
 
+// Enable lookup of bundle txs by bundleId
+var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
+var RedisExpiryWhitehatBundleTransactions = time.Duration(24 * time.Hour) // 1 day
+
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
 // var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
@@ -55,6 +59,10 @@ func RedisKeySenderOfTxHash(txHash string) string {
 
 func RedisKeySenderMaxNonce(txFrom string) string {
 	return RedisPrefixSenderMaxNonce + strings.ToLower(txFrom)
+}
+
+func RedisKeyWhitehatBundleTransactions(bundleId string) string {
+	return RedisPrefixWhitehatBundleTransactions + strings.ToLower(bundleId)
 }
 
 // func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
@@ -178,6 +186,39 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 	}
 
 	return strings.ToLower(txSender), true, nil
+}
+
+//
+// Enable lookup of tx bundles by bundle ID
+//
+func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+
+	// Add item
+	err := s.RedisClient.LPush(context.Background(), key, signedTx).Err()
+	if err != nil {
+		return err
+	}
+
+	// Set expiry
+	err = s.RedisClient.Expire(context.Background(), key, RedisExpiryWhitehatBundleTransactions).Err()
+	if err != nil {
+		return err
+	}
+
+	// Limit to 15 entries
+	err = s.RedisClient.LTrim(context.Background(), key, 0, 15).Err()
+	return err
+}
+
+func (s *RedisState) GetWhitehatBundleTx(bundleId string) ([]string, error) {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	return s.RedisClient.LRange(context.Background(), key, 0, -1).Result()
+}
+
+func (s *RedisState) DelWhitehatBundleTx(bundleId string) error {
+	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	return s.RedisClient.Del(context.Background(), key).Err()
 }
 
 //
