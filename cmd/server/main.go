@@ -48,14 +48,19 @@ func main() {
 		log.Fatal("Cannot use the relay without a signing key.")
 	}
 
-	if strings.HasPrefix(*relaySigningKey, "0x") {
-		*relaySigningKey = (*relaySigningKey)[2:]
+	pkHex := strings.Replace(*relaySigningKey, "0x", "", 1)
+	if pkHex == "dev" {
+		log.Println("Creating a new dev signing key...")
+		key, err = crypto.GenerateKey()
+	} else {
+		key, err = crypto.HexToECDSA(pkHex)
 	}
 
-	key, err = crypto.HexToECDSA(*relaySigningKey)
 	if err != nil {
-		log.Fatal("Invalid relay signing key", err)
+		log.Fatal("Error with relay signing key:", err)
 	}
+
+	log.Printf("Signing key: %s\n", crypto.PubkeyToAddress(key.PublicKey).Hex())
 
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl)
