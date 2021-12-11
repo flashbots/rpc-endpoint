@@ -25,6 +25,8 @@ var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
 // No IPs blacklisted right now
 var blacklistedIps = []string{"127.0.0.2"}
 
+var maxBundleCacheKeys = uint64(2000)
+
 // Metamask fix helper
 var RState *RedisState
 
@@ -40,6 +42,7 @@ type RpcEndPointServer struct {
 	listenAddress   string
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
+	allowTxCache    bool
 }
 
 func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
@@ -80,13 +83,8 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 func (s *RpcEndPointServer) Start() {
 	log.Printf("Starting rpc endpoint %s at %v...", s.version, s.listenAddress)
 
-	// Regularly log debug info
-	go func() {
-		for {
-			log.Printf("num-goroutines: %d", runtime.NumGoroutine())
-			time.Sleep(10 * time.Second)
-		}
-	}()
+	// Start regular tasks
+	s.SpawnRegularTasks()
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
@@ -112,7 +110,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relaySigningKey)
+	request := NewRpcRequest(&respw, req, s.proxyUrl, s.relaySigningKey, s.allowTxCache)
 	request.process()
 }
 
@@ -142,4 +140,36 @@ func IsBlacklisted(ip string) bool {
 		}
 	}
 	return false
+}
+
+func (s *RpcEndPointServer) SpawnRegularTasks() {
+	// All 10 seconds: print some debug info
+	go func() {
+		for {
+			log.Printf("num-goroutines: %d", runtime.NumGoroutine())
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// Every minute: check whether bundleCache is growing too large
+	go func() {
+		for {
+			t1 := time.Now()
+			numCachedKeys, err := RState.GetNumberOfBuncleCacheKeys()
+			if err != nil {
+				log.Println("[server.CheckBundleCache] ERROR in ", err)
+			} else {
+				log.Printf("[server.CheckBundleCache] num-keys: %d / time-needed: %.3f sec", numCachedKeys, time.Since(t1).Seconds())
+
+				if numCachedKeys >= maxBundleCacheKeys && s.allowTxCache {
+					log.Println("[server.CheckBundleCache] ERROR - Limit of cached keys reached, disabling caching now")
+					s.allowTxCache = false
+				} else if numCachedKeys < maxBundleCacheKeys && !s.allowTxCache {
+					log.Println("[server.CheckBundleCache] Back below limit of cached keys reached, enableing caching again")
+					s.allowTxCache = true
+				}
+			}
+			time.Sleep(1 * time.Minute)
+		}
+	}()
 }

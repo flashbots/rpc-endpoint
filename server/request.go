@@ -30,6 +30,7 @@ type RpcRequest struct {
 	timeStarted     time.Time
 	defaultProxyUrl string
 	relaySigningKey *ecdsa.PrivateKey
+	allowTxCache    bool
 
 	// extracted during request lifecycle:
 	origin   string
@@ -46,7 +47,7 @@ type RpcRequest struct {
 	respBodyWritten              bool
 }
 
-func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
+func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, allowTxCache bool) *RpcRequest {
 	return &RpcRequest{
 		respw:           respw,
 		req:             req,
@@ -54,6 +55,7 @@ func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl strin
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		relaySigningKey: relaySigningKey,
+		allowTxCache:    allowTxCache,
 	}
 }
 

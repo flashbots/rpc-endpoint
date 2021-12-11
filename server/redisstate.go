@@ -33,10 +33,6 @@ var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 var RedisPrefixBundleTransactions = RedisPrefix + "cached-tx-for-bundle-id:"
 var RedisExpiryBundleTransactions = time.Duration(24 * time.Hour) // 1 day
 
-// // Enable lookup of last privateTransaction-txHash sent by txFrom
-// var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
-// var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
-
 func RedisKeyTxSentToRelay(txHash string) string {
 	return RedisPrefixTxSentToRelay + strings.ToLower(txHash)
 }
@@ -56,10 +52,6 @@ func RedisKeySenderOfTxHash(txHash string) string {
 func RedisKeyBundleTransactions(bundleId string) string {
 	return RedisPrefixBundleTransactions + strings.ToLower(bundleId)
 }
-
-// func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
-// 	return RedisPrefixLastPrivTxHashOfAccount + strings.ToLower(txFrom)
-// }
 
 type RedisState struct {
 	RedisClient *redis.Client
@@ -189,23 +181,10 @@ func (s *RedisState) AddTxToBundle(bundleId string, signedTx string) error {
 	return err
 }
 
-//
-// Enable lookup of last txHash sent by txFrom
-//
-// func (s *RedisState) SetLastPrivTxHashOfAccount(txFrom string, txHash string) error {
-// 	key := RedisKeyLastPrivTxHashOfAccount(txFrom)
-// 	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txHash), RedisExpiryLastPrivTxHashOfAccount).Err()
-// 	return err
-// }
-
-// func (s *RedisState) GetLastPrivTxHashOfAccount(txFrom string) (txHash string, found bool, err error) {
-// 	key := RedisKeyLastPrivTxHashOfAccount(txFrom)
-// 	txHash, err = s.RedisClient.Get(context.Background(), key).Result()
-// 	if err == redis.Nil { // not found
-// 		return "", false, nil
-// 	} else if err != nil {
-// 		return "", false, err
-// 	}
-
-// 	return strings.ToLower(txHash), true, nil
-// }
+func (s *RedisState) GetNumberOfBuncleCacheKeys() (uint64, error) {
+	keys, _, err := s.RedisClient.Scan(context.Background(), 0, RedisPrefixBundleTransactions, int64(maxBundleCacheKeys)*2).Result()
+	if err != nil {
+		return 0, err
+	}
+	return uint64(len(keys)), nil
+}

@@ -71,6 +71,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// If users specify a bundle ID, cache this transaction
 	if cacheId := r.req.URL.Query().Get("bundle-id"); cacheId != "" {
+		if !r.allowTxCache {
+			r.logError("cannot cache tx because cache is disabled")
+			r.writeRpcError("cannot cache tx because cache is disabled")
+			return
+		}
+
 		r.log("caching tx to bundle %s txData: %s", cacheId, r.rawTxHex)
 		RState.AddTxToBundle(cacheId, r.rawTxHex)
 		// return // TODO: return a fake confirmation // note(chris): should the TX NOT be sent?
