@@ -69,6 +69,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
+	// Check if tx is being cached for later bundling
+	cachingTx := r.isCachingBundleTx()
+
 	// Check for cancellation-tx
 	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
@@ -79,6 +82,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		// It's a cancel-tx for the mempool
 		needsProtection = false
 		r.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
+	}
+
+	if cachingTx {
+		// If users specify a bundle ID, cache this request
+		r.cacheTx()
+		// return // TODO: return a fake confirmation
 	}
 
 	if needsProtection {
@@ -138,5 +147,14 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	} else {
 		r.log("[protect-check] tx needs protection - function: %v", data[0:8])
 		return true // needs protection if not on whitelist
+	}
+}
+
+func (r *RpcRequest) isCachingBundleTx() bool {
+	_, ok := r.req.URL.Query()["bundle-id"]
+	if ok {
+		return true
+	} else {
+		return false
 	}
 }

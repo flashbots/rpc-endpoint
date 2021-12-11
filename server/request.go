@@ -94,12 +94,6 @@ func (r *RpcRequest) process() {
 		r.log("Using custom url: %s", r.defaultProxyUrl)
 	}
 
-	// If users specify a bundle ID, cache this request
-	bundleId, ok := r.req.URL.Query()["bundle-id"]
-	if ok && len(bundleId[0]) > 1 {
-		r.cacheTx()
-	}
-
 	// Decode request JSON RPC
 	defer r.req.Body.Close()
 	r.body, err = ioutil.ReadAll(r.req.Body)
@@ -234,11 +228,13 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 // Cache tx for later bundling
 func (r *RpcRequest) cacheTx() {
 	bundleId, ok := r.req.URL.Query()["bundle-id"]
-	txHex := r.jsonReq.Params[0].(string)
 	if ok {
-		r.log("caching tx to bundle %s txData: _%s_", bundleId[0], txHex)
-		// TODO: store in redis
+		txHash := strings.ToLower(r.tx.Hash().Hex())
+		txHex := r.rawTxHex
+		r.log("caching tx to bundle %s txData: %s", bundleId[0], txHex)
 		RState.AddTxToBundle(bundleId[0], txHex)
+		r.writeRpcResult(txHash)
+		return
 	}
 }
 

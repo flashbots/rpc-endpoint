@@ -190,7 +190,9 @@ func (s *RedisState) AddTxToBundle(bundleId string, signedTx string) error {
 	// append new tx if array exists, otherwise just create a new array
 	// txs := make([]string, 1)
 	// txs[0] = signedTx
-	err := s.RedisClient.Set(context.Background(), key, signedTx, RedisExpiryBundleTransactions).Err()
+	// TODO: how to store arrays in redis w/ go? idk any ser/de methods in Go
+	txs := signedTx
+	err := s.RedisClient.Set(context.Background(), key, txs, RedisExpiryBundleTransactions).Err()
 	return err
 }
 
