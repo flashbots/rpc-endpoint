@@ -225,19 +225,6 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 	}
 }
 
-// Cache tx for later bundling
-func (r *RpcRequest) cacheTx() {
-	bundleId, ok := r.req.URL.Query()["bundle-id"]
-	if ok {
-		txHash := strings.ToLower(r.tx.Hash().Hex())
-		txHex := r.rawTxHex
-		r.log("caching tx to bundle %s txData: %s", bundleId[0], txHex)
-		RState.AddTxToBundle(bundleId[0], txHex)
-		r.writeRpcResult(txHash)
-		return
-	}
-}
-
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
