@@ -37,7 +37,13 @@ To send your transactions through the Flashbots Protect RPC please refer to the 
 To run the server, run the following command:
 
 ```bash
-go run main.go -redis dev -proxy PROXY_URL -signingKey ETH_PRIVATE_KEY
+go run cmd/server/main.go -redis REDIS_URL -signingKey ETH_PRIVATE_KEY -proxy PROXY_URL
+
+# For development, you can use built-in redis and create a random signing key
+go run cmd/server/main.go -redis dev -signingKey dev -proxy PROXY_URL
+
+# You can use the DEBUG_DONT_SEND_RAWTX to skip sending transactions anywhere (useful for local testing):
+DEBUG_DONT_SEND_RAWTX=1 go run cmd/server/main.go -redis dev -signingKey dev -proxy PROXY_URL
 ```
 
 Example call:
@@ -61,8 +67,15 @@ You are welcome here <3.
 
 - If you want to join us, come and say hi in our [Discord chat](https://discord.gg/7hvTycdNcK).
 - If you have a question, feedback or a bug report for this project, please [open a new Issue](https://github.com/flashbots/rpc-endpoint/issues).
-- If you would like to contribute with code, check the [CONTRIBUTING file](CONTRIBUTING.md).
-- We just ask you to be nice.
+- We ask you to be nice.
+
+**Send a pull request**
+
+- Your proposed changes should be first described and discussed in an issue.
+- Every pull request should be small and represent a single change. If the problem is complicated, split it in multiple issues and pull requests.
+- Every pull request should be covered by unit/e2e tests.
+
+We appreciate your contributions <3
 
 ## Security
 
