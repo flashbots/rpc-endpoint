@@ -30,7 +30,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.logError("reading transaction object failed - rawTx: %s", r.rawTxHex)
+		r.log("reading transaction object failed - rawTx: %s", r.rawTxHex)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
@@ -38,7 +38,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Get tx from address
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
-		r.logError("couldn't get address from rawTx: %v", err)
+		r.log("couldn't get address from rawTx: %v", err)
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
