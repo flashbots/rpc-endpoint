@@ -21,3 +21,7 @@ func isOnFunctionWhiteList(data string) bool {
 		return false
 	}
 }
+
+var allowedLargeTxTargets = map[string]bool{
+	"0x737901bea3eeb88459df9ef1be8ff3ae1b42a2ba": true, // Aztec rollup contract
+}

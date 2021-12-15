@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -236,7 +237,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.log("[sendTxToRelay] sending %s ... -- from ip: %s / address: %s", txHash, r.ip, r.txFrom)
+	r.log("[sendTxToRelay] sending %s -- from ip: %s / address: %s / to: %s", txHash, r.ip, r.txFrom, r.tx.To())
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
@@ -244,7 +245,33 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.logError("[sendTxToRelay] redis:SetTxSentToRelay failed: %v", err)
 	}
 
-	// remember that this tx based on from+nonce (for cancel-tx)
+	txTo := r.tx.To()
+	if txTo == nil {
+		r.writeRpcError("invalid target")
+		return
+	}
+
+	minNonce, maxNonce := r.GetAddressNonceRange(r.txFrom)
+	if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
+		r.log("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
+		r.writeRpcError("invalid nonce")
+		return
+	}
+
+	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce())
+
+	// only allow large transactions to certain addresses - default max tx size is 128KB
+	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
+	if r.tx.Size() > 131072 {
+		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
+			r.log("sendTxToRelay] large tx to not allowed target - hash: %s - target: %s", txHash, txTo)
+			r.writeRpcError("invalid target for large tx")
+			return
+		}
+		r.log("sendTxToRelay] allowed large tx - hash: %s - target: %s", txHash, txTo)
+	}
+
+	// remember this tx based on from+nonce (for cancel-tx)
 	err = RState.SetTxHashForSenderAndNonce(r.txFrom, r.tx.Nonce(), txHash)
 	if err != nil {
 		r.logError("[sendTxToRelay] redis:SetTxHashForSenderAndNonce failed: %v", err)
@@ -345,4 +372,31 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 
 	r.writeRpcResult(cancelTxHash)
 	return true
+}
+
+func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce uint64) {
+	// Get minimum nonce by asking the eth node for the current transaction count
+	_req := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{r.txFrom, "latest"})
+	_res, err := utils.SendRpcAndParseResponseTo(r.defaultProxyUrl, _req)
+	if err != nil {
+		r.logError("[sendTxToRelay] eth_getTransactionCount failed: %v", err)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+	_userNonceStr := ""
+	err = json.Unmarshal(_res.Result, &_userNonceStr)
+	if err != nil {
+		r.logError("[sendTxToRelay] eth_getTransactionCount unmarshall failed: %v - result: %s", err, _res.Result)
+		r.writeHeaderStatus(http.StatusInternalServerError)
+		return
+	}
+	_userNonceStr = strings.Replace(_userNonceStr, "0x", "", 1)
+	_userNonceBigInt := new(big.Int)
+	_userNonceBigInt.SetString(_userNonceStr, 16)
+	minNonce = _userNonceBigInt.Uint64()
+
+	// Get maximum nonce by looking at redis, which has current pending transactions
+	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
+	maxNonce = Max(minNonce, _redisMaxNonce)
+	return minNonce, maxNonce
 }

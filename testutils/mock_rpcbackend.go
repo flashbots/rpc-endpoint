@@ -29,8 +29,12 @@ func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error)
 
 	switch req.Method {
 	case "eth_getTransactionCount":
+		if req.Params[0] == TestTx_BundleFailedTooManyTimes_From {
+			return TestTx_BundleFailedTooManyTimes_Nonce, nil
+		} else if req.Params[0] == TestTx_CancelAtRelay_Cancel_From {
+			return TestTx_CancelAtRelay_Cancel_Nonce, nil
+		}
 		return "0x22", nil
-		// return hex.DecodeString("0x22")
 
 	case "eth_call":
 		return "0x12345", nil

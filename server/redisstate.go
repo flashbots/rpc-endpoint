@@ -29,6 +29,10 @@ var RedisExpiryNonceFixForAccount = time.Duration(24 * time.Hour)
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
 var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
 
+// Remember nonce of pending user tx
+var RedisPrefixSenderMaxNonce = RedisPrefix + "txsender-pending-max-nonce:"
+var RedisExpirySenderMaxNonce = time.Duration(2 * time.Hour)
+
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
 // var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
@@ -47,6 +51,10 @@ func RedisKeyNonceFixForAccount(txFrom string) string {
 
 func RedisKeySenderOfTxHash(txHash string) string {
 	return RedisPrefixSenderOfTxHash + strings.ToLower(txHash)
+}
+
+func RedisKeySenderMaxNonce(txFrom string) string {
+	return RedisPrefixSenderMaxNonce + strings.ToLower(txFrom)
 }
 
 // func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
@@ -192,3 +200,35 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 
 // 	return strings.ToLower(txHash), true, nil
 // }
+
+func (s *RedisState) SetSenderMaxNonce(txFrom string, nonce uint64) error {
+	prevMaxNonce, found, err := s.GetSenderMaxNonce(txFrom)
+	if err != nil {
+		return err
+	}
+
+	// Do nothing if current nonce is not higher than already existing
+	if found && prevMaxNonce >= nonce {
+		return nil
+	}
+
+	key := RedisKeySenderMaxNonce(txFrom)
+	err = s.RedisClient.Set(context.Background(), key, nonce, RedisExpirySenderMaxNonce).Err()
+	return err
+}
+
+func (s *RedisState) GetSenderMaxNonce(txFrom string) (senderMaxNonce uint64, found bool, err error) {
+	key := RedisKeySenderMaxNonce(txFrom)
+	val, err := s.RedisClient.Get(context.Background(), key).Result()
+	if err == redis.Nil {
+		return 0, false, nil // not found
+	} else if err != nil {
+		return 0, false, err
+	}
+
+	senderMaxNonce, err = strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, true, err
+	}
+	return senderMaxNonce, true, nil
+}
