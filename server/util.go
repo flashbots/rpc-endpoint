@@ -15,6 +15,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+func Min(a uint64, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func Max(a uint64, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	// Create new request:
 	req, err := http.NewRequest("POST", proxyUrl, bytes.NewBuffer(body))
@@ -88,18 +102,4 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	}
 
 	return respObj, nil
-}
-
-func Min(a uint64, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func Max(a uint64, b uint64) uint64 {
-	if a > b {
-		return a
-	}
-	return b
 }
