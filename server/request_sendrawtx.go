@@ -14,9 +14,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
-		r.logError("no params for eth_sendRawTransaction")
+		r.log("no params for eth_sendRawTransaction")
 		r.writeHeaderStatus(http.StatusBadRequest)
 		return
+	}
+
+	if r.jsonReq.Params[0] == nil {
+		r.log("nil param for eth_sendRawTransaction")
+		r.writeHeaderStatus(http.StatusBadRequest)
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
