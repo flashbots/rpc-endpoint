@@ -28,7 +28,7 @@ func NewJsonRpcRequest1(id interface{}, method string, param interface{}) *JsonR
 
 type JsonRpcResponse struct {
 	Id      interface{}     `json:"id"`
-	Result  json.RawMessage `json:"result"`
+	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *JsonRpcError   `json:"error,omitempty"`
 	Version string          `json:"jsonrpc"`
 }
