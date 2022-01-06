@@ -17,6 +17,10 @@ func SendRpcAndParseResponse(req *types.JsonRpcRequest) (*types.JsonRpcResponse,
 	return utils.SendRpcAndParseResponseTo(RpcEndpointUrl, req)
 }
 
+func SendBatchRpcAndParseResponse(req []*types.JsonRpcRequest) ([]*types.JsonRpcResponse, error) {
+	return utils.SendBatchRpcAndParseResponseTo(RpcEndpointUrl, req)
+}
+
 func SendRpcAndParseResponseOrFailNow(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
 	res, err := SendRpcAndParseResponse(req)
 	if err != nil {

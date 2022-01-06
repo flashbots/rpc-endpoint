@@ -349,3 +349,139 @@ func TestRelayTxWithWrongNonce(t *testing.T) {
 	require.NotNil(t, resp1.Error)
 	require.Equal(t, "invalid nonce", resp1.Error.Message)
 }
+
+// Test batch request with multiple eth raw transaction
+func TestBatch_eth_sendRawTransaction(t *testing.T) {
+	resetTestServers()
+
+	var batch []*types.JsonRpcRequest
+	for i, _ := range "testing" {
+		rpcRequest := types.NewJsonRpcRequest(i, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
+		batch = append(batch, rpcRequest)
+	}
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 7)
+}
+
+// Test batch request with different eth transaction
+func TestBatch_eth_transaction(t *testing.T) {
+	resetTestServers()
+
+	var batch []*types.JsonRpcRequest
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, req_getTransactionCount)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	req_sendRawTransaction := types.NewJsonRpcRequest(2, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, req_sendRawTransaction)
+	// call getTxReceipt to trigger query to Tx API
+	req_getTransactionReceipt := types.NewJsonRpcRequest(3, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, req_getTransactionReceipt)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 3)
+	expected := []*types.JsonRpcResponse{
+		{float64(1), []byte(`"0x22"`), nil, "2.0"},
+		{float64(2), []byte(`"tx-hash1"`), nil, "2.0"},
+		{float64(3), []byte(`null`), nil, "2.0"},
+	}
+	assert.Equal(t, expected, res)
+}
+
+// Test batch request with different eth transaction
+func TestBatch_eth_call(t *testing.T) {
+	resetTestServers()
+
+	var batch []*types.JsonRpcRequest
+	// eth_call intercept
+	req := types.NewJsonRpcRequest(1, "eth_call", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a",
+	}})
+	batch = append(batch, req)
+	// eth_call passthrough
+	req2 := types.NewJsonRpcRequest(2, "eth_call", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1b",
+	}})
+	batch = append(batch, req2)
+	req_getTransactionCount := types.NewJsonRpcRequest(3, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, req_getTransactionCount)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	req_sendRawTransaction := types.NewJsonRpcRequest(4, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, req_sendRawTransaction)
+	// call getTxReceipt to trigger query to Tx API
+	req_getTransactionReceipt := types.NewJsonRpcRequest(5, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, req_getTransactionReceipt)
+	expected := []*types.JsonRpcResponse{
+		{float64(1), []byte(`"0x0000000000000000000000000000000000000000000000000000000000000001"`), nil, "2.0"},
+		{float64(2), []byte(`"0x12345"`), nil, "2.0"},
+		{float64(3), []byte(`"0x22"`), nil, "2.0"},
+		{float64(4), []byte(`"tx-hash1"`), nil, "2.0"},
+		{float64(5), []byte(`null`), nil, "2.0"},
+	}
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 5)
+	assert.Equal(t, expected, res)
+
+}
+
+// Test batch request with different transaction
+func TestBatch_CombinationOfSuccessAndFailure(t *testing.T) {
+	resetTestServers()
+
+	var batch []*types.JsonRpcRequest
+	// eth_call intercept
+	req := types.NewJsonRpcRequest(1, "eth_call", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a",
+	}})
+	batch = append(batch, req)
+	// eth_call passthrough
+	req2 := types.NewJsonRpcRequest(1, "eth_callxvssfa", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1b",
+	}})
+	batch = append(batch, req2)
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, req_getTransactionCount)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransactionxxx", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, req_sendRawTransaction)
+	// call getTxReceipt to trigger query to Tx API
+	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, req_getTransactionReceipt)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 5)
+}
+
+// Test batch request with multiple eth raw transaction
+func TestBatch_Validate_eth_sendRawTransaction_Error(t *testing.T) {
+	resetTestServers()
+	// key=request-id, value=json-rpc error
+	m := map[float64]int{
+		1: types.JsonRpcInvalidParams,
+		2: types.JsonRpcInvalidParams,
+		3: types.JsonRpcInvalidParams,
+		4: types.JsonRpcInvalidRequest,
+	}
+	var batch []*types.JsonRpcRequest
+
+	r1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{})     // no params
+	r2 := types.NewJsonRpcRequest(2, "eth_sendRawTransaction", nil)                 // nil params
+	r3 := types.NewJsonRpcRequest(3, "eth_sendRawTransaction", []interface{}{"x"})  // invalid params
+	r4 := types.NewJsonRpcRequest(4, "eth_sendRawTransaction", []interface{}{"xy"}) // invalid request
+	batch = append(batch, r1, r2, r3, r4)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 4)
+	for _, r := range res {
+		assert.Equal(t, m[r.Id.(float64)], r.Error.Code)
+	}
+
+}

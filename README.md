@@ -46,10 +46,15 @@ go run cmd/server/main.go -redis dev -signingKey dev -proxy PROXY_URL
 DEBUG_DONT_SEND_RAWTX=1 go run cmd/server/main.go -redis dev -signingKey dev -proxy PROXY_URL
 ```
 
-Example call:
+Example Single request:
 
 ```bash
 curl localhost:9000 -f -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1}'
+```
+Example Batch/multiple request:
+
+```bash
+curl localhost:9000 -f -d '[{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1},{"jsonrpc":"2.0","method":"net_version","params":[],"id":7},{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":3}]'
 ```
 
 ## Maintainers

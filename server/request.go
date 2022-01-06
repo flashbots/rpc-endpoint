@@ -22,7 +22,7 @@ import (
 	"github.com/metachris/flashbotsrpc"
 )
 
-// RPC request for a single client JSON-RPC request
+// RPC request for a single/ batch JSON-RPC request
 type RpcRequest struct {
 	respw *http.ResponseWriter
 	req   *http.Request
@@ -37,14 +37,14 @@ type RpcRequest struct {
 	ip       string
 	body     []byte
 	jsonReq  *types.JsonRpcRequest
+	jsonRes  *types.JsonRpcResponse
 	rawTxHex string
 	tx       *ethtypes.Transaction
 	txFrom   string
 
-	// response flags
-	respHeaderContentTypeWritten bool
-	respHeaderStatusCodeWritten  bool
-	respBodyWritten              bool
+	// Batch request
+	jsonBatchReq []*types.JsonRpcRequest // To handle batch request
+	handleBatch  bool                    // If set, batch request will be handled
 }
 
 func NewRpcRequest(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequest {
@@ -83,7 +83,7 @@ func (r *RpcRequest) process() {
 
 	if IsBlacklisted(r.ip) {
 		r.log("Blocked IP: %s", r.ip)
-		r.writeHeaderStatus(http.StatusUnauthorized)
+		r._writeHeaderStatus(http.StatusUnauthorized)
 		return
 	}
 
@@ -100,25 +100,70 @@ func (r *RpcRequest) process() {
 	r.body, err = ioutil.ReadAll(r.req.Body)
 	if err != nil {
 		r.logError("failed to read request body: %v", err)
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r._writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
 	if len(r.body) == 0 {
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r._writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
-	// Parse JSON RPC
-	if err = json.Unmarshal(r.body, &r.jsonReq); err != nil {
-		r.log("failed to parse JSON RPC request: %v - body: %s", err, r.body)
-		r.writeHeaderStatus(http.StatusBadRequest)
+	// Parse JSON RPC payload
+	if err = r.UnmarshalJSON(r.body); err != nil {
+		r.log("Parse payload %v", err)
+		r._writeHeaderStatus(http.StatusBadRequest)
 		return
 	}
 
-	r.log("JSON-RPC method: %s ip: %s", r.jsonReq.Method, r.ip)
+	// Handle batch request
+	if r.handleBatch {
+		batchRes := make([]*types.JsonRpcResponse, 0)
+		for _, req := range r.jsonBatchReq {
+			r.jsonReq = req                        // Set each individual request
+			r.processRequest(req)                  // Process each individual request
+			batchRes = append(batchRes, r.jsonRes) // Add it to batch response list
+		}
+		// Write consolidated response
+		r._writeRpcBatchResponse(batchRes)
+		return
+	}
 
-	if r.jsonReq.Method == "eth_sendRawTransaction" {
+	// Handle single request
+	r.processRequest(r.jsonReq)
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (r *RpcRequest) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 {
+		return fmt.Errorf("failed to parse JSON RPC request: no bytes to unmarshal - body: %s", r.body)
+	}
+	// Based on the first character decide single or multiple
+	switch b[0] {
+	// If payload with single request
+	case '{':
+		if err := json.Unmarshal(r.body, &r.jsonReq); err != nil {
+			return fmt.Errorf("failed to parse JSON RPC request: %v - body: %s", err, r.body)
+		}
+	// If payload with batch request
+	case '[':
+		if err := json.Unmarshal(r.body, &r.jsonBatchReq); err != nil {
+			return fmt.Errorf("failed to parse JSON RPC Batch request: %v - body: %s", err, r.body)
+		}
+
+		// Set handle batch request
+		r.handleBatch = true
+
+	// If unsupported payload
+	default:
+		return fmt.Errorf("failed to parse JSON RPC request: unsupported payload %s", r.body)
+	}
+	return nil
+}
+
+func (r *RpcRequest) processRequest(req *types.JsonRpcRequest) {
+
+	if req.Method == "eth_sendRawTransaction" {
 		r.handle_sendRawTransaction()
 
 	} else {
@@ -131,15 +176,13 @@ func (r *RpcRequest) process() {
 			r.writeRpcResult("1")
 			return
 		}
-
 		// Proxy the request to a node
-		readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+		readJsonRpcSuccess, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 		if !readJsonRpcSuccess {
 			r.log("Proxy to node failed: %s", r.jsonReq.Method)
-			r.writeHeaderStatus(http.StatusInternalServerError)
+			r.writeRpcError("internal server error", types.JsonRpcInternalError)
 			return
 		}
-
 		// After proxy, perhaps check backend [MM fix #3 step 2]
 		if r.jsonReq.Method == "eth_getTransactionReceipt" {
 			requestCompleted := r.check_post_getTransactionReceipt(jsonResp)
@@ -147,28 +190,33 @@ func (r *RpcRequest) process() {
 				return
 			}
 		}
-
-		// Write the response to user
-		r.writeHeaderContentTypeJson()
-		r.writeHeaderStatus(proxyHttpStatus)
 		r._writeRpcResponse(jsonResp)
 		r.log("Proxy to node successful: %s", r.jsonReq.Method)
 	}
 }
 
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
-func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, httpStatusCode int, jsonResp *types.JsonRpcResponse) {
+func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool, jsonResp *types.JsonRpcResponse) {
 	timeProxyStart := Now() // for measuring execution time
 	r.log("proxyRequest to: %s", proxyUrl)
 
+	body := r.body
+	if r.handleBatch {
+		var err error
+		body, err = json.Marshal(r.jsonReq)
+		if err != nil {
+			r.logError("failed to marshal request before making proxy request: %v", err)
+			return false, jsonResp
+		}
+	}
 	// Proxy request
-	proxyResp, err := ProxyRequest(proxyUrl, r.body)
+	proxyResp, err := ProxyRequest(proxyUrl, body)
 	if err != nil {
 		r.logError("failed to make proxy request: %v / resp: %v", err, proxyResp)
 		if proxyResp == nil {
-			return false, http.StatusInternalServerError, jsonResp
+			return false, jsonResp
 		} else {
-			return false, proxyResp.StatusCode, jsonResp
+			return false, jsonResp
 		}
 	}
 
@@ -182,17 +230,17 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
 	if err != nil {
 		r.logError("failed to read proxy request body: %v", err)
-		return false, proxyResp.StatusCode, jsonResp
+		return false, jsonResp
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(types.JsonRpcResponse)
-	if err := json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
+	if err = json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
 		r.logError("failed decoding proxy json-rpc response: %v - data: %s", err, proxyRespBody)
-		return false, proxyResp.StatusCode, jsonResp
+		return false, jsonResp
 	}
 
-	return true, proxyResp.StatusCode, jsonRpcResp
+	return true, jsonRpcResp
 }
 
 // Check whether to block resending this tx. Send only if (a) not sent before, (b) sent and status=failed, (c) sent, status=unknown and sent at least 5 min ago
@@ -247,14 +295,14 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	txTo := r.tx.To()
 	if txTo == nil {
-		r.writeRpcError("invalid target")
+		r.writeRpcError("invalid target", types.JsonRpcInternalError)
 		return
 	}
 
 	minNonce, maxNonce := r.GetAddressNonceRange(r.txFrom)
 	if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
 		r.log("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
-		r.writeRpcError("invalid nonce")
+		r.writeRpcError("invalid nonce", types.JsonRpcInternalError)
 		return
 	}
 
@@ -265,7 +313,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	if r.tx.Size() > 131072 {
 		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
 			r.log("sendTxToRelay] large tx to not allowed target - hash: %s - target: %s", txHash, txTo)
-			r.writeRpcError("invalid target for large tx")
+			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
 			return
 		}
 		r.log("sendTxToRelay] allowed large tx - hash: %s - target: %s", txHash, txTo)
@@ -293,10 +341,10 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.log("[sendTxToRelay] %v - rawTx: %s", err, r.rawTxHex)
-			r.writeRpcError(err.Error())
+			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
 		} else {
 			r.logError("[sendTxToRelay] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
-			r.writeHeaderStatus(http.StatusInternalServerError)
+			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
 		}
 		return
 	}
@@ -315,7 +363,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	initialTxHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxHashForSenderAndNonce failed %v", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
 	}
 
@@ -327,7 +375,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	_, txWasSentToRelay, err := RState.GetTxSentToRelay(initialTxHash)
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxSentToRelay failed: %s", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
 	}
 
@@ -339,7 +387,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	_, cancelTxAlreadySentToRelay, err := RState.GetTxSentToRelay(cancelTxHash)
 	if err != nil {
 		r.logError("[cancel-tx] redis:GetTxSentToRelay error: %v", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
 	}
 
@@ -362,10 +410,10 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'
 			r.log("[cancel-tx] %v - rawTx: %s", err, r.rawTxHex)
-			r.writeRpcError(err.Error())
+			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
 		} else {
 			r.logError("[cancel-tx] relay call failed: %v - rawTx: %s", err, r.rawTxHex)
-			r.writeHeaderStatus(http.StatusInternalServerError)
+			r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		}
 		return true
 	}
@@ -380,14 +428,14 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	_res, err := utils.SendRpcAndParseResponseTo(r.defaultProxyUrl, _req)
 	if err != nil {
 		r.logError("[sendTxToRelay] eth_getTransactionCount failed: %v", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
 	_userNonceStr := ""
 	err = json.Unmarshal(_res.Result, &_userNonceStr)
 	if err != nil {
 		r.logError("[sendTxToRelay] eth_getTransactionCount unmarshall failed: %v - result: %s", err, _res.Result)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
 	_userNonceStr = strings.Replace(_userNonceStr, "0x", "", 1)

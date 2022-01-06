@@ -7,35 +7,20 @@ import (
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
-func (r *RpcRequest) writeHeaderStatus(statusCode int) {
-	if r.respHeaderStatusCodeWritten {
-		return
-	}
-	r.respHeaderStatusCodeWritten = true
+func (r *RpcRequest) writeHeaderContentTypeJson() {
+	(*r.respw).Header().Set("Content-Type", "application/json")
+}
+
+func (r *RpcRequest) _writeHeaderStatus(statusCode int) {
 	(*r.respw).WriteHeader(statusCode)
 }
 
-func (r *RpcRequest) writeHeaderContentType(contentType string) {
-	if r.respHeaderStatusCodeWritten {
-		r.logError("writeHeaderContentType failed because status code was already written")
-	}
-	if r.respHeaderContentTypeWritten {
-		return
-	}
-	r.respHeaderContentTypeWritten = true
-	(*r.respw).Header().Set("Content-Type", contentType)
-}
-
-func (r *RpcRequest) writeHeaderContentTypeJson() {
-	r.writeHeaderContentType("application/json")
-}
-
-func (r *RpcRequest) writeRpcError(msg string) {
+func (r *RpcRequest) writeRpcError(msg string, errCode int) {
 	res := types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
 		Error: &types.JsonRpcError{
-			Code:    -32603,
+			Code:    errCode,
 			Message: msg,
 		},
 	}
@@ -46,7 +31,7 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 	resBytes, err := json.Marshal(result)
 	if err != nil {
 		r.logError("writeRpcResult error marshalling %s: %s", result, err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
 	res := types.JsonRpcResponse{
@@ -58,23 +43,49 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 }
 
 func (r *RpcRequest) _writeRpcResponse(res *types.JsonRpcResponse) {
-	if r.respBodyWritten {
-		r.logError("_writeRpcResponse: response already written")
+
+	// If the request is batch, handle it in the end
+	// when all the individual request gets completed
+	if r.handleBatch {
+		r.jsonRes = res
 		return
 	}
 
-	if !r.respHeaderContentTypeWritten {
-		r.writeHeaderContentTypeJson() // set content type to json, if not yet set
-	}
+	// If the request is single and not batch
+	// Write content type
+	r.writeHeaderContentTypeJson() // Set content type to json
 
-	if !r.respHeaderStatusCodeWritten {
-		r.writeHeaderStatus(http.StatusOK) // set status header to 200, if not yet set
+	// Choose httpStatusCode based on json-rpc error code
+	statusCode := http.StatusOK
+	if res.Error != nil {
+		// TODO(Note): http.StatusUnauthorized is not mapped
+		switch res.Error.Code {
+		case types.JsonRpcInvalidRequest, types.JsonRpcInvalidParams:
+			statusCode = http.StatusBadRequest
+		case types.JsonRpcMethodNotFound:
+			statusCode = http.StatusNotFound
+		case types.JsonRpcInternalError, types.JsonRpcParseError:
+			statusCode = http.StatusInternalServerError
+		default:
+			statusCode = http.StatusInternalServerError
+		}
 	}
+	r._writeHeaderStatus(statusCode) // set status header
 
+	// Write response
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logError("failed writing rpc response: %v", err)
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r._writeHeaderStatus(http.StatusInternalServerError)
+	}
+}
+
+func (r *RpcRequest) _writeRpcBatchResponse(res []*types.JsonRpcResponse) {
+
+	r.writeHeaderContentTypeJson()      // Set content type to json
+	r._writeHeaderStatus(http.StatusOK) // Set status header to 200
+	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
+		r.logError("failed writing rpc response: %v", err)
+		r._writeHeaderStatus(http.StatusInternalServerError)
 	}
 
-	r.respBodyWritten = true
 }

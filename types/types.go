@@ -6,6 +6,16 @@ import (
 	"time"
 )
 
+// As per JSON-RPC 2.0 Specification
+// https://www.jsonrpc.org/specification#error_object
+const (
+	JsonRpcParseError     = -32700
+	JsonRpcInvalidRequest = -32600
+	JsonRpcMethodNotFound = -32601
+	JsonRpcInvalidParams  = -32602
+	JsonRpcInternalError  = -32603
+)
+
 type JsonRpcRequest struct {
 	Id      interface{}   `json:"id"`
 	Method  string        `json:"method"`
