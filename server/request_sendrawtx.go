@@ -2,7 +2,8 @@ package server
 
 import (
 	"encoding/hex"
-	"net/http"
+	"fmt"
+	"github.com/flashbots/rpc-endpoint/types"
 	"strings"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -15,19 +16,19 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
 		r.log("no params for eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r.writeRpcError("empty params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 		return
 	}
 
 	if r.jsonReq.Params[0] == nil {
 		r.log("nil param for eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r.writeRpcError("nil params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
 		r.logError("invalid raw transaction (wrong length)")
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r.writeRpcError("invalid raw transaction param (wrong length)", types.JsonRpcInvalidParams)
 		return
 	}
 
@@ -36,7 +37,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
 		r.log("reading transaction object failed - rawTx: %s", r.rawTxHex)
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r.writeRpcError(fmt.Sprintf("reading transaction object failed - rawTx: %s", r.rawTxHex), types.JsonRpcInvalidRequest)
 		return
 	}
 
@@ -44,7 +45,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.log("couldn't get address from rawTx: %v", err)
-		r.writeHeaderStatus(http.StatusBadRequest)
+		r.writeRpcError(fmt.Sprintf("couldn't get address from rawTx: %v", err), types.JsonRpcInvalidRequest)
 		return
 	}
 
@@ -53,7 +54,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if r.tx.Nonce() >= 1e9 {
 		r.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
-		r.writeRpcError("tx rejected - nonce too high")
+		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
 
@@ -67,7 +68,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if isOnOFACList(r.txFrom) {
 		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
-		r.writeHeaderStatus(http.StatusUnauthorized)
+		r.writeRpcError("blocked tx from ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
 
@@ -98,12 +99,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy to public node now
-	readJsonRpcSuccess, proxyHttpStatus, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+	readJsonRpcSuccess, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
 		r.logError("Proxy to mempool failed: eth_sendRawTransaction")
-		r.writeHeaderStatus(http.StatusInternalServerError)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
 
@@ -111,8 +112,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
 	// Write JSON-RPC response now
-	r.writeHeaderContentTypeJson()
-	r.writeHeaderStatus(proxyHttpStatus)
 	r._writeRpcResponse(jsonResp)
 
 	if jsonResp.Error != nil {

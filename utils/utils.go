@@ -65,6 +65,33 @@ func SendRpcAndParseResponseTo(url string, req *types.JsonRpcRequest) (*types.Js
 	return jsonRpcResp, nil
 }
 
+func SendBatchRpcAndParseResponseTo(url string, req []*types.JsonRpcRequest) ([]*types.JsonRpcResponse, error) {
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal")
+	}
+
+	// fmt.Printf("%s\n", jsonData)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, errors.Wrap(err, "post")
+	}
+
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read")
+	}
+
+	var jsonRpcResp []*types.JsonRpcResponse
+
+	// Unmarshall JSON-RPC response and check for error inside
+	if err := json.Unmarshal(respData, &jsonRpcResp); err != nil {
+		return nil, errors.Wrap(err, "unmarshal")
+	}
+
+	return jsonRpcResp, nil
+}
+
 func BigIntPtrToStr(i *big.Int) string {
 	if i == nil {
 		return ""
