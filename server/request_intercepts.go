@@ -25,12 +25,12 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 	}
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
-	r.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
+	r.logger.log("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx: %s", txHashLower)
 
 	// get tx status from private-tx-api
 	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
-		r.logError("[post_getTransactionReceipt] privateTxApi failed: %s", err)
+		r.logger.logError("[post_getTransactionReceipt] privateTxApi failed: %s", err)
 		return false
 	}
 
@@ -38,7 +38,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Get the sender of this transaction
 		txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
 		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
+			r.logger.logError("[post_getTransactionReceipt] redis:GetSenderOfTxHash failed: %v", err)
 			return
 		}
 
@@ -49,7 +49,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Check if nonceFix is already in place for this user
 		_, nonceFixAlreadyExists, err := RState.GetNonceFixForAccount(txFromLower)
 		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis:GetNonceFixForAccount failed: %s", err)
+			r.logger.logError("[post_getTransactionReceipt] redis:GetNonceFixForAccount failed: %s", err)
 			return
 		}
 
@@ -60,16 +60,16 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Setup a new nonce-fix for this user
 		err = RState.SetNonceFixForAccount(txFromLower, 0)
 		if err != nil {
-			r.logError("[post_getTransactionReceipt] redis error: %s", err)
+			r.logger.logError("[post_getTransactionReceipt] redis error: %s", err)
 			return
 		}
 
-		r.log("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
+		r.logger.log("[post_getTransactionReceipt] nonce-fix set for: %s", txFromLower)
 	}
 
-	r.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
+	r.logger.log("[post_getTransactionReceipt] priv-tx-api status: %s", statusApiResponse.Status)
 	if statusApiResponse.Status == types.TxStatusFailed || (DebugDontSendTx && statusApiResponse.Status == types.TxStatusUnknown) {
-		r.log("[post_getTransactionReceipt] failed private tx, ensure account fix is in place")
+		r.logger.log("[post_getTransactionReceipt] failed private tx, ensure account fix is in place")
 		ensureAccountFixIsInPlace()
 		// r.writeRpcError("Transaction failed") // If this is sent before metamask dropped the tx (received 4x invalid nonce), then it doesn't call getTransactionCount anymore
 		// TODO: return standard failed tx payload?
@@ -96,7 +96,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	// Check if nonceFix is in place for this user
 	numTimesSent, nonceFixInPlace, err := RState.GetNonceFixForAccount(addr)
 	if err != nil {
-		r.logError("redis:GetAccountWithNonceFix error:", err)
+		r.logger.logError("redis:GetAccountWithNonceFix error:", err)
 		return false
 	}
 
@@ -112,17 +112,17 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 
 	err = RState.SetNonceFixForAccount(addr, numTimesSent)
 	if err != nil {
-		r.logError("redis:SetAccountWithNonceFix error:", err)
+		r.logger.logError("redis:SetAccountWithNonceFix error:", err)
 		return false
 	}
 
-	r.log("eth_getTransactionCount intercept: #%d", numTimesSent)
+	r.logger.log("eth_getTransactionCount intercept: #%d", numTimesSent)
 
 	// Return invalid nonce
 	var wrongNonce uint64 = 1e9 + 1
 	resp := fmt.Sprintf("0x%x", wrongNonce)
 	r.writeRpcResult(resp)
-	r.log("Intercepted eth_getTransactionCount for %s", addr)
+	r.logger.log("Intercepted eth_getTransactionCount for %s", addr)
 	return true
 }
 
@@ -147,6 +147,6 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 	}
 
 	r.writeRpcResult("0x0000000000000000000000000000000000000000000000000000000000000001")
-	r.log("Intercepted eth_call to FlashRPC contract")
+	r.logger.log("Intercepted eth_call to FlashRPC contract")
 	return true
 }

@@ -56,7 +56,7 @@ func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
 	}
 
 	tx := new(ethtypes.Transaction)
-	if err := tx.UnmarshalBinary(rawTxBytes); err != nil {
+	if err = tx.UnmarshalBinary(rawTxBytes); err != nil {
 		return nil, errors.New("error unmarshalling")
 	}
 
