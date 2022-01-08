@@ -355,7 +355,7 @@ func TestBatch_eth_sendRawTransaction(t *testing.T) {
 	resetTestServers()
 
 	var batch []*types.JsonRpcRequest
-	for i, _ := range "testing" {
+	for i := range "testing" {
 		rpcRequest := types.NewJsonRpcRequest(i, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
 		batch = append(batch, rpcRequest)
 	}
@@ -382,9 +382,9 @@ func TestBatch_eth_transaction(t *testing.T) {
 	require.Nil(t, err, err)
 	assert.Equal(t, len(res), 3)
 	expected := []*types.JsonRpcResponse{
-		{float64(1), []byte(`"0x22"`), nil, "2.0"},
-		{float64(2), []byte(`"tx-hash1"`), nil, "2.0"},
-		{float64(3), []byte(`null`), nil, "2.0"},
+		{Id: float64(1), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
+		{Id: float64(2), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
+		{Id: float64(3), Result: []byte(`null`), Error: nil, Version: "2.0"},
 	}
 	assert.Equal(t, expected, res)
 }
@@ -415,11 +415,11 @@ func TestBatch_eth_call(t *testing.T) {
 	req_getTransactionReceipt := types.NewJsonRpcRequest(5, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
 	batch = append(batch, req_getTransactionReceipt)
 	expected := []*types.JsonRpcResponse{
-		{float64(1), []byte(`"0x0000000000000000000000000000000000000000000000000000000000000001"`), nil, "2.0"},
-		{float64(2), []byte(`"0x12345"`), nil, "2.0"},
-		{float64(3), []byte(`"0x22"`), nil, "2.0"},
-		{float64(4), []byte(`"tx-hash1"`), nil, "2.0"},
-		{float64(5), []byte(`null`), nil, "2.0"},
+		{Id: float64(1), Result: []byte(`"0x0000000000000000000000000000000000000000000000000000000000000001"`), Error: nil, Version: "2.0"},
+		{Id: float64(2), Result: []byte(`"0x12345"`), Error: nil, Version: "2.0"},
+		{Id: float64(3), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
+		{Id: float64(4), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
+		{Id: float64(5), Result: []byte(`null`), Error: nil, Version: "2.0"},
 	}
 	res, err := testutils.SendBatchRpcAndParseResponse(batch)
 	require.Nil(t, err, err)
