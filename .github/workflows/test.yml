@@ -10,8 +10,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Install staticcheck
+      run: go install honnef.co/go/tools/cmd/staticcheck
+
     - name: Lint
-      run: gofmt -d ./
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin
+        make lint
+      shell: bash
 
     - name: Test
       run: make test
