@@ -15,28 +15,28 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
-		r.log("no params for eth_sendRawTransaction")
+		r.logger.log("no params for eth_sendRawTransaction")
 		r.writeRpcError("empty params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 		return
 	}
 
 	if r.jsonReq.Params[0] == nil {
-		r.log("nil param for eth_sendRawTransaction")
+		r.logger.log("nil param for eth_sendRawTransaction")
 		r.writeRpcError("nil params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
-		r.logError("invalid raw transaction (wrong length)")
+		r.logger.logError("invalid raw transaction (wrong length)")
 		r.writeRpcError("invalid raw transaction param (wrong length)", types.JsonRpcInvalidParams)
 		return
 	}
 
-	r.log("rawTx: %s", r.rawTxHex)
+	r.logger.log("rawTx: %s", r.rawTxHex)
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.log("reading transaction object failed - rawTx: %s", r.rawTxHex)
+		r.logger.log("reading transaction object failed - rawTx: %s", r.rawTxHex)
 		r.writeRpcError(fmt.Sprintf("reading transaction object failed - rawTx: %s", r.rawTxHex), types.JsonRpcInvalidRequest)
 		return
 	}
@@ -44,16 +44,16 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Get tx from address
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
-		r.log("couldn't get address from rawTx: %v", err)
+		r.logger.log("couldn't get address from rawTx: %v", err)
 		r.writeRpcError(fmt.Sprintf("couldn't get address from rawTx: %v", err), types.JsonRpcInvalidRequest)
 		return
 	}
 
-	r.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice()))
+	r.logger.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
+		r.logger.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -63,11 +63,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
 	if err != nil {
-		r.logError("redis:SetSenderOfTxHash failed: %v", err)
+		r.logger.logError("redis:SetSenderOfTxHash failed: %v", err)
 	}
 
 	if isOnOFACList(r.txFrom) {
-		r.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
+		r.logger.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
 		r.writeRpcError("blocked tx from ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -84,7 +84,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 		// It's a cancel-tx for the mempool
 		needsProtection = false
-		r.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
+		r.logger.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
 	}
 
 	if needsProtection {
@@ -93,17 +93,17 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	if DebugDontSendTx {
-		r.log("faked sending tx to mempool, did nothing")
+		r.logger.log("faked sending tx to mempool, did nothing")
 		r.writeRpcResult(r.tx.Hash().Hex())
 		return
 	}
 
 	// Proxy to public node now
-	readJsonRpcSuccess, jsonResp := r.proxyRequestRead(r.defaultProxyUrl)
+	readJsonRpcSuccess := r.proxyRequestRead(r.defaultProxyUrl)
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
-		r.logError("Proxy to mempool failed: eth_sendRawTransaction")
+		r.logger.logError("Proxy to mempool failed: eth_sendRawTransaction")
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
@@ -111,13 +111,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// at the end, save the nonce for further spam protection checks
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
-	// Write JSON-RPC response now
-	r._writeRpcResponse(jsonResp)
-
-	if jsonResp.Error != nil {
-		r.log("Proxied eth_sendRawTransaction to mempool - with JSON-RPC Error %s", jsonResp.Error.Message)
+	if r.jsonRes.Error != nil {
+		r.logger.log("Proxied eth_sendRawTransaction to mempool - with JSON-RPC Error %s", r.jsonRes.Error.Message)
 	} else {
-		r.log("Proxied eth_sendRawTransaction to mempool")
+		r.logger.log("Proxied eth_sendRawTransaction to mempool")
 	}
 }
 
@@ -125,7 +122,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 // for example simple ERC20 transfers.
 func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) bool {
 	gas := tx.Gas()
-	r.log("[protect-check] gas: %v", gas)
+	r.logger.log("[protect-check] gas: %v", gas)
 
 	// Flashbots Relay will reject anything less than 42000 gas, so we just send those to the mempool
 	// Anyway things with that low of gas probably don't need frontrunning protection regardless
@@ -134,7 +131,7 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	}
 
 	data := hex.EncodeToString(tx.Data())
-	r.log("[protect-check] tx-data: %v", data)
+	r.logger.log("[protect-check] tx-data: %v", data)
 
 	if len(data) < 8 {
 		return false
@@ -143,7 +140,7 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	if isOnFunctionWhiteList(data[0:8]) {
 		return false // function being called is on our whitelist and no protection needed
 	} else {
-		r.log("[protect-check] tx needs protection - function: %v", data[0:8])
+		r.logger.log("[protect-check] tx needs protection - function: %v", data[0:8])
 		return true // needs protection if not on whitelist
 	}
 }

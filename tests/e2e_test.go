@@ -381,12 +381,16 @@ func TestBatch_eth_transaction(t *testing.T) {
 	res, err := testutils.SendBatchRpcAndParseResponse(batch)
 	require.Nil(t, err, err)
 	assert.Equal(t, len(res), 3)
-	expected := []*types.JsonRpcResponse{
-		{Id: float64(1), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
-		{Id: float64(2), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
-		{Id: float64(3), Result: []byte(`null`), Error: nil, Version: "2.0"},
+
+	m := map[float64]*types.JsonRpcResponse{
+		float64(1): {Id: float64(1), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
+		float64(2): {Id: float64(2), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
+		float64(3): {Id: float64(3), Result: []byte(`null`), Error: nil, Version: "2.0"},
 	}
-	assert.Equal(t, expected, res)
+	for _, j := range res {
+		assert.Equal(t, m[j.Id.(float64)], j)
+	}
+
 }
 
 // Test batch request with different eth transaction
@@ -414,17 +418,20 @@ func TestBatch_eth_call(t *testing.T) {
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := types.NewJsonRpcRequest(5, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
 	batch = append(batch, req_getTransactionReceipt)
-	expected := []*types.JsonRpcResponse{
-		{Id: float64(1), Result: []byte(`"0x0000000000000000000000000000000000000000000000000000000000000001"`), Error: nil, Version: "2.0"},
-		{Id: float64(2), Result: []byte(`"0x12345"`), Error: nil, Version: "2.0"},
-		{Id: float64(3), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
-		{Id: float64(4), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
-		{Id: float64(5), Result: []byte(`null`), Error: nil, Version: "2.0"},
+
+	m := map[float64]*types.JsonRpcResponse{
+		float64(1): {Id: float64(1), Result: []byte(`"0x0000000000000000000000000000000000000000000000000000000000000001"`), Error: nil, Version: "2.0"},
+		float64(2): {Id: float64(2), Result: []byte(`"0x12345"`), Error: nil, Version: "2.0"},
+		float64(3): {Id: float64(3), Result: []byte(`"0x22"`), Error: nil, Version: "2.0"},
+		float64(4): {Id: float64(4), Result: []byte(`"tx-hash1"`), Error: nil, Version: "2.0"},
+		float64(5): {Id: float64(5), Result: []byte(`null`), Error: nil, Version: "2.0"},
 	}
 	res, err := testutils.SendBatchRpcAndParseResponse(batch)
 	require.Nil(t, err, err)
 	assert.Equal(t, len(res), 5)
-	assert.Equal(t, expected, res)
+	for _, j := range res {
+		assert.Equal(t, m[j.Id.(float64)], j)
+	}
 
 }
 
