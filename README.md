@@ -82,6 +82,8 @@ You are welcome here <3.
 
 We appreciate your contributions <3
 
+Please install [`staticcheck`](https://staticcheck.io/) (`go install honnef.co/go/tools/cmd/staticcheck@latest`) and run `make lint` before submitting a PR.
+
 ## Security
 
 If you find a security vulnerability on this project or any other initiative related to Flashbots, please let us know sending an email to security@flashbots.net.
