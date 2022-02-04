@@ -14,7 +14,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/alicebob/miniredis"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -44,6 +43,8 @@ func init() {
 // 	}
 // }
 
+var bundleJsonApi *httptest.Server
+
 // Reset the RPC endpoint and mock backend servers
 func resetTestServers() {
 	redisServer, err := miniredis.Run()
@@ -54,11 +55,9 @@ func resetTestServers() {
 	// Create a fresh mock backend server (covers for both eth node and relay)
 	rpcBackendServer := httptest.NewServer(http.HandlerFunc(testutils.RpcBackendHandler))
 	RpcBackendServerUrl = rpcBackendServer.URL
-	testutils.MockBackendLastRawRequest = nil
-	testutils.MockBackendLastJsonRpcRequest = nil
-	testutils.MockBackendLastJsonRpcRequestTimestamp = time.Time{}
-
+	testutils.MockRpcBackendReset()
 	testutils.MockTxApiReset()
+
 	txApiServer := httptest.NewServer(http.HandlerFunc(testutils.MockTxApiHandler))
 	server.ProtectTxApiHost = txApiServer.URL
 
@@ -68,6 +67,7 @@ func resetTestServers() {
 		panic(err)
 	}
 	rpcEndpointServer := httptest.NewServer(http.HandlerFunc(rpcServer.HandleHttpRequest))
+	bundleJsonApi = httptest.NewServer(http.HandlerFunc(rpcServer.HandleBundleRequest))
 	testutils.RpcEndpointUrl = rpcEndpointServer.URL
 }
 
@@ -490,5 +490,68 @@ func TestBatch_Validate_eth_sendRawTransaction_Error(t *testing.T) {
 	for _, r := range res {
 		assert.Equal(t, m[r.Id.(float64)], r.Error.Code)
 	}
+}
 
+//
+// Whitehat Tests
+//
+func TestWhitehatBundleCollection(t *testing.T) {
+	resetTestServers()
+
+	bundleId := "123"
+	url := testutils.RpcEndpointUrl + "?bundle=" + bundleId
+
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	resp, err := utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
+	require.Nil(t, err, err)
+	require.Nil(t, resp.Error, resp.Error)
+
+	// Request should never go to node/relay
+	require.Nil(t, testutils.MockBackendLastJsonRpcRequest)
+
+	// Check redis
+	txs, err := server.RState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 1, len(txs))
+
+	// Send again (#2)
+	resp, err = utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
+	require.Nil(t, err, err)
+	require.Nil(t, resp.Error, resp.Error)
+
+	// Check redis (#2)
+	txs, err = server.RState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 2, len(txs))
+
+	// Check JSON API
+	jsonApiUrl := bundleJsonApi.URL + "/bundle?id=" + bundleId
+	fmt.Println("jsonApiUrl: ", jsonApiUrl)
+	res, err := http.Get(jsonApiUrl)
+	require.Nil(t, err, err)
+	body, err := ioutil.ReadAll(res.Body)
+	require.Nil(t, err, err)
+	fmt.Println(string(body))
+	bundleResponse := new(types.BundleResponse)
+	err = json.Unmarshal(body, bundleResponse)
+	require.Nil(t, err, err)
+	require.Equal(t, bundleId, bundleResponse.BundleId)
+	require.Equal(t, 2, len(bundleResponse.RawTxs))
+}
+
+func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
+	resetTestServers()
+	bundleId := "123"
+	url := testutils.RpcEndpointUrl + "?bundle=" + bundleId
+
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getBalance", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	resp, err := utils.SendRpcAndParseResponseTo(url, req_getTransactionCount)
+	require.Nil(t, err, err)
+	require.Nil(t, resp.Error, resp.Error)
+	val := ""
+	err = json.Unmarshal(resp.Result, &val)
+	require.Nil(t, err, err)
+	require.Equal(t, "0x56bc75e2d63100000", val)
 }

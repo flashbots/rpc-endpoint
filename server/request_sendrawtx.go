@@ -75,6 +75,19 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
 
+	// If users specify a bundle ID, cache this transaction
+	if r.isWhitehatBundleCollection {
+		r.logger.log("[WhitehatBundleCollection] adding tx to bundle %s txData: %s", r.whitehatBundleId, r.rawTxHex)
+		err = RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
+		if err != nil {
+			r.logger.logError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", err)
+			r.writeRpcError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", types.JsonRpcInternalError)
+			return
+		}
+		r.writeRpcResult(r.tx.Hash().Hex())
+		return
+	}
+
 	// Check for cancellation-tx
 	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user

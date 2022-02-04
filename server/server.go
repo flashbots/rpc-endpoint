@@ -91,6 +91,7 @@ func (s *RpcEndPointServer) Start() {
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
 	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
 	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
+	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -133,6 +134,49 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 	respw.Header().Set("Content-Type", "application/json")
 	respw.WriteHeader(http.StatusOK)
 	respw.Write(jsonResp)
+}
+
+func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
+	respw.Header().Set("Access-Control-Allow-Origin", "*")
+	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
+
+	bundleId := req.URL.Query().Get("id")
+	if bundleId == "" {
+		http.Error(respw, "no bundle id", http.StatusBadRequest)
+		return
+	}
+
+	if req.Method == "GET" {
+		txs, err := RState.GetWhitehatBundleTx(bundleId)
+		if err != nil {
+			log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
+			respw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		res := types.BundleResponse{
+			BundleId: bundleId,
+			RawTxs:   txs,
+		}
+
+		jsonResp, err := json.Marshal(res)
+		if err != nil {
+			log.Println("[handleBundleRequest] ERROR json marshal failed:", err)
+			respw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		respw.Header().Set("Content-Type", "application/json")
+		respw.WriteHeader(http.StatusOK)
+		respw.Write(jsonResp)
+
+	} else if req.Method == "POST" {
+		RState.DelWhitehatBundleTx(bundleId)
+		respw.WriteHeader(http.StatusOK)
+
+	} else {
+		respw.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 func IsBlacklisted(ip string) bool {

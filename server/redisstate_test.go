@@ -197,23 +197,38 @@ func TestSenderMaxNonce(t *testing.T) {
 	require.Equal(t, uint64(18), val)
 }
 
-// func TestLastTxHashOfAccount(t *testing.T) {
-// 	var err error
-// 	resetRedis()
+func TestWhitehatTx(t *testing.T) {
+	resetRedis()
+	bundleId := "123"
 
-// 	txFrom := "0x0Sender"
-// 	txHash := "0xDeadBeef"
+	// get (empty)
+	txs, err := redisState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 0, len(txs))
 
-// 	val, found, err := redisState.GetLastPrivTxHashOfAccount(txFrom)
-// 	require.Nil(t, err, err)
-// 	require.False(t, found)
-// 	require.Equal(t, "", val)
+	// add #1
+	tx1 := "0xa12345"
+	tx2 := "0xb12345"
+	err = redisState.AddTxToWhitehatBundle(bundleId, tx1)
+	require.Nil(t, err, err)
 
-// 	err = redisState.SetLastPrivTxHashOfAccount(txFrom, txHash)
-// 	require.Nil(t, err, err)
+	txs, err = redisState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 1, len(txs))
 
-// 	val, found, err = redisState.GetLastPrivTxHashOfAccount(txFrom)
-// 	require.Nil(t, err, err)
-// 	require.True(t, found)
-// 	require.Equal(t, strings.ToLower(txHash), val)
-// }
+	err = redisState.AddTxToWhitehatBundle(bundleId, tx2)
+	require.Nil(t, err, err)
+
+	txs, err = redisState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 2, len(txs))
+	require.Equal(t, tx2, txs[0])
+	require.Equal(t, tx1, txs[1])
+
+	err = redisState.DelWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+
+	txs, err = redisState.GetWhitehatBundleTx(bundleId)
+	require.Nil(t, err, err)
+	require.Equal(t, 0, len(txs))
+}

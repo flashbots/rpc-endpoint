@@ -41,8 +41,12 @@ func (r *RpcRequestHandler) process() {
 		r.logger.log("request took %.6f sec", timeRequestNeeded.Seconds())
 	}()
 
+	whitehatBundleId := r.req.URL.Query().Get("bundle")
+	isWhitehatBundleCollection := whitehatBundleId != ""
+
 	ip := utils.GetIP(r.req)             // Fetch ip
 	origin := r.req.Header.Get("Origin") // Fetch origin
+
 	// Logger setup
 	r.uid = uuid.New().String()
 	r.logger = NewLogger(r.uid)
@@ -87,25 +91,25 @@ func (r *RpcRequestHandler) process() {
 			return
 		}
 		// Process batch request
-		r.processBatchRequest(jsonBatchReq, ip, origin)
+		r.processBatchRequest(jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 		return
 	}
 	// Process single request
-	r.processRequest(jsonReq, ip, origin)
+	r.processRequest(jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(jsonReq *types.JsonRpcRequest, ip, origin string) {
+func (r *RpcRequestHandler) processRequest(jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, jsonReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin)
+	rpcReq := NewRpcRequest(r.logger, jsonReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcRequest, ip, origin string) {
+func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request
@@ -114,7 +118,7 @@ func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcReq
 			// Create child logger
 			l := r.logger.CreateChildLogger(strconv.FormatInt(int64(count), 10))
 			// Create rpc request
-			req := NewRpcRequest(l, rpcReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin) // Set each individual request
+			req := NewRpcRequest(l, rpcReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i])

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/big"
+	"reflect"
 	"strings"
 	"time"
 
@@ -19,26 +20,30 @@ import (
 )
 
 type RpcRequest struct {
-	logger          Logger
-	jsonReq         *types.JsonRpcRequest
-	jsonRes         *types.JsonRpcResponse
-	rawTxHex        string
-	tx              *ethtypes.Transaction
-	txFrom          string
-	defaultProxyUrl string
-	relaySigningKey *ecdsa.PrivateKey
-	ip              string
-	origin          string
+	logger                     Logger
+	jsonReq                    *types.JsonRpcRequest
+	jsonRes                    *types.JsonRpcResponse
+	rawTxHex                   string
+	tx                         *ethtypes.Transaction
+	txFrom                     string
+	defaultProxyUrl            string
+	relaySigningKey            *ecdsa.PrivateKey
+	ip                         string
+	origin                     string
+	isWhitehatBundleCollection bool
+	whitehatBundleId           string
 }
 
-func NewRpcRequest(logger Logger, jsonReq *types.JsonRpcRequest, defaultProxyUrl string, relaySigningKey *ecdsa.PrivateKey, ip, origin string) *RpcRequest {
+func NewRpcRequest(logger Logger, jsonReq *types.JsonRpcRequest, defaultProxyUrl string, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
 	return &RpcRequest{
-		logger:          logger,
-		jsonReq:         jsonReq,
-		defaultProxyUrl: defaultProxyUrl,
-		relaySigningKey: relaySigningKey,
-		ip:              ip,
-		origin:          origin,
+		logger:                     logger,
+		jsonReq:                    jsonReq,
+		defaultProxyUrl:            defaultProxyUrl,
+		relaySigningKey:            relaySigningKey,
+		ip:                         ip,
+		origin:                     origin,
+		isWhitehatBundleCollection: isWhitehatBundleCollection,
+		whitehatBundleId:           whitehatBundleId,
 	}
 }
 
@@ -50,7 +55,12 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
 	case r.jsonReq.Method == "net_version": // don't need to proxy to node, it's always 1 (mainnet)
 		r.writeRpcResult("1")
+	case r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance":
+		r.writeRpcResult("0x56bc75e2d63100000") // 100 ETH, same as the eth_call SC call above returns
 	default:
+		if r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_call" {
+			r.WhitehatBalanceCheckerRewrite()
+		}
 		// Proxy the request to a node
 		readJsonRpcSuccess := r.proxyRequestRead(r.defaultProxyUrl)
 		if !readJsonRpcSuccess {
@@ -320,6 +330,30 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
 	maxNonce = Max(minNonce, _redisMaxNonce)
 	return minNonce, maxNonce
+}
+
+func (r *RpcRequest) WhitehatBalanceCheckerRewrite() {
+	var err error
+
+	if len(r.jsonReq.Params) == 0 {
+		return
+	}
+
+	// Ensure param is of type map
+	t := reflect.TypeOf(r.jsonReq.Params[0])
+	if t.Kind() != reflect.Map {
+		return
+	}
+
+	p := r.jsonReq.Params[0].(map[string]interface{})
+	if to := p["to"]; to == "0xb1f8e55c7f64d203c1400b9d8555d050f94adf39" {
+		r.jsonReq.Params[0].(map[string]interface{})["to"] = "0x268F7Cd7A396BCE178f0937095772C7fb83a9104"
+		if err != nil {
+			r.logger.logError("isWhitehatBundleCollection json marshal failed:", err)
+		} else {
+			r.logger.log("BalanceChecker contract was rewritten to new version")
+		}
+	}
 }
 
 func (r *RpcRequest) writeRpcError(msg string, errCode int) {
