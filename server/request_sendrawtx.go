@@ -32,7 +32,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] raw traction value", "tx", r.rawTxHex)
+	r.logger.Info("[sendRawTransaction] raw tx value", "tx", r.rawTxHex)
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if r.tx.Nonce() >= 1e9 {
 		r.logger.Info(fmt.Sprintf("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin))
-		r.writeRpcError("[sendRawTransaction] Tx rejected - nonce too high", types.JsonRpcInvalidRequest)
+		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
 
