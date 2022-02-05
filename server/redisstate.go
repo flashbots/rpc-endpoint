@@ -15,27 +15,27 @@ var RedisPrefix = "rpc-endpoint:"
 
 // Enable lookup of timeSentToRelay by txHash
 var RedisPrefixTxSentToRelay = RedisPrefix + "tx-sent-to-relay:"
-var RedisExpiryTxSentToRelay = time.Duration(24 * time.Hour) // 1 day
+var RedisExpiryTxSentToRelay = 24 * time.Hour // 1 day
 
 // Enable lookup of txHash by txFrom+nonce (only if sent to relay)
 var RedisPrefixTxHashForSenderAndNonce = RedisPrefix + "txsender-and-nonce-to-txhash:"
-var RedisExpiryTxHashForSenderAndNonce = time.Duration(24 * time.Hour) // 1 day
+var RedisExpiryTxHashForSenderAndNonce = 24 * time.Hour // 1 day
 
 // nonce-fix of an account (with number of times sent)
 var RedisPrefixNonceFixForAccount = RedisPrefix + "txsender-with-nonce-fix:"
-var RedisExpiryNonceFixForAccount = time.Duration(24 * time.Hour)
+var RedisExpiryNonceFixForAccount = 24 * time.Hour // 1 day
 
 // Enable lookup of txFrom by txHash
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
-var RedisExpirySenderOfTxHash = time.Duration(24 * time.Hour) // 1 day
+var RedisExpirySenderOfTxHash = 24 * time.Hour // 1 day
 
 // Remember nonce of pending user tx
 var RedisPrefixSenderMaxNonce = RedisPrefix + "txsender-pending-max-nonce:"
-var RedisExpirySenderMaxNonce = time.Duration(2 * time.Hour)
+var RedisExpirySenderMaxNonce = 24 * time.Hour // 1 day
 
 // Enable lookup of bundle txs by bundleId
 var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
-var RedisExpiryWhitehatBundleTransactions = time.Duration(24 * time.Hour) // 1 day
+var RedisExpiryWhitehatBundleTransactions = 24 * time.Hour // 1 day
 
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
