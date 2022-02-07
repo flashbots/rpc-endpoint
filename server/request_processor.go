@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -48,6 +49,8 @@ func NewRpcRequest(logger Logger, jsonReq *types.JsonRpcRequest, defaultProxyUrl
 }
 
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
+	r.logger.log("JSON-RPC request from ip: %s - method: %s / goroutines: %d", r.ip, r.jsonReq.Method, runtime.NumGoroutine())
+
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.handle_sendRawTransaction()

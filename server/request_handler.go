@@ -3,13 +3,14 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/flashbots/rpc-endpoint/utils"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/flashbots/rpc-endpoint/utils"
+	"github.com/google/uuid"
 )
 
 // RPC request handler for a single/ batch JSON-RPC request
@@ -34,7 +35,6 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 }
 
 func (r *RpcRequestHandler) process() {
-
 	// At end of request, log the time it needed
 	defer func() {
 		timeRequestNeeded := time.Since(r.timeStarted)
@@ -50,12 +50,11 @@ func (r *RpcRequestHandler) process() {
 	// Logger setup
 	r.uid = uuid.New().String()
 	r.logger = NewLogger(r.uid)
-	r.logger.log("POST request received")
 
 	// Validate if ip blacklisted
 	if IsBlacklisted(ip) {
 		r.logger.log("Blocked IP: %s", ip)
-		r._writeHeaderStatus(http.StatusUnauthorized)
+		(*r.respw).WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -72,12 +71,12 @@ func (r *RpcRequestHandler) process() {
 	body, err := ioutil.ReadAll(r.req.Body)
 	if err != nil {
 		r.logger.logError("failed to read request body: %v", err)
-		r._writeHeaderStatus(http.StatusBadRequest)
+		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if len(body) == 0 {
-		r._writeHeaderStatus(http.StatusBadRequest)
+		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -87,16 +86,16 @@ func (r *RpcRequestHandler) process() {
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
 			r.logger.logError("Parse payload %v", err)
-			r._writeHeaderStatus(http.StatusBadRequest)
+			(*r.respw).WriteHeader(http.StatusBadRequest)
 			return
 		}
 		// Process batch request
 		r.processBatchRequest(jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 		return
 	}
+
 	// Process single request
 	r.processRequest(jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
-
 }
 
 // processRequest handles single request
