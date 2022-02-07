@@ -111,7 +111,6 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	// Afterwards, check time and result
 	timeProxyNeeded := time.Since(timeProxyStart)
 	r.logger.Info(fmt.Sprintf("[proxyRequestRead] proxy response %d after %.6f sec", proxyResp.StatusCode, timeProxyNeeded.Seconds()))
-	// r.logger.Info("proxy response %d after %.6f: %v", proxyResp.StatusCode, timeProxyNeeded.Seconds(), proxyResp)
 
 	// Read body
 	defer proxyResp.Body.Close()
@@ -183,7 +182,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	txTo := r.tx.To()
 	if txTo == nil {
-		r.writeRpcError("[sendTxToRelay] Invalid target", types.JsonRpcInternalError)
+		r.writeRpcError("invalid target", types.JsonRpcInternalError)
 		return
 	}
 

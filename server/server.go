@@ -137,7 +137,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
-		http.Error(respw, "[handleBundleRequest] No bundle id", http.StatusBadRequest)
+		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
 
