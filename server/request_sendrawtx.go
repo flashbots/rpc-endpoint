@@ -41,7 +41,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	// Get tx from address
+	// Get address from tx
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 		r.logger.Info("[sendRawTransaction] Couldn't get address from rawTx", "error", err)
@@ -53,7 +53,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.logger.Info(fmt.Sprintf("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin))
+		r.logger.Info(fmt.Sprintf("[sendRawTransaction] tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin))
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
