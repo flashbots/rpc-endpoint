@@ -41,11 +41,11 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	var err error
 
 	if DebugDontSendTx {
-		log.Info("DEBUG MODE: raw transactions will not be sent out!", "env", redisUrl)
+		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
 	}
 
 	if redisUrl == "dev" {
-		log.Info("Using integrated in-memory Redis instance", "env", redisUrl)
+		log.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
 		redisServer, err := miniredis.Run()
 		if err != nil {
 			return nil, err

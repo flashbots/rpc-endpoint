@@ -54,7 +54,7 @@ func main() {
 		return
 	}
 
-	log.Info("rpc-endpoint", "version", version)
+	log.Info("Init rpc-endpoint", "version", version)
 
 	if *relaySigningKey == "" {
 		log.Error("Cannot use the relay without a signing key.")
