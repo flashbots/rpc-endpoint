@@ -190,7 +190,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.logger.logError("[sendTxToRelay] GetAddressNonceRange error: %v", err)
 	} else {
 		if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
-			r.logger.logError("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
+			r.logger.log("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
 			r.writeRpcError("invalid nonce", types.JsonRpcInternalError)
 			return
 		}
