@@ -40,7 +40,7 @@ func (r *RpcRequestHandler) process() {
 	// At end of request, log the time it needed
 	defer func() {
 		timeRequestNeeded := time.Since(r.timeStarted)
-		log.Info("[process] Time taken to process request", "request took", fmt.Sprintf("%.6f sec", timeRequestNeeded.Seconds()))
+		log.Info("[process] Time taken to process request", "timeTakenInSec", fmt.Sprintf("%.6f sec", timeRequestNeeded.Seconds()))
 	}()
 
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
