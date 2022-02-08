@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -48,6 +49,8 @@ func NewRpcRequest(logger Logger, jsonReq *types.JsonRpcRequest, defaultProxyUrl
 }
 
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
+	r.logger.log("JSON-RPC request from ip: %s - method: %s / goroutines: %d", r.ip, r.jsonReq.Method, runtime.NumGoroutine())
+
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.handle_sendRawTransaction()
@@ -182,11 +185,15 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	minNonce, maxNonce := r.GetAddressNonceRange(r.txFrom)
-	if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
-		r.logger.logError("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
-		r.writeRpcError("invalid nonce", types.JsonRpcInternalError)
-		return
+	minNonce, maxNonce, err := r.GetAddressNonceRange(r.txFrom)
+	if err != nil {
+		r.logger.logError("[sendTxToRelay] GetAddressNonceRange error: %v", err)
+	} else {
+		if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
+			r.logger.log("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce())
+			r.writeRpcError("invalid nonce", types.JsonRpcInternalError)
+			return
+		}
 	}
 
 	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce())
@@ -305,14 +312,12 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	return true
 }
 
-func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce uint64) {
+func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce uint64, err error) {
 	// Get minimum nonce by asking the eth node for the current transaction count
 	_req := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{r.txFrom, "latest"})
 	_res, err := utils.SendRpcAndParseResponseTo(r.defaultProxyUrl, _req)
 	if err != nil {
-		r.logger.logError("[sendTxToRelay] eth_getTransactionCount failed: %v", err)
-		r.writeRpcError("internal server error", types.JsonRpcInternalError)
-		return
+		return 0, 0, err
 	}
 	_userNonceStr := ""
 	err = json.Unmarshal(_res.Result, &_userNonceStr)
@@ -329,7 +334,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	// Get maximum nonce by looking at redis, which has current pending transactions
 	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
 	maxNonce = Max(minNonce, _redisMaxNonce)
-	return minNonce, maxNonce
+	return minNonce, maxNonce, nil
 }
 
 func (r *RpcRequest) WhitehatBalanceCheckerRewrite() {

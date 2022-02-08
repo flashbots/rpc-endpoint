@@ -11,10 +11,6 @@ func (r *RpcRequestHandler) writeHeaderContentTypeJson() {
 	(*r.respw).Header().Set("Content-Type", "application/json")
 }
 
-func (r *RpcRequestHandler) _writeHeaderStatus(statusCode int) {
-	(*r.respw).WriteHeader(statusCode)
-}
-
 func (r *RpcRequestHandler) _writeRpcResponse(res *types.JsonRpcResponse) {
 
 	// If the request is single and not batch
@@ -36,23 +32,21 @@ func (r *RpcRequestHandler) _writeRpcResponse(res *types.JsonRpcResponse) {
 			statusCode = http.StatusInternalServerError
 		}
 	}
-	r._writeHeaderStatus(statusCode) // set status header
+	(*r.respw).WriteHeader(statusCode)
 
 	// Write response
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logger.logError("failed writing rpc response: %v", err)
-		r._writeHeaderStatus(http.StatusInternalServerError)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }
 
 func (r *RpcRequestHandler) _writeRpcBatchResponse(res []*types.JsonRpcResponse) {
-
-	r.writeHeaderContentTypeJson()      // Set content type to json
-	r._writeHeaderStatus(http.StatusOK) // Set status header to 200
+	r.writeHeaderContentTypeJson() // Set content type to json
+	(*r.respw).WriteHeader(http.StatusOK)
 	// Write response
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
 		r.logger.logError("failed writing rpc response: %v", err)
-		r._writeHeaderStatus(http.StatusInternalServerError)
+		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
-
 }

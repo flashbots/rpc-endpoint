@@ -13,22 +13,22 @@ import (
 )
 
 var (
+	version = "dev" // is set during build process
+
+	// defaults
 	defaultListenAddress = "127.0.0.1:9000"
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
 	defaultRedisUrl      = "localhost:6379"
 
-	version = "dev" // is set during build process
+	// cli flags
+	versionPtr      = flag.Bool("version", false, "just print the program version")
+	listenAddress   = flag.String("listen", getEnvOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
+	proxyUrl        = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
+	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
+	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
+	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
 )
-
-var versionPtr = flag.Bool("version", false, "just print the program version")
-var listenAddress = flag.String("listen", getEnvOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
-var proxyUrl = flag.String("proxy", getEnvOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
-var redisUrl = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
-
-// Flags for using the relay
-var relayUrl = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
-var relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
 
 func main() {
 	var key *ecdsa.PrivateKey
