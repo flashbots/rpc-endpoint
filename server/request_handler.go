@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 
-	"fmt"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/flashbots/rpc-endpoint/utils"
@@ -40,7 +39,7 @@ func (r *RpcRequestHandler) process() {
 	// At end of request, log the time it needed
 	defer func() {
 		timeRequestNeeded := time.Since(r.timeStarted)
-		log.Info("[process] Time taken to process request", "timeTakenInSec", fmt.Sprintf("%.6f sec", timeRequestNeeded.Seconds()))
+		log.Info("Request finished", "secNeeded", timeRequestNeeded.Seconds())
 	}()
 
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
