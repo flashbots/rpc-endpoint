@@ -32,7 +32,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] raw tx value", "tx", r.rawTxHex)
+	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
@@ -49,11 +49,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info(fmt.Sprintf("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice())))
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", utils.AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", utils.BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.logger.Info(fmt.Sprintf("[sendRawTransaction] tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin))
+		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txHash", r.tx.Hash(), "txFromLower", txFromLower, "origin", r.origin)
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}

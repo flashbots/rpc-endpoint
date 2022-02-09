@@ -7,7 +7,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/ethereum/go-ethereum/log"
 	"io/ioutil"
 	"math/big"
@@ -51,7 +50,7 @@ func NewRpcRequest(logger log.Logger, jsonReq *types.JsonRpcRequest, defaultProx
 }
 
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
-	r.logger.Info(fmt.Sprintf("JSON-RPC request from ip: %s - method: %s / goroutines: %d", r.ip, r.jsonReq.Method, runtime.NumGoroutine()))
+	r.logger.Info("JSON-RPC request", "ip", r.ip, "method", r.jsonReq.Method, "goroutines", runtime.NumGoroutine())
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
@@ -110,7 +109,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 
 	// Afterwards, check time and result
 	timeProxyNeeded := time.Since(timeProxyStart)
-	r.logger.Info(fmt.Sprintf("[proxyRequestRead] proxy response %d after %.6f sec", proxyResp.StatusCode, timeProxyNeeded.Seconds()))
+	r.logger.Info("[proxyRequestRead] proxied response", "statusCode", proxyResp.StatusCode, "secNeeded", timeProxyNeeded.Seconds())
 
 	// Read body
 	defer proxyResp.Body.Close()
@@ -172,7 +171,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.logger.Info(fmt.Sprintf("[sendTxToRelay] sending %s -- from ip: %s / address: %s / to: %s", txHash, r.ip, r.txFrom, r.tx.To()))
+	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "ip", r.ip, "fromAddress", r.txFrom, "toAddress", r.tx.To())
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
@@ -191,7 +190,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.logger.Error("[sendTxToRelay] GetAddressNonceRange error", "error", err)
 	} else {
 		if r.tx.Nonce() < minNonce || r.tx.Nonce() > maxNonce+1 {
-			r.logger.Error(fmt.Sprintf("[sendTxToRelay] invalid nonce for %s from %s - want: [%d, %d], got: %d", txHash, r.txFrom, minNonce, maxNonce+1, r.tx.Nonce()))
+			r.logger.Error("[sendTxToRelay] invalid nonce", "tx", txHash, "txFrom", r.txFrom, "minNonce", minNonce, "maxNonce", maxNonce+1, "txNonce", r.tx.Nonce())
 			r.writeRpcError("invalid nonce", types.JsonRpcInternalError)
 			return
 		}
@@ -203,11 +202,11 @@ func (r *RpcRequest) sendTxToRelay() {
 	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
 	if r.tx.Size() > 131072 {
 		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
-			r.logger.Error(fmt.Sprintf("[sendTxToRelay] large tx to not allowed target - hash: %s - target: %s", txHash, txTo))
+			r.logger.Error("[sendTxToRelay] large tx not allowed to target", "tx", txHash, "target", txTo)
 			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
 			return
 		}
-		r.logger.Info(fmt.Sprintf("sendTxToRelay] allowed large tx - hash: %s - target: %s", txHash, txTo))
+		r.logger.Info("sendTxToRelay] allowed large tx", "tx", txHash, "target", txTo)
 	}
 
 	// remember this tx based on from+nonce (for cancel-tx)
@@ -248,7 +247,7 @@ func (r *RpcRequest) sendTxToRelay() {
 func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	cancelTxHash := strings.ToLower(r.tx.Hash().Hex())
 	txFromLower := strings.ToLower(r.txFrom)
-	r.logger.Info(fmt.Sprintf("[cancel-tx] %s - check %s/%d", cancelTxHash, txFromLower, r.tx.Nonce()))
+	r.logger.Info("[cancel-tx] cancelling transaction", "cancelTxHash", cancelTxHash, "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
 
 	// Get initial txHash by sender+nonce
 	initialTxHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
@@ -287,7 +286,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 		return true
 	}
 
-	r.logger.Info(fmt.Sprintf("[cancel-tx] sending to relay: %s for %s/%d", initialTxHash, txFromLower, r.tx.Nonce()))
+	r.logger.Info("[cancel-tx] sending to relay", "initialTxHash", initialTxHash, "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
 
 	if DebugDontSendTx {
 		r.logger.Info("[cancelTx] Faked sending cancel-tx to relay, did nothing", "tx", initialTxHash)

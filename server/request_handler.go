@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -10,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -117,7 +117,7 @@ func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcReq
 		// Scatter worker
 		go func(count int, rpcReq *types.JsonRpcRequest) {
 			// Create child logger
-			l := r.logger.New(log.Ctx{"worker-id": strconv.FormatInt(int64(count), 10)})
+			l := log.New(log.Ctx{"uid": fmt.Sprintf("%s.%d", r.uid, count)})
 			// Create rpc request
 			req := NewRpcRequest(l, rpcReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
 			res := req.ProcessRequest()

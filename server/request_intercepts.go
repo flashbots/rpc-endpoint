@@ -147,6 +147,6 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 	}
 
 	r.writeRpcResult("0x0000000000000000000000000000000000000000000000000000000000000001")
-	r.logger.Info("[call_to_FlashRPC_Contract] Intercepted eth_call to FlashRPC contract")
+	r.logger.Info("Intercepted eth_call to FlashRPC contract")
 	return true
 }
