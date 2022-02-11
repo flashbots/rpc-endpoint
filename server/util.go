@@ -103,3 +103,14 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 
 	return respObj, nil
 }
+
+func Contains(arr []string, element string) bool {
+	var result bool = false
+	for _, x := range arr {
+		if x == element {
+			result = true
+			break
+		}
+	}
+	return result
+}

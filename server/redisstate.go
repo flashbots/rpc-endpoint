@@ -193,11 +193,14 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 //
 func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
 	key := RedisKeyWhitehatBundleTransactions(bundleId)
+	err := error(nil)
 
-	// Add item
-	err := s.RedisClient.LPush(context.Background(), key, signedTx).Err()
-	if err != nil {
-		return err
+	// Add tx if it's not a duplicate
+	if !Contains(s.RedisClient.LRange(context.Background(), key, 0, -1).Val(), signedTx) {
+		err = s.RedisClient.LPush(context.Background(), key, signedTx).Err()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Set expiry
