@@ -170,7 +170,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 		respw.WriteHeader(http.StatusOK)
 		respw.Write(jsonResp)
 
-	} else if req.Method == "POST" {
+	} else if req.Method == "DELETE" {
 		RState.DelWhitehatBundleTx(bundleId)
 		respw.WriteHeader(http.StatusOK)
 
