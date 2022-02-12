@@ -523,7 +523,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	// Check redis (#2)
 	txs, err = server.RState.GetWhitehatBundleTx(bundleId)
 	require.Nil(t, err, err)
-	require.Equal(t, 2, len(txs))
+	require.Equal(t, 1, len(txs))
 
 	// Check JSON API
 	jsonApiUrl := bundleJsonApi.URL + "/bundle?id=" + bundleId
@@ -537,7 +537,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	err = json.Unmarshal(body, bundleResponse)
 	require.Nil(t, err, err)
 	require.Equal(t, bundleId, bundleResponse.BundleId)
-	require.Equal(t, 2, len(bundleResponse.RawTxs))
+	require.Equal(t, 1, len(bundleResponse.RawTxs))
 }
 
 func TestWhitehatBundleCollectionGetBalance(t *testing.T) {

@@ -208,7 +208,7 @@ func TestWhitehatTx(t *testing.T) {
 
 	// add #1
 	tx1 := "0xa12345"
-	tx2 := "0xb12345"
+	tx2 := "0xb123456"
 	err = redisState.AddTxToWhitehatBundle(bundleId, tx1)
 	require.Nil(t, err, err)
 
@@ -216,6 +216,8 @@ func TestWhitehatTx(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, 1, len(txs))
 
+	err = redisState.AddTxToWhitehatBundle(bundleId, tx1)
+	require.Nil(t, err, err)
 	err = redisState.AddTxToWhitehatBundle(bundleId, tx2)
 	require.Nil(t, err, err)
 
