@@ -194,8 +194,18 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
 	key := RedisKeyWhitehatBundleTransactions(bundleId)
 
+	// Check if item already exists
+	txs, err := s.GetWhitehatBundleTx(bundleId)
+	if err == nil {
+		for _, tx := range txs {
+			if signedTx == tx {
+				return nil
+			}
+		}
+	}
+
 	// Add item
-	err := s.RedisClient.LPush(context.Background(), key, signedTx).Err()
+	err = s.RedisClient.LPush(context.Background(), key, signedTx).Err()
 	if err != nil {
 		return err
 	}
