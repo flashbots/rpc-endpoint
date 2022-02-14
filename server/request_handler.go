@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/flashbots/rpc-endpoint/utils"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -32,14 +32,19 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		relaySigningKey: relaySigningKey,
+		uid:             uuid.New().String(),
 	}
 }
 
 func (r *RpcRequestHandler) process() {
+	// Logger setup
+	r.logger = log.New(log.Ctx{"uid": r.uid})
+	r.logger.Info("[process] POST request received")
+
 	// At end of request, log the time it needed
 	defer func() {
 		timeRequestNeeded := time.Since(r.timeStarted)
-		log.Info("Request finished", "secNeeded", timeRequestNeeded.Seconds())
+		log.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
 	}()
 
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
@@ -47,11 +52,6 @@ func (r *RpcRequestHandler) process() {
 
 	ip := utils.GetIP(r.req)             // Fetch ip
 	origin := r.req.Header.Get("Origin") // Fetch origin
-
-	// Logger setup
-	r.uid = uuid.New().String()
-	r.logger = log.New(log.Ctx{"uid": r.uid})
-	r.logger.Info("[process] POST request received")
 
 	// Validate if ip blacklisted
 	if IsBlacklisted(ip) {
