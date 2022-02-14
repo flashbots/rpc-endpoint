@@ -3,21 +3,22 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"time"
+	"fmt"
+	"github.com/google/uuid"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/flashbots/rpc-endpoint/utils"
-	"github.com/google/uuid"
+	"io/ioutil"
+	"net/http"
+	"time"
 )
 
 // RPC request handler for a single/ batch JSON-RPC request
 type RpcRequestHandler struct {
 	respw           *http.ResponseWriter
 	req             *http.Request
-	logger          Logger
+	logger          log.Logger
 	timeStarted     time.Time
 	defaultProxyUrl string
 	relaySigningKey *ecdsa.PrivateKey
@@ -31,14 +32,19 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		relaySigningKey: relaySigningKey,
+		uid:             uuid.New().String(),
 	}
 }
 
 func (r *RpcRequestHandler) process() {
+	// Logger setup
+	r.logger = log.New(log.Ctx{"uid": r.uid})
+	r.logger.Info("[process] POST request received")
+
 	// At end of request, log the time it needed
 	defer func() {
 		timeRequestNeeded := time.Since(r.timeStarted)
-		r.logger.log("request took %.6f sec", timeRequestNeeded.Seconds())
+		r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
 	}()
 
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
@@ -47,13 +53,9 @@ func (r *RpcRequestHandler) process() {
 	ip := utils.GetIP(r.req)             // Fetch ip
 	origin := r.req.Header.Get("Origin") // Fetch origin
 
-	// Logger setup
-	r.uid = uuid.New().String()
-	r.logger = NewLogger(r.uid)
-
 	// Validate if ip blacklisted
 	if IsBlacklisted(ip) {
-		r.logger.log("Blocked IP: %s", ip)
+		r.logger.Info("[process] Blocked IP", "ip", ip)
 		(*r.respw).WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -63,14 +65,14 @@ func (r *RpcRequestHandler) process() {
 	customProxyUrl, ok := r.req.URL.Query()["url"]
 	if ok && len(customProxyUrl[0]) > 1 {
 		r.defaultProxyUrl = customProxyUrl[0]
-		r.logger.log("Using custom url: %s", r.defaultProxyUrl)
+		r.logger.Info("[process] Using custom url", "url", r.defaultProxyUrl)
 	}
 
 	// Decode request JSON RPC
 	defer r.req.Body.Close()
 	body, err := ioutil.ReadAll(r.req.Body)
 	if err != nil {
-		r.logger.logError("failed to read request body: %v", err)
+		r.logger.Error("[process] Failed to read request body", "error", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -85,7 +87,7 @@ func (r *RpcRequestHandler) process() {
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
-			r.logger.logError("Parse payload %v", err)
+			r.logger.Error("[process] Parse payload", "error", err)
 			(*r.respw).WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -115,7 +117,7 @@ func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcReq
 		// Scatter worker
 		go func(count int, rpcReq *types.JsonRpcRequest) {
 			// Create child logger
-			l := r.logger.CreateChildLogger(strconv.FormatInt(int64(count), 10))
+			l := log.New(log.Ctx{"uid": fmt.Sprintf("%s.%d", r.uid, count)})
 			// Create rpc request
 			req := NewRpcRequest(l, rpcReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
 			res := req.ProcessRequest()

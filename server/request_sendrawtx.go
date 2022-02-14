@@ -15,45 +15,45 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// JSON-RPC sanity checks
 	if len(r.jsonReq.Params) < 1 {
-		r.logger.log("no params for eth_sendRawTransaction")
+		r.logger.Info("[sendRawTransaction] No params for eth_sendRawTransaction")
 		r.writeRpcError("empty params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 		return
 	}
 
 	if r.jsonReq.Params[0] == nil {
-		r.logger.log("nil param for eth_sendRawTransaction")
+		r.logger.Info("[sendRawTransaction]  Nil param for eth_sendRawTransaction")
 		r.writeRpcError("nil params for eth_sendRawTransaction", types.JsonRpcInvalidParams)
 	}
 
 	r.rawTxHex = r.jsonReq.Params[0].(string)
 	if len(r.rawTxHex) < 2 {
-		r.logger.logError("invalid raw transaction (wrong length)")
+		r.logger.Error("[sendRawTransaction] Invalid raw transaction (wrong length)")
 		r.writeRpcError("invalid raw transaction param (wrong length)", types.JsonRpcInvalidParams)
 		return
 	}
 
-	r.logger.log("rawTx: %s", r.rawTxHex)
+	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
 
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
-		r.logger.log("reading transaction object failed - rawTx: %s", r.rawTxHex)
+		r.logger.Info("[sendRawTransaction] Reading transaction object failed", "tx", r.rawTxHex)
 		r.writeRpcError(fmt.Sprintf("reading transaction object failed - rawTx: %s", r.rawTxHex), types.JsonRpcInvalidRequest)
 		return
 	}
 
-	// Get tx from address
+	// Get address from tx
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
-		r.logger.log("couldn't get address from rawTx: %v", err)
+		r.logger.Info("[sendRawTransaction] Couldn't get address from rawTx", "error", err)
 		r.writeRpcError(fmt.Sprintf("couldn't get address from rawTx: %v", err), types.JsonRpcInvalidRequest)
 		return
 	}
 
-	r.logger.log("txHash: %s - from: %s / to: %s / nonce: %d / gasPrice: %s", r.tx.Hash(), r.txFrom, utils.AddressPtrToStr(r.tx.To()), r.tx.Nonce(), utils.BigIntPtrToStr(r.tx.GasPrice()))
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", utils.AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", utils.BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
-		r.logger.log("tx rejected - nonce too high: %d - %s from %s / origin: %s", r.tx.Nonce(), r.tx.Hash(), txFromLower, r.origin)
+		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txHash", r.tx.Hash(), "txFromLower", txFromLower, "origin", r.origin)
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -63,11 +63,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
 	if err != nil {
-		r.logger.logError("redis:SetSenderOfTxHash failed: %v", err)
+		r.logger.Error("[sendRawTransaction] Redis:SetSenderOfTxHash failed: %v", err)
 	}
 
 	if isOnOFACList(r.txFrom) {
-		r.logger.log("BLOCKED TX FROM OFAC SANCTIONED ADDRESS")
+		r.logger.Info("[sendRawTransaction] Blocked tx from ofac sanctioned address", "txFrom", r.txFrom)
 		r.writeRpcError("blocked tx from ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -77,10 +77,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// If users specify a bundle ID, cache this transaction
 	if r.isWhitehatBundleCollection {
-		r.logger.log("[WhitehatBundleCollection] adding tx to bundle %s txData: %s", r.whitehatBundleId, r.rawTxHex)
+		r.logger.Info("[WhitehatBundleCollection] Adding tx to bundle", "whiteHatBundleId", r.whitehatBundleId, "tx", r.rawTxHex)
 		err = RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
 		if err != nil {
-			r.logger.logError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", err)
+			r.logger.Error("[WhitehatBundleCollection] AddTxToWhitehatBundle failed", "error", err)
 			r.writeRpcError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", types.JsonRpcInternalError)
 			return
 		}
@@ -97,7 +97,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 		// It's a cancel-tx for the mempool
 		needsProtection = false
-		r.logger.log("[cancel-tx] sending to mempool for %s/%d", txFromLower, r.tx.Nonce())
+		r.logger.Info("[cancel-tx] Sending to mempool", "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
 	}
 
 	if needsProtection {
@@ -106,7 +106,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	if DebugDontSendTx {
-		r.logger.log("faked sending tx to mempool, did nothing")
+		r.logger.Info("[sendRawTransaction] Faked sending tx to mempool, did nothing")
 		r.writeRpcResult(r.tx.Hash().Hex())
 		return
 	}
@@ -116,7 +116,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
-		r.logger.logError("Proxy to mempool failed: eth_sendRawTransaction")
+		r.logger.Error("[sendRawTransaction] Proxy to mempool failed")
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
@@ -125,9 +125,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
 	if r.jsonRes.Error != nil {
-		r.logger.log("Proxied eth_sendRawTransaction to mempool - with JSON-RPC Error %s", r.jsonRes.Error.Message)
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "JSON-RPC Error", r.jsonRes.Error.Message)
 	} else {
-		r.logger.log("Proxied eth_sendRawTransaction to mempool")
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
 	}
 }
 
@@ -135,7 +135,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 // for example simple ERC20 transfers.
 func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) bool {
 	gas := tx.Gas()
-	r.logger.log("[protect-check] gas: %v", gas)
+	r.logger.Info("[protect-check]", "gas", gas)
 
 	// Flashbots Relay will reject anything less than 42000 gas, so we just send those to the mempool
 	// Anyway things with that low of gas probably don't need frontrunning protection regardless
@@ -144,7 +144,7 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	}
 
 	data := hex.EncodeToString(tx.Data())
-	r.logger.log("[protect-check] tx-data: %v", data)
+	r.logger.Info("[protect-check] ", "tx-data", data)
 
 	if len(data) < 8 {
 		return false
@@ -153,7 +153,7 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	if isOnFunctionWhiteList(data[0:8]) {
 		return false // function being called is on our whitelist and no protection needed
 	} else {
-		r.logger.log("[protect-check] tx needs protection - function: %v", data[0:8])
+		r.logger.Info("[protect-check] Tx needs protection - function", "tx-data", data[0:8])
 		return true // needs protection if not on whitelist
 	}
 }

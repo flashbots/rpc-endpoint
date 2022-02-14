@@ -3,19 +3,19 @@ package main
 import (
 	"crypto/ecdsa"
 	"flag"
-	"fmt"
-	"log"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/rpc-endpoint/server"
 	"os"
 	"strings"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flashbots/rpc-endpoint/server"
 )
 
 var (
 	version = "dev" // is set during build process
 
 	// defaults
+	defaultDebug         = os.Getenv("DEBUG") == "1"
+	defaultLogJSON       = os.Getenv("LOG_JSON") == "1"
 	defaultListenAddress = "127.0.0.1:9000"
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
@@ -28,6 +28,8 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
+	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
+	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
 )
 
 func main() {
@@ -35,37 +37,48 @@ func main() {
 	var err error
 
 	flag.Parse()
+	logFormat := log.TerminalFormat(true)
+	if *logJSONPtr {
+		logFormat = log.JSONFormat()
+	}
 
+	logLevel := log.LvlInfo
+	if *debugPtr {
+		logLevel = log.LvlDebug
+	}
+
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
 	// Perhaps print only the version
 	if *versionPtr {
-		fmt.Printf("rpc-endpoint %s\n", version)
+		log.Info("rpc-endpoint", "version", version)
 		return
 	}
 
-	log.Printf("rpc-endpoint %s\n", version)
+	log.Info("Init rpc-endpoint", "version", version)
 
 	if *relaySigningKey == "" {
-		log.Fatal("Cannot use the relay without a signing key.")
+		log.Error("Cannot use the relay without a signing key.")
+		return
 	}
 
 	pkHex := strings.Replace(*relaySigningKey, "0x", "", 1)
 	if pkHex == "dev" {
-		log.Println("Creating a new dev signing key...")
+		log.Info("Creating a new dev signing key...")
 		key, err = crypto.GenerateKey()
 	} else {
 		key, err = crypto.HexToECDSA(pkHex)
 	}
 
 	if err != nil {
-		log.Fatal("Error with relay signing key:", err)
+		log.Error("Error with relay signing key", "error", err)
+		return
 	}
-
-	log.Printf("Signing key: %s\n", crypto.PubkeyToAddress(key.PublicKey).Hex())
 
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl)
 	if err != nil {
-		log.Fatal("Server init error:", err)
+		log.Error("Server init error", "error", err)
+		return
 	}
 	s.Start()
 }

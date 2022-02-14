@@ -3,14 +3,13 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"log"
+	"github.com/ethereum/go-ethereum/log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
 	"time"
-
-	_ "net/http/pprof"
 
 	"github.com/alicebob/miniredis"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -30,10 +29,6 @@ var RState *RedisState
 
 var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
 
-func init() {
-	log.SetOutput(os.Stdout)
-}
-
 type RpcEndPointServer struct {
 	version         string
 	startTime       time.Time
@@ -46,11 +41,11 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	var err error
 
 	if DebugDontSendTx {
-		log.Println("DEBUG MODE: raw transactions will not be sent out!")
+		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
 	}
 
 	if redisUrl == "dev" {
-		log.Println("Using integrated in-memory Redis instance")
+		log.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
 		redisServer, err := miniredis.Run()
 		if err != nil {
 			return nil, err
@@ -59,7 +54,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	}
 
 	// Setup redis connection
-	log.Println("Connecting to redis at", redisUrl, "...")
+	log.Info("Connecting to redis...", "redisUrl", redisUrl)
 	RState, err = NewRedisState(redisUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")
@@ -78,12 +73,12 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Printf("Starting rpc endpoint %s at %v...", s.version, s.listenAddress)
+	log.Info("[Start] Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
 
 	// Regularly log debug info
 	go func() {
 		for {
-			log.Printf("num-goroutines: %d", runtime.NumGoroutine())
+			log.Info("[Start] Num-goroutines", "count", runtime.NumGoroutine())
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -95,7 +90,7 @@ func (s *RpcEndPointServer) Start() {
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
-		log.Fatalf("Failed to start rpc endpoint: %v", err)
+		log.Error("[Start] Failed to start rpc endpoint", "error", err)
 	}
 }
 
@@ -126,7 +121,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 
 	jsonResp, err := json.Marshal(res)
 	if err != nil {
-		log.Println("healthCheck json error:", err)
+		log.Info("[healthCheck] Json error", "error", err)
 		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -149,7 +144,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 	if req.Method == "GET" {
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
-			log.Printf("[handleBundleRequest] ERROR: GetWhitehatBundleTx for %s failed: %v\n", bundleId, err)
+			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -161,7 +156,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 		jsonResp, err := json.Marshal(res)
 		if err != nil {
-			log.Println("[handleBundleRequest] ERROR json marshal failed:", err)
+			log.Info("[handleBundleRequest] Json marshal failed", "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}

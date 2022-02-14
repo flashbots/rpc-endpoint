@@ -36,7 +36,7 @@ func (r *RpcRequestHandler) _writeRpcResponse(res *types.JsonRpcResponse) {
 
 	// Write response
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
-		r.logger.logError("failed writing rpc response: %v", err)
+		r.logger.Error("[_writeRpcResponse] Failed writing rpc response", "error", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -46,7 +46,7 @@ func (r *RpcRequestHandler) _writeRpcBatchResponse(res []*types.JsonRpcResponse)
 	(*r.respw).WriteHeader(http.StatusOK)
 	// Write response
 	if err := json.NewEncoder(*r.respw).Encode(res); err != nil {
-		r.logger.logError("failed writing rpc response: %v", err)
+		r.logger.Error("[_writeRpcBatchResponse] Failed writing rpc response", "error", err)
 		(*r.respw).WriteHeader(http.StatusInternalServerError)
 	}
 }
