@@ -1,20 +1,16 @@
 package server
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"io/ioutil"
-	"math/big"
-	"net/http"
-	"strconv"
-	"time"
-
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"math/big"
+	"net/http"
 )
 
 func Min(a uint64, b uint64) uint64 {
@@ -29,22 +25,6 @@ func Max(a uint64, b uint64) uint64 {
 		return a
 	}
 	return b
-}
-
-func (r *RpcRequest) ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
-	// Create new request:
-	req, err := http.NewRequest("POST", proxyUrl, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
-
-	client := &http.Client{
-		Timeout: time.Duration(10 * time.Second),
-	}
-	return client.Do(req)
 }
 
 func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
