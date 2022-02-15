@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -102,4 +103,33 @@ type RelayErrorResponse struct {
 type BundleResponse struct {
 	BundleId string   `json:"bundleId"`
 	RawTxs   []string `json:"rawTxs"`
+}
+
+type EthSendRawTransactionModel struct {
+	Id                         uuid.UUID     `db:"id"`
+	ReceivedAt                 time.Time     `db:"received_at"`
+	InsertedAt                 time.Time     `db:"inserted_at"`
+	RequestDuration            time.Duration `db:"request_duration"`
+	RequestType                string        `db:"request_type"`
+	HttpMethod                 string        `db:"http_method"`
+	HttpUrl                    string        `db:"http_url"`
+	HttpQueryParam             string        `db:"http_query_param"`
+	HttpResponseStatus         int           `db:"http_response_status"`
+	Ip                         string        `db:"ip"`
+	Origin                     string        `db:"origin"`
+	Host                       string        `db:"host"`
+	IsOnOafcList               string        `db:"is_on_oafc_list"`
+	IsWhiteHatBundleCollection bool          `db:"is_white_hat_bundle_collection"`
+	WhiteHatBundleId           string        `db:"white_hat_bundle_id"`
+	IsCancelTx                 bool          `db:"is_cancel_tx"`
+	IsTxSentToRelay            bool          `db:"is_tx_sent_to_relay"`
+	IsBlockedBczAlreadySent    bool          `db:"is_blocked_bcz_already_sent"`
+	Error                      string        `db:"error"`
+	TxRaw                      string        `db:"tx_raw"`
+	TxHash                     string        `db:"tx_hash"`
+	TxFrom                     string        `db:"tx_from"`
+	TxTo                       string        `db:"tx_to"`
+	TxNonce                    int           `db:"tx_nonce"`
+	TxData                     string        `db:"tx_data"`
+	TxSmartContractMethod      string        `db:"tx_smart_contract_method"`
 }
