@@ -104,7 +104,7 @@ func IsMetamaskMoz(r *http.Request) bool {
 	return r.Header.Get("Origin") == "moz-extension://57f9aaf6-270a-154f-9a8a-632d0db4128c"
 }
 
-func ParseResponseTo(resp *http.Response) (*types.JsonRpcResponse, error) {
+func ParseJsonRPCResponse(resp *http.Response) (*types.JsonRpcResponse, error) {
 	respData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read")

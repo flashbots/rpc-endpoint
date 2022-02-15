@@ -22,7 +22,7 @@ import (
 
 type RpcRequest struct {
 	logger                     log.Logger
-	client                     HttpClient
+	client                     RPCProxyClient
 	jsonReq                    *types.JsonRpcRequest
 	jsonRes                    *types.JsonRpcResponse
 	rawTxHex                   string
@@ -35,7 +35,7 @@ type RpcRequest struct {
 	whitehatBundleId           string
 }
 
-func NewRpcRequest(logger log.Logger, client HttpClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -315,15 +315,15 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	_req := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{r.txFrom, "latest"})
 	jsonData, err := json.Marshal(_req)
 	if err != nil {
-		r.logger.Error("[sendTxToRelay] eth_getTransactionCount marshal failed", "error", err)
+		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount marshal failed", "error", err)
 		return 0, 0, err
 	}
 	httpRes, err := r.client.ProxyRequest(jsonData)
 	if err != nil {
-		r.logger.Error("[sendTxToRelay] eth_getTransactionCount proxy request failed", "error", err)
+		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount proxy request failed", "error", err)
 		return 0, 0, err
 	}
-	_res, err := ParseResponseTo(httpRes)
+	_res, err := ParseJsonRPCResponse(httpRes)
 	if err != nil {
 		r.logger.Error("[sendTxToRelay] eth_getTransactionCount parsing response failed", "error", err)
 		return 0, 0, err
@@ -331,7 +331,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	_userNonceStr := ""
 	err = json.Unmarshal(_res.Result, &_userNonceStr)
 	if err != nil {
-		r.logger.Error("[sendTxToRelay] eth_getTransactionCount unmarshall failed", "error", err, "result", _res.Result)
+		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount unmarshall failed", "error", err, "result", _res.Result)
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}

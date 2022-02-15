@@ -81,8 +81,8 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	// create http client for making proxy request
-	client := NewHttpClient(r.defaultProxyUrl)
+	// create rpc proxy client for making proxy request
+	client := NewRPCProxyClient(r.defaultProxyUrl)
 
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
@@ -103,7 +103,7 @@ func (r *RpcRequestHandler) process() {
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client HttpClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 	res := rpcReq.ProcessRequest()
@@ -112,7 +112,7 @@ func (r *RpcRequestHandler) processRequest(client HttpClient, jsonReq *types.Jso
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(client HttpClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request
