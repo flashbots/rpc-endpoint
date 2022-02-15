@@ -12,8 +12,8 @@ type RPCProxyClient interface {
 }
 
 type rpcProxyClient struct {
-	httpClient http.Client // http client for making proxy request
-	proxyURL   string      // target URL
+	httpClient http.Client
+	proxyURL   string
 }
 
 func NewRPCProxyClient(proxyURL string) RPCProxyClient {
