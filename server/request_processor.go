@@ -17,18 +17,17 @@ import (
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/flashbots/rpc-endpoint/utils"
 	"github.com/metachris/flashbotsrpc"
 )
 
 type RpcRequest struct {
 	logger                     log.Logger
+	client                     HttpClient
 	jsonReq                    *types.JsonRpcRequest
 	jsonRes                    *types.JsonRpcResponse
 	rawTxHex                   string
 	tx                         *ethtypes.Transaction
 	txFrom                     string
-	defaultProxyUrl            string
 	relaySigningKey            *ecdsa.PrivateKey
 	ip                         string
 	origin                     string
@@ -36,11 +35,11 @@ type RpcRequest struct {
 	whitehatBundleId           string
 }
 
-func NewRpcRequest(logger log.Logger, jsonReq *types.JsonRpcRequest, defaultProxyUrl string, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client HttpClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
+		client:                     client,
 		jsonReq:                    jsonReq,
-		defaultProxyUrl:            defaultProxyUrl,
 		relaySigningKey:            relaySigningKey,
 		ip:                         ip,
 		origin:                     origin,
@@ -66,7 +65,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 			r.WhitehatBalanceCheckerRewrite()
 		}
 		// Proxy the request to a node
-		readJsonRpcSuccess := r.proxyRequestRead(r.defaultProxyUrl)
+		readJsonRpcSuccess := r.proxyRequestRead()
 		if !readJsonRpcSuccess {
 			r.logger.Info("[ProcessRequest] Proxy to node failed", "method", r.jsonReq.Method)
 			r.writeRpcError("internal server error", types.JsonRpcInternalError)
@@ -86,9 +85,8 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 }
 
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
-func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSuccess bool) {
+func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	timeProxyStart := Now() // for measuring execution time
-	r.logger.Info("[proxyRequestRead] ProxyRequest to", "url", proxyUrl)
 
 	body, err := json.Marshal(r.jsonReq)
 	if err != nil {
@@ -97,7 +95,7 @@ func (r *RpcRequest) proxyRequestRead(proxyUrl string) (readJsonRpsResponseSucce
 	}
 
 	// Proxy request
-	proxyResp, err := ProxyRequest(proxyUrl, body)
+	proxyResp, err := r.client.ProxyRequest(body)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to make proxy request", "error", err, "response", proxyResp)
 		if proxyResp == nil {
@@ -315,8 +313,19 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce uint64, err error) {
 	// Get minimum nonce by asking the eth node for the current transaction count
 	_req := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{r.txFrom, "latest"})
-	_res, err := utils.SendRpcAndParseResponseTo(r.defaultProxyUrl, _req)
+	jsonData, err := json.Marshal(_req)
 	if err != nil {
+		r.logger.Error("[sendTxToRelay] eth_getTransactionCount marshal failed", "error", err)
+		return 0, 0, err
+	}
+	httpRes, err := r.client.ProxyRequest(jsonData)
+	if err != nil {
+		r.logger.Error("[sendTxToRelay] eth_getTransactionCount proxy request failed", "error", err)
+		return 0, 0, err
+	}
+	_res, err := ParseResponseTo(httpRes)
+	if err != nil {
+		r.logger.Error("[sendTxToRelay] eth_getTransactionCount parsing response failed", "error", err)
 		return 0, 0, err
 	}
 	_userNonceStr := ""

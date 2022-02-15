@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/flashbots/rpc-endpoint/utils"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -50,7 +49,7 @@ func (r *RpcRequestHandler) process() {
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
 	isWhitehatBundleCollection := whitehatBundleId != ""
 
-	ip := utils.GetIP(r.req)             // Fetch ip
+	ip := GetIP(r.req)                   // Fetch ip
 	origin := r.req.Header.Get("Origin") // Fetch origin
 
 	// Validate if ip blacklisted
@@ -82,6 +81,9 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
+	// create http client for making proxy request
+	client := NewHttpClient(r.defaultProxyUrl)
+
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
@@ -92,34 +94,34 @@ func (r *RpcRequestHandler) process() {
 			return
 		}
 		// Process batch request
-		r.processBatchRequest(jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 		return
 	}
 
 	// Process single request
-	r.processRequest(jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processRequest(client HttpClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, jsonReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processBatchRequest(client HttpClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request
 		// Scatter worker
 		go func(count int, rpcReq *types.JsonRpcRequest) {
 			// Create child logger
-			l := log.New(log.Ctx{"uid": fmt.Sprintf("%s.%d", r.uid, count)})
+			logger := log.New(log.Ctx{"uid": fmt.Sprintf("%s.%d", r.uid, count)})
 			// Create rpc request
-			req := NewRpcRequest(l, rpcReq, r.defaultProxyUrl, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
+			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i])

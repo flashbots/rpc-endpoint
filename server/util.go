@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,7 +31,7 @@ func Max(a uint64, b uint64) uint64 {
 	return b
 }
 
-func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
+func (r *RpcRequest) ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
 	// Create new request:
 	req, err := http.NewRequest("POST", proxyUrl, bytes.NewBuffer(body))
 	if err != nil {
@@ -102,4 +104,60 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	}
 
 	return respObj, nil
+}
+
+func GetIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		return forwarded
+	}
+	return r.RemoteAddr
+}
+
+// CHROME_ID: nkbihfbeogaeaoehlefnkodbefgpgknn
+func IsMetamask(r *http.Request) bool {
+	return r.Header.Get("Origin") == "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn"
+}
+
+// FIREFOX_ID: webextension@metamask.io
+func IsMetamaskMoz(r *http.Request) bool {
+	return r.Header.Get("Origin") == "moz-extension://57f9aaf6-270a-154f-9a8a-632d0db4128c"
+}
+
+func ParseResponseTo(resp *http.Response) (*types.JsonRpcResponse, error) {
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read")
+	}
+
+	jsonRpcResp := new(types.JsonRpcResponse)
+
+	// Check if returned an error, if so then convert to standard JSON-RPC error
+	errorResp := new(types.RelayErrorResponse)
+	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
+		// relay returned an error, convert to standard JSON-RPC error now
+		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
+		return jsonRpcResp, nil
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
+	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+		return nil, errors.Wrap(err, "unmarshal")
+	}
+
+	return jsonRpcResp, nil
+}
+
+func BigIntPtrToStr(i *big.Int) string {
+	if i == nil {
+		return ""
+	}
+	return i.String()
+}
+
+func AddressPtrToStr(a *common.Address) string {
+	if a == nil {
+		return ""
+	}
+	return a.Hex()
 }

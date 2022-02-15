@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/flashbots/rpc-endpoint/utils"
 )
 
 func (r *RpcRequest) handle_sendRawTransaction() {
@@ -49,7 +48,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", utils.AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", utils.BigIntPtrToStr(r.tx.GasPrice()))
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	if r.tx.Nonce() >= 1e9 {
@@ -112,7 +111,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Proxy to public node now
-	readJsonRpcSuccess := r.proxyRequestRead(r.defaultProxyUrl)
+	readJsonRpcSuccess := r.proxyRequestRead()
 
 	// Log after proxying
 	if !readJsonRpcSuccess {
