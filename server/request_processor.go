@@ -7,13 +7,13 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"github.com/ethereum/go-ethereum/log"
 	"io/ioutil"
 	"math/big"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -49,7 +49,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 }
 
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
-	r.logger.Info("JSON-RPC request", "ip", r.ip, "method", r.jsonReq.Method, "goroutines", runtime.NumGoroutine())
+	r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "origin", r.origin, "ip", r.ip)
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
