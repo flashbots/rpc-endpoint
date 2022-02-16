@@ -1,18 +1,16 @@
 package server
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"time"
-
+	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"math/big"
+	"net/http"
 )
 
 func Min(a uint64, b uint64) uint64 {
@@ -27,22 +25,6 @@ func Max(a uint64, b uint64) uint64 {
 		return a
 	}
 	return b
-}
-
-func ProxyRequest(proxyUrl string, body []byte) (*http.Response, error) {
-	// Create new request:
-	req, err := http.NewRequest("POST", proxyUrl, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
-
-	client := &http.Client{
-		Timeout: time.Duration(10 * time.Second),
-	}
-	return client.Do(req)
 }
 
 func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
@@ -102,4 +84,60 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 	}
 
 	return respObj, nil
+}
+
+func GetIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		return forwarded
+	}
+	return r.RemoteAddr
+}
+
+// CHROME_ID: nkbihfbeogaeaoehlefnkodbefgpgknn
+func IsMetamask(r *http.Request) bool {
+	return r.Header.Get("Origin") == "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn"
+}
+
+// FIREFOX_ID: webextension@metamask.io
+func IsMetamaskMoz(r *http.Request) bool {
+	return r.Header.Get("Origin") == "moz-extension://57f9aaf6-270a-154f-9a8a-632d0db4128c"
+}
+
+func ParseJsonRPCResponse(resp *http.Response) (*types.JsonRpcResponse, error) {
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "read")
+	}
+
+	jsonRpcResp := new(types.JsonRpcResponse)
+
+	// Check if returned an error, if so then convert to standard JSON-RPC error
+	errorResp := new(types.RelayErrorResponse)
+	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
+		// relay returned an error, convert to standard JSON-RPC error now
+		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
+		return jsonRpcResp, nil
+	}
+
+	// Unmarshall JSON-RPC response and check for error inside
+	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+		return nil, errors.Wrap(err, "unmarshal")
+	}
+
+	return jsonRpcResp, nil
+}
+
+func BigIntPtrToStr(i *big.Int) string {
+	if i == nil {
+		return ""
+	}
+	return i.String()
+}
+
+func AddressPtrToStr(a *common.Address) string {
+	if a == nil {
+		return ""
+	}
+	return a.Hex()
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/flashbots/rpc-endpoint/testutils"
 	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/flashbots/rpc-endpoint/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -145,7 +144,7 @@ func TestNetVersionIntercept(t *testing.T) {
 
 	// eth_call intercept
 	req := types.NewJsonRpcRequest(1, "net_version", nil)
-	res, err := utils.SendRpcAndParseResponseTo(RpcBackendServerUrl, req)
+	res, err := testutils.SendRpcAndParseResponseTo(RpcBackendServerUrl, req)
 	require.Nil(t, err, err)
 	json.Unmarshal(res.Result, &rpcResult)
 	require.Equal(t, "3", rpcResult, "net_version from backend")
@@ -202,7 +201,7 @@ func TestGetTxReceiptNull(t *testing.T) {
 	// fmt.Println(jsonResp)
 	require.Equal(t, "null", string(jsonResp.Result))
 
-	jsonResp, err := utils.SendRpcAndParseResponseTo(RpcBackendServerUrl, req_getTransactionCount)
+	jsonResp, err := testutils.SendRpcAndParseResponseTo(RpcBackendServerUrl, req_getTransactionCount)
 	require.Nil(t, err, err)
 
 	fmt.Println(jsonResp)
@@ -503,7 +502,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
-	resp, err := utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
+	resp, err := testutils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
 	require.Nil(t, err, err)
 	require.Nil(t, resp.Error, resp.Error)
 
@@ -516,7 +515,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	require.Equal(t, 1, len(txs))
 
 	// Send again (#2)
-	resp, err = utils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
+	resp, err = testutils.SendRpcAndParseResponseTo(url, req_sendRawTransaction)
 	require.Nil(t, err, err)
 	require.Nil(t, resp.Error, resp.Error)
 
@@ -547,7 +546,7 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getBalance", []interface{}{testutils.TestTx_MM2_From, "latest"})
-	resp, err := utils.SendRpcAndParseResponseTo(url, req_getTransactionCount)
+	resp, err := testutils.SendRpcAndParseResponseTo(url, req_getTransactionCount)
 	require.Nil(t, err, err)
 	require.Nil(t, resp.Error, resp.Error)
 	val := ""
