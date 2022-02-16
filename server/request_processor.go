@@ -325,7 +325,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 	}
 	_res, err := ParseJsonRPCResponse(httpRes)
 	if err != nil {
-		r.logger.Error("[sendTxToRelay] eth_getTransactionCount parsing response failed", "error", err)
+		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount parsing response failed", "error", err)
 		return 0, 0, err
 	}
 	_userNonceStr := ""
