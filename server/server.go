@@ -3,13 +3,14 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/alicebob/miniredis"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -61,7 +62,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 	}
 
 	FlashbotsRPC = flashbotsrpc.New(relayUrl)
-	FlashbotsRPC.Debug = true
+	// FlashbotsRPC.Debug = true
 
 	return &RpcEndPointServer{
 		startTime:       Now(),
@@ -73,12 +74,12 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Info("[Start] Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
+	log.Info("Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
 
 	// Regularly log debug info
 	go func() {
 		for {
-			log.Info("[Start] Num-goroutines", "count", runtime.NumGoroutine())
+			log.Info("[stats] num-goroutines", "count", runtime.NumGoroutine())
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -90,7 +91,7 @@ func (s *RpcEndPointServer) Start() {
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
-		log.Error("[Start] Failed to start rpc endpoint", "error", err)
+		log.Error("http server failed", "error", err)
 	}
 }
 
