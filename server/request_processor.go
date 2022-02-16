@@ -79,7 +79,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 				return r.jsonRes
 			}
 		}
-		r.logger.Info("[ProcessRequest] Proxy to node successful", "method", r.jsonReq.Method)
+		// r.logger.Info("[ProcessRequest] Proxy to node successful", "method", r.jsonReq.Method)
 	}
 	return r.jsonRes
 }
