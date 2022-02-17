@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -33,9 +34,11 @@ type RpcRequest struct {
 	origin                     string
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
+	reqRecord                  *RequestRecord
+	id                         uuid.UUID
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, reqRecord *RequestRecord, id uuid.UUID) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -45,6 +48,8 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		origin:                     origin,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
+		reqRecord:                  reqRecord,
+		id:                         id,
 	}
 }
 
@@ -53,6 +58,9 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
+		r.reqRecord.ethSendRawTxEntry.IsWhiteHatBundleCollection = r.isWhitehatBundleCollection
+		r.reqRecord.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
+		r.reqRecord.ethSendRawTxEntry.Id = r.id
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
@@ -176,7 +184,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		r.logger.Error("[sendTxToRelay] Redis:SetTxSentToRelay failed", "error", err)
 	}
-
+	r.reqRecord.ethSendRawTxEntry.IsTxSentToRelay = true
 	txTo := r.tx.To()
 	if txTo == nil {
 		r.writeRpcError("invalid target", types.JsonRpcInternalError)

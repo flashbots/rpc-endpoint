@@ -1,14 +1,14 @@
 package server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
-	"github.com/google/uuid"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/google/uuid"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"time"
 )
@@ -21,36 +21,33 @@ type RpcRequestHandler struct {
 	timeStarted     time.Time
 	defaultProxyUrl string
 	relaySigningKey *ecdsa.PrivateKey
-	uid             string
+	uid             uuid.UUID
+	reqRecord       *RequestRecord
+	jsonReq         *types.JsonRpcRequest
 }
 
-func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey) *RpcRequestHandler {
+func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, reqRecord *RequestRecord) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		respw:           respw,
 		req:             req,
 		timeStarted:     Now(),
 		defaultProxyUrl: proxyUrl,
 		relaySigningKey: relaySigningKey,
-		uid:             uuid.New().String(),
+		uid:             uuid.New(),
+		reqRecord:       reqRecord,
 	}
 }
 
 func (r *RpcRequestHandler) process() {
-	// Logger setup
 	r.logger = log.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")
-
-	// At end of request, log the time it needed
-	defer func() {
-		timeRequestNeeded := time.Since(r.timeStarted)
-		r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
-	}()
-
+	defer r.requestRecord()
+	r.reqRecord.requestEntry.ReceivedAt = r.timeStarted
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
 	isWhitehatBundleCollection := whitehatBundleId != ""
 
-	ip := GetIP(r.req)                   // Fetch ip
-	origin := r.req.Header.Get("Origin") // Fetch origin
+	ip := GetIP(r.req)
+	origin := r.req.Header.Get("Origin")
 
 	// Validate if ip blacklisted
 	if IsBlacklisted(ip) {
@@ -71,12 +68,14 @@ func (r *RpcRequestHandler) process() {
 	defer r.req.Body.Close()
 	body, err := ioutil.ReadAll(r.req.Body)
 	if err != nil {
+		r.reqRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
 		r.logger.Error("[process] Failed to read request body", "error", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if len(body) == 0 {
+		r.reqRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, "empty request body")
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -84,20 +83,26 @@ func (r *RpcRequestHandler) process() {
 	// create rpc proxy client for making proxy request
 	client := NewRPCProxyClient(r.defaultProxyUrl)
 
+	r.reqRecord.UpdateRequestEntry(r.req, http.StatusOK, "")
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
+			r.reqRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
 			r.logger.Error("[process] Parse payload", "error", err)
 			(*r.respw).WriteHeader(http.StatusBadRequest)
 			return
 		}
+		r.jsonReq = jsonReq
+		r.reqRecord.requestEntry.RequestType = "batch"
 		// Process batch request
 		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 		return
 	}
 
+	r.jsonReq = jsonReq
+	r.reqRecord.requestEntry.RequestType = "single"
 	// Process single request
 	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 }
@@ -105,7 +110,7 @@ func (r *RpcRequestHandler) process() {
 // processRequest handles single request
 func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, r.reqRecord, r.uid)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
@@ -119,9 +124,10 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 		// Scatter worker
 		go func(count int, rpcReq *types.JsonRpcRequest) {
 			// Create child logger
-			logger := log.New(log.Ctx{"uid": fmt.Sprintf("%s.%d", r.uid, count)})
+			id := uuid.NewMD5(r.uid, big.NewInt(int64(count)).Bytes())
+			logger := log.New(log.Ctx{"uid": r.uid, "id": id, "count": count})
 			// Create rpc request
-			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId) // Set each individual request
+			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, r.reqRecord, id) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i])
@@ -136,4 +142,15 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 	close(resCh)
 	// Write consolidated response
 	r._writeRpcBatchResponse(response)
+}
+
+func (r *RpcRequestHandler) requestRecord() {
+	timeRequestNeeded := time.Since(r.timeStarted) // At end of request, log the time it needed
+	r.reqRecord.requestEntry.RequestDuration = timeRequestNeeded
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		r.reqRecord.SaveRequestEntryToDB(ctx)
+	}()
+	r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
 }
