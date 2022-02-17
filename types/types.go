@@ -116,10 +116,11 @@ type RequestEntry struct {
 	HttpUrl            string        `db:"http_url"`
 	HttpQueryParam     string        `db:"http_query_param"`
 	HttpResponseStatus int           `db:"http_response_status"`
-	Ip                 string        `db:"ip"`
-	Origin             string        `db:"origin"`
-	Host               string        `db:"host"`
-	Error              string        `json:"error"`
+	IpHash             string        `db:"ip_hash"`
+	//TODO:encode ip
+	Origin string `db:"origin"`
+	Host   string `db:"host"`
+	Error  string `json:"error"`
 }
 
 // EthSendRawTxEntry to store each eth_sendRawTransaction calls

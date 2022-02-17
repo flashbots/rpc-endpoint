@@ -86,9 +86,9 @@ func (s *RpcEndPointServer) Start() {
 	}()
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
-	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
-	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
+	http.HandleFunc("/", s.HandleHttpRequest)
+	http.HandleFunc("/health", s.handleHealthRequest)
+	http.HandleFunc("/bundle", s.HandleBundleRequest)
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -101,12 +101,14 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 	if req.Method == http.MethodGet {
 		s.reqRecord.UpdateRequestEntry(req, http.StatusFound, "requestRedirected")
+		s.reqRecord.SaveRequestEntryToDB()
 		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
 		return
 	}
 
 	if req.Method == http.MethodOptions {
 		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		s.reqRecord.SaveRequestEntryToDB()
 		respw.WriteHeader(http.StatusOK)
 		return
 	}
@@ -140,6 +142,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
 		s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, "no bundle id")
+		s.reqRecord.SaveRequestEntryToDB()
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
@@ -148,6 +151,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
 			s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
+			s.reqRecord.SaveRequestEntryToDB()
 			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
@@ -161,18 +165,21 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 		jsonResp, err := json.Marshal(res)
 		if err != nil {
 			s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
+			s.reqRecord.SaveRequestEntryToDB()
 			log.Info("[handleBundleRequest] Json marshal failed", "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		s.reqRecord.SaveRequestEntryToDB()
 		respw.Header().Set("Content-Type", "application/json")
 		respw.WriteHeader(http.StatusOK)
 		respw.Write(jsonResp)
 
 	} else if req.Method == http.MethodDelete {
 		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		s.reqRecord.SaveRequestEntryToDB()
 		RState.DelWhitehatBundleTx(bundleId)
 		respw.WriteHeader(http.StatusOK)
 

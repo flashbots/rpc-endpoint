@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
@@ -26,22 +25,22 @@ func NewRequestRecord() *RequestRecord {
 	}
 }
 
-func (r *RequestRecord) SaveRequestEntryToDB(ctx context.Context) {
+func (r *RequestRecord) SaveRequestEntryToDB() {
 	r.requestEntry.InsertedAt = time.Now()
-	r.logger.Info("[RequestRecord] requestEntry", "model", r.requestEntry)
-
+	r.logger.Info("[RequestRecord] SaveRequestEntryToDB called", "requestEntry", r.requestEntry)
 }
-func (r *RequestRecord) SaveEthSendRawTxEntryToDB(ctx context.Context) {
-	r.logger.Info("[RequestRecord] eth_sendRawTxDBModel", "model", r.ethSendRawTxEntry)
+func (r *RequestRecord) SaveEthSendRawTxEntryToDB() {
+	r.logger.Info("[RequestRecord] SaveEthSendRawTxEntryToDB called", "EthSendRawTxEntry", r.ethSendRawTxEntry)
 }
 
 func (r *RequestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, error string) {
 	// TODO:Error should be converted to enum
+
 	r.requestEntry.HttpMethod = req.Method
-	r.requestEntry.Ip = GetIP(req)
+	r.requestEntry.IpHash = GetIPHash(req)
 	r.requestEntry.Error = error
-	// TODO: handle url + query param
-	r.requestEntry.HttpUrl = ""
+	r.requestEntry.HttpUrl = req.URL.Path
+	r.requestEntry.HttpQueryParam = req.URL.RawQuery
 	r.requestEntry.HttpResponseStatus = reqStatus
 	r.requestEntry.Origin = req.Header.Get("Origin")
 	r.requestEntry.Host = req.Header.Get("Host")

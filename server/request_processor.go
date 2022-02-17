@@ -4,7 +4,6 @@ Request represents an incoming client request
 package server
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -415,10 +414,6 @@ func (r *RpcRequest) updateRequestRecord(msg string, rpcStatusCode int) {
 			r.reqRecord.ethSendRawTxEntry.Error = msg
 			r.reqRecord.ethSendRawTxEntry.ErrorCode = rpcStatusCode
 		}
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-			r.reqRecord.SaveEthSendRawTxEntryToDB(ctx)
-		}()
+		r.reqRecord.SaveEthSendRawTxEntryToDB()
 	}
 }

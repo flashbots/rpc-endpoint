@@ -1,14 +1,12 @@
 package server
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
 	"io/ioutil"
-	"math/big"
 	"net/http"
 	"time"
 )
@@ -41,7 +39,7 @@ func (r *RpcRequestHandler) process() {
 	r.logger = log.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")
 
-	defer r.requestRecord()
+	defer r.finishRequest()
 	r.reqRecord.requestEntry.ReceivedAt = r.timeStarted
 	r.reqRecord.requestEntry.Id = r.uid
 	r.reqRecord.UpdateRequestEntry(r.req, http.StatusOK, "")
@@ -124,8 +122,8 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 		// Process each individual request
 		// Scatter worker
 		go func(count int, rpcReq *types.JsonRpcRequest) {
+			id := uuid.New()
 			// Create child logger
-			id := uuid.NewMD5(r.uid, big.NewInt(int64(count)).Bytes())
 			logger := log.New(log.Ctx{"uid": r.uid, "id": id, "count": count})
 			// Create rpc request
 			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, r.reqRecord, id) // Set each individual request
@@ -145,13 +143,9 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 	r._writeRpcBatchResponse(response)
 }
 
-func (r *RpcRequestHandler) requestRecord() {
+func (r *RpcRequestHandler) finishRequest() {
 	timeRequestNeeded := time.Since(r.timeStarted) // At end of request, log the time it needed
 	r.reqRecord.requestEntry.RequestDuration = timeRequestNeeded
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-		r.reqRecord.SaveRequestEntryToDB(ctx)
-	}()
+	r.reqRecord.SaveRequestEntryToDB()
 	r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
 }
