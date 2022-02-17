@@ -60,7 +60,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.reqRecord.ethSendRawTxEntry.TxTo = r.tx.To().String()
 	r.reqRecord.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
 	r.reqRecord.ethSendRawTxEntry.TxData = r.tx.Data()
-	if len(r.tx.Data()) > signatureMethodLen {
+	if len(r.tx.Data()) >= signatureMethodLen {
 		r.reqRecord.ethSendRawTxEntry.TxSmartContractMethod = r.tx.Data()[:signatureMethodLen]
 	}
 

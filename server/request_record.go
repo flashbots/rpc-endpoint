@@ -26,7 +26,7 @@ func NewRequestRecord() *RequestRecord {
 }
 
 func (r *RequestRecord) SaveRequestEntryToDB() {
-	r.requestEntry.InsertedAt = time.Now()
+	r.requestEntry.InsertedAt = time.Now() // this will be updated while adding db integration
 	r.logger.Info("[RequestRecord] SaveRequestEntryToDB called", "requestEntry", r.requestEntry)
 }
 func (r *RequestRecord) SaveEthSendRawTxEntryToDB() {
