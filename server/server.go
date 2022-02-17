@@ -74,7 +74,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Info("[Start] Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
+	log.Info("Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
 
 	// Regularly log debug info
 	go func() {
@@ -91,7 +91,7 @@ func (s *RpcEndPointServer) Start() {
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
-		log.Error("[Start] Failed to start rpc endpoint", "error", err)
+		log.Error("http server failed", "error", err)
 	}
 }
 
