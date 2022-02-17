@@ -9,6 +9,10 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
+const (
+	signatureMethodByteLen = 10
+)
+
 func (r *RpcRequest) handle_sendRawTransaction() {
 	var err error
 
@@ -32,17 +36,18 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
-
+	r.reqRecord.ethSendRawTxEntry.TxRaw = r.rawTxHex
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
 		r.logger.Info("[sendRawTransaction] Reading transaction object failed", "tx", r.rawTxHex)
 		r.writeRpcError(fmt.Sprintf("reading transaction object failed - rawTx: %s", r.rawTxHex), types.JsonRpcInvalidRequest)
 		return
 	}
-
+	r.reqRecord.ethSendRawTxEntry.TxHash = r.tx.Hash().String()
 	// Get address from tx
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
+
 		r.logger.Info("[sendRawTransaction] Couldn't get address from rawTx", "error", err)
 		r.writeRpcError(fmt.Sprintf("couldn't get address from rawTx: %v", err), types.JsonRpcInvalidRequest)
 		return
@@ -50,6 +55,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
+
+	r.reqRecord.ethSendRawTxEntry.TxFrom = r.txFrom
+	r.reqRecord.ethSendRawTxEntry.TxTo = r.tx.To().String()
+	r.reqRecord.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
+	r.reqRecord.ethSendRawTxEntry.TxData = r.tx.Data()
+	if len(r.tx.Data()) > signatureMethodByteLen {
+		r.reqRecord.ethSendRawTxEntry.TxSmartContractMethod = r.tx.Data()[:10]
+	}
 
 	if r.tx.Nonce() >= 1e9 {
 		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txHash", r.tx.Hash(), "txFromLower", txFromLower, "origin", r.origin)
@@ -64,8 +77,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	if err != nil {
 		r.logger.Error("[sendRawTransaction] Redis:SetSenderOfTxHash failed: %v", err)
 	}
-
-	if isOnOFACList(r.txFrom) {
+	isOnOfacList := isOnOFACList(r.txFrom)
+	r.reqRecord.ethSendRawTxEntry.IsOnOafcList = isOnOfacList
+	if isOnOfacList {
 		r.logger.Info("[sendRawTransaction] Blocked tx from ofac sanctioned address", "txFrom", r.txFrom)
 		r.writeRpcError("blocked tx from ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
@@ -73,7 +87,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
-
 	// If users specify a bundle ID, cache this transaction
 	if r.isWhitehatBundleCollection {
 		r.logger.Info("[WhitehatBundleCollection] Adding tx to bundle", "whiteHatBundleId", r.whitehatBundleId, "tx", r.rawTxHex)
@@ -90,6 +103,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Check for cancellation-tx
 	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
+		r.reqRecord.ethSendRawTxEntry.IsCancelTx = requestDone
 		if requestDone {
 			return
 		}

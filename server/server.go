@@ -36,11 +36,11 @@ type RpcEndPointServer struct {
 	listenAddress   string
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
+	reqRecord       *RequestRecord
 }
 
 func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
 	var err error
-
 	if DebugDontSendTx {
 		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
 	}
@@ -70,6 +70,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
 		relaySigningKey: relaySigningKey,
+		reqRecord:       NewRequestRecord(),
 	}, nil
 }
 
@@ -98,18 +99,19 @@ func (s *RpcEndPointServer) Start() {
 func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
-
-	if req.Method == "GET" {
+	if req.Method == http.MethodGet {
+		s.reqRecord.UpdateRequestEntry(req, http.StatusFound, "requestRedirected")
 		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
 		return
 	}
 
-	if req.Method == "OPTIONS" {
+	if req.Method == http.MethodOptions {
+		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
 		respw.WriteHeader(http.StatusOK)
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey)
+	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.reqRecord)
 	request.process()
 }
 
@@ -135,16 +137,17 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
-
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
+		s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, "no bundle id")
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
 
-	if req.Method == "GET" {
+	if req.Method == http.MethodGet {
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
+			s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
 			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
@@ -157,20 +160,24 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 		jsonResp, err := json.Marshal(res)
 		if err != nil {
+			s.reqRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
 			log.Info("[handleBundleRequest] Json marshal failed", "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
+		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
 		respw.Header().Set("Content-Type", "application/json")
 		respw.WriteHeader(http.StatusOK)
 		respw.Write(jsonResp)
 
-	} else if req.Method == "DELETE" {
+	} else if req.Method == http.MethodDelete {
+		s.reqRecord.UpdateRequestEntry(req, http.StatusOK, "")
 		RState.DelWhitehatBundleTx(bundleId)
 		respw.WriteHeader(http.StatusOK)
 
 	} else {
+		s.reqRecord.UpdateRequestEntry(req, http.StatusMethodNotAllowed, "")
 		respw.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
