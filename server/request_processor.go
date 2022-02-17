@@ -4,6 +4,7 @@ Request represents an incoming client request
 package server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -379,6 +380,7 @@ func (r *RpcRequest) WhitehatBalanceCheckerRewrite() {
 }
 
 func (r *RpcRequest) writeRpcError(msg string, errCode int) {
+	r.updateRequestRecord(msg, errCode)
 	r.jsonRes = &types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
@@ -397,9 +399,26 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return
 	}
+	r.updateRequestRecord("", 0)
 	r.jsonRes = &types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",
 		Result:  resBytes,
+	}
+}
+
+func (r *RpcRequest) updateRequestRecord(msg string, rpcStatusCode int) {
+	r.reqRecord.requestEntry.Error = msg
+	r.reqRecord.requestEntry.HttpResponseStatus = rpcToHttpCode(rpcStatusCode)
+	if r.jsonReq.Method == "eth_sendRawTransaction" {
+		if rpcStatusCode != 0 {
+			r.reqRecord.ethSendRawTxEntry.Error = msg
+			r.reqRecord.ethSendRawTxEntry.ErrorCode = rpcStatusCode
+		}
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			r.reqRecord.SaveEthSendRawTxEntryToDB(ctx)
+		}()
 	}
 }

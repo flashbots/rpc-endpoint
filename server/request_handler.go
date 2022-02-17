@@ -23,7 +23,6 @@ type RpcRequestHandler struct {
 	relaySigningKey *ecdsa.PrivateKey
 	uid             uuid.UUID
 	reqRecord       *RequestRecord
-	jsonReq         *types.JsonRpcRequest
 }
 
 func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, reqRecord *RequestRecord) *RpcRequestHandler {
@@ -41,8 +40,13 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 func (r *RpcRequestHandler) process() {
 	r.logger = log.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")
+
 	defer r.requestRecord()
 	r.reqRecord.requestEntry.ReceivedAt = r.timeStarted
+	r.reqRecord.requestEntry.Id = r.uid
+	r.reqRecord.UpdateRequestEntry(r.req, http.StatusOK, "")
+	r.reqRecord.ethSendRawTxEntry.RequestId = r.uid
+
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
 	isWhitehatBundleCollection := whitehatBundleId != ""
 
@@ -94,14 +98,11 @@ func (r *RpcRequestHandler) process() {
 			(*r.respw).WriteHeader(http.StatusBadRequest)
 			return
 		}
-		r.jsonReq = jsonReq
 		r.reqRecord.requestEntry.RequestType = "batch"
 		// Process batch request
 		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
 		return
 	}
-
-	r.jsonReq = jsonReq
 	r.reqRecord.requestEntry.RequestType = "single"
 	// Process single request
 	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)

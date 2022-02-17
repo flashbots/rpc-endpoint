@@ -139,8 +139,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if r.jsonRes.Error != nil {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "JSON-RPC Error", r.jsonRes.Error.Message)
+		r.updateRequestRecord(r.jsonRes.Error.Message, r.jsonRes.Error.Code)
 	} else {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
+		r.updateRequestRecord("", 0)
 	}
 }
 

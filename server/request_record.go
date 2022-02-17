@@ -37,7 +37,6 @@ func (r *RequestRecord) SaveEthSendRawTxEntryToDB(ctx context.Context) {
 
 func (r *RequestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, error string) {
 	// TODO:Error should be converted to enum
-	r.requestEntry.ReceivedAt = time.Now()
 	r.requestEntry.HttpMethod = req.Method
 	r.requestEntry.Ip = GetIP(req)
 	r.requestEntry.Error = error
