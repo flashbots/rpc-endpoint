@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	signatureMethodLen = 10 // first 4 byte of data field
+	signatureMethodByteLen = 4 // first 4 byte of data field
 )
 
 func (r *RpcRequest) handle_sendRawTransaction() {
@@ -62,8 +62,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
 	r.ethSendRawTxEntry.TxData = r.tx.Data()
 
-	if len(r.tx.Data()) >= signatureMethodLen {
-		r.ethSendRawTxEntry.TxSmartContractMethod = r.tx.Data()[:signatureMethodLen]
+	if len(r.tx.Data()) >= signatureMethodByteLen {
+		r.ethSendRawTxEntry.TxSmartContractMethod = r.tx.Data()[:signatureMethodByteLen]
 	}
 
 	if r.tx.Nonce() >= 1e9 {
