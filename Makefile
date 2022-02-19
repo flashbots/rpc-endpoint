@@ -1,4 +1,4 @@
-.PHONY: all build test clean lint cover cover-html
+.PHONY: all build test up down migrate_up migrate_down clean lint cover cover-html
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
@@ -12,12 +12,16 @@ clean:
 	rm -rf rpc-endpoint build/
 
 test:
-
 	go test ./...
-test_up:
+migrate_up:
+	docker run -v ${CURDIR}/sql:/migrations --network host migrate/migrate -path=/migrations/ -database 'postgres://postgres:postgres@localhost:5432/test?sslmode=disable&search_path=requests' up
+migrate_down:
+	docker run -v ${CURDIR}/sql:/migrations --network host migrate/migrate -path=/migrations/ -database 'postgres://postgres:postgres@localhost:5432/test?sslmode=disable&search_path=requests' down -all
+up:
 	docker run --rm --name pg-rpc-endpoint -e POSTGRES_DB=test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v ${HOME}/docker/volumes/postgres:/var/lib/postgresql/data  -t postgres
-	#docker run -v ${CURDIR}/sql:/migrations --network host migrate/migrate -path=/migrations/ -database postgres://postgres:postgres@localhost:5432/test?sslmode=disable&search_path=postgres
-test_down:
+	@make migrate_up
+down:
+	@make migrate_down
 	docker stop pg-rpc-endpoint
 lint:
 	gofmt -d ./

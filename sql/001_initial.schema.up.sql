@@ -16,7 +16,6 @@ CREATE TABLE requests.main(
     host varchar,
     error varchar
 );
-
 CREATE TABLE requests.eth_send_raw_txs (
     id uuid not null unique primary key,
     request_id uuid not null,
