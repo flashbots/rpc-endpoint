@@ -12,8 +12,13 @@ clean:
 	rm -rf rpc-endpoint build/
 
 test:
-	go test ./...
 
+	go test ./...
+test_up:
+	docker run --rm --name pg-rpc-endpoint -e POSTGRES_DB=test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -d -p 5432:5432 -v ${HOME}/docker/volumes/postgres:/var/lib/postgresql/data  -t postgres
+	#docker run -v ${CURDIR}/sql:/migrations --network host migrate/migrate -path=/migrations/ -database postgres://postgres:postgres@localhost:5432/test?sslmode=disable&search_path=postgres
+test_down:
+	docker stop pg-rpc-endpoint
 lint:
 	gofmt -d ./
 	go vet ./...

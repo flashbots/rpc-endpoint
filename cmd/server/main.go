@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"flag"
+	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/server"
@@ -20,6 +21,8 @@ var (
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
 	defaultRedisUrl      = "localhost:6379"
+	defaultPostgresDSN   = fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
+		"127.0.0.1", 5432, "test", "postgres", "postgres")
 
 	// cli flags
 	versionPtr      = flag.Bool("version", false, "just print the program version")
@@ -28,6 +31,7 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
+	psqlDsn         = flag.String("psqlDsn", getEnvOrDefault("POSTGRES_DSN", defaultPostgresDSN), "Postgres DSN")
 	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
 )
@@ -75,7 +79,7 @@ func main() {
 	}
 
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl)
+	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, *psqlDsn)
 	if err != nil {
 		log.Error("Server init error", "error", err)
 		return
