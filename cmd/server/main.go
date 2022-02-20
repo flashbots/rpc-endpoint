@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/server"
 	"os"
 	"strings"
@@ -78,8 +79,11 @@ func main() {
 		return
 	}
 
+	// Setup database
+	db := database.NewPostgresStore(*psqlDsn)
+
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, *psqlDsn)
+	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)
 	if err != nil {
 		log.Error("Server init error", "error", err)
 		return

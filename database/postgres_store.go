@@ -12,35 +12,35 @@ const (
 	connTimeOut = 10 * time.Second
 )
 
-type DatabaseService struct {
+type postgresStore struct {
 	DB *sqlx.DB
 }
 
-func NewDatabaseService(dsn string) Store {
+func NewPostgresStore(dsn string) Store {
 	db := sqlx.MustConnect("postgres", dsn)
-	return &DatabaseService{
+	return &postgresStore{
 		DB: db,
 	}
 }
 
-func (d *DatabaseService) Close() {
+func (d *postgresStore) Close() {
 	d.DB.Close()
 }
 
-func (d *DatabaseService) SaveRequestEntry(in *RequestEntry) error {
+func (d *postgresStore) SaveRequestEntry(in *RequestEntry) error {
 	query := `INSERT INTO requests.main 
 	(id,received_at,inserted_at,request_duration,is_batch_request,num_request_in_batch,http_method,http_url,http_query_param,http_response_status,ip_hash,origin,host,error) VALUES (:id,:received_at,:inserted_at,:request_duration,:is_batch_request,:num_request_in_batch,:http_method,:http_url,:http_query_param,:http_response_status,:ip_hash,:origin,:host,:error)`
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeOut)
 	defer cancel()
 	if _, err := d.DB.NamedExecContext(ctx, query, in); err != nil {
-		log.Error("[DatabaseService] SaveRequestEntry failed", "error", err)
+		log.Error("[postgresStore] SaveRequestEntry failed", "error", err)
 		return err
 	}
-	log.Info("[DatabaseService] SaveRequestEntry succeeded", "RequestEntry", in) // TODO:Remove logging
+	log.Info("[postgresStore] SaveRequestEntry succeeded", "RequestEntry", in) // TODO:Remove logging
 	return nil
 }
 
-func (d *DatabaseService) SaveEthSendRawTxEntry(in *EthSendRawTxEntry) error {
+func (d *postgresStore) SaveEthSendRawTxEntry(in *EthSendRawTxEntry) error {
 	query := `INSERT INTO requests.eth_send_raw_txs (id,request_id,is_on_oafc_list,is_white_hat_bundle_collection,white_hat_bundle_id,is_cancel_tx,needs_front_running_protection,was_sent_to_relay,is_tx_sent_to_relay,is_blocked_bcz_already_sent,error,error_code,tx_raw,tx_hash,tx_from,tx_to,tx_nonce,tx_data,tx_smart_contract_method) VALUES (:id,:request_id,:is_on_oafc_list,:is_white_hat_bundle_collection,:white_hat_bundle_id,:is_cancel_tx,:needs_front_running_protection,:was_sent_to_relay,:is_tx_sent_to_relay,:is_blocked_bcz_already_sent,:error,:error_code,:tx_raw,:tx_hash,:tx_from,:tx_to,:tx_nonce,:tx_data,:tx_smart_contract_method)`
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeOut)
 	defer cancel()

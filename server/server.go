@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"github.com/flashbots/rpc-endpoint/database"
-	"github.com/flashbots/rpc-endpoint/testutils"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -38,11 +37,10 @@ type RpcEndPointServer struct {
 	listenAddress   string
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
-	psqlDsn         string
 	db              database.Store
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, psqlDsn string) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
 	var err error
 	if DebugDontSendTx {
 		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
@@ -56,15 +54,6 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		}
 		redisUrl = redisServer.Addr()
 	}
-
-	// Setup database
-	var db database.Store
-	if psqlDsn == "" {
-		db = testutils.NewMockStore()
-	} else {
-		db = database.NewDatabaseService(psqlDsn)
-	}
-
 	// Setup redis connection
 	log.Info("Connecting to redis...", "redisUrl", redisUrl)
 	RState, err = NewRedisState(redisUrl)
@@ -81,7 +70,6 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
 		relaySigningKey: relaySigningKey,
-		psqlDsn:         psqlDsn,
 		db:              db,
 	}, nil
 }

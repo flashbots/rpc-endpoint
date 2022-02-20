@@ -8,6 +8,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -46,6 +48,12 @@ var bundleJsonApi *httptest.Server
 
 // Reset the RPC endpoint and mock backend servers
 func resetTestServers() {
+	redisServerAddr, rpcBackendUrl := serverPreSetup()
+	db := testutils.NewMockStore()
+	serverSetup(redisServerAddr, rpcBackendUrl, db)
+}
+
+func serverPreSetup() (string, string) {
 	redisServer, err := miniredis.Run()
 	if err != nil {
 		panic(err)
@@ -59,9 +67,12 @@ func resetTestServers() {
 
 	txApiServer := httptest.NewServer(http.HandlerFunc(testutils.MockTxApiHandler))
 	server.ProtectTxApiHost = txApiServer.URL
+	return redisServer.Addr(), RpcBackendServerUrl
+}
 
+func serverSetup(redisServerAddr, rpcBackendUrl string, db database.Store) {
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, redisServer.Addr(), "")
+	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendUrl, rpcBackendUrl, relaySigningKey, redisServerAddr, db)
 	if err != nil {
 		panic(err)
 	}
@@ -554,3 +565,73 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, "0x56bc75e2d63100000", val)
 }
+
+func Test_StoreRequests(t *testing.T) {
+	// Store setup
+	requests := make(map[uuid.UUID]*database.RequestEntry)
+	ethSendRawTxs := make(map[uuid.UUID]*database.EthSendRawTxEntry)
+	db := database.NewMemStore(requests, ethSendRawTxs)
+
+	// Server setup
+	redisServerAddr, rpcBackendUrl := serverPreSetup()
+	serverSetup(redisServerAddr, rpcBackendUrl, db)
+
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_Hash})
+	_ = testutils.SendRpcAndParseResponseOrFailNow(t, req_getTransactionCount)
+	// sendRawTransaction of the initial TX
+	reqSendRawTransaction1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Initial_RawTx})
+	testutils.SendRpcAndParseResponseOrFailNow(t, reqSendRawTransaction1)
+
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	reqSendRawTransaction2 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, reqSendRawTransaction2)
+	require.Nil(t, r1.Error)
+
+	require.Equal(t, 3, len(requests))
+	require.Equal(t, 2, len(ethSendRawTxs))
+	for _, tx := range ethSendRawTxs {
+		assert.Equal(t, true, tx.NeedsFrontRunningProtection)
+	}
+}
+
+func Test_StoreBatchRequests(t *testing.T) {
+	// Store setup
+	requests := make(map[uuid.UUID]*database.RequestEntry)
+	ethSendRawTxs := make(map[uuid.UUID]*database.EthSendRawTxEntry)
+	db := database.NewMemStore(requests, ethSendRawTxs)
+
+	// Server setup
+	redisServerAddr, rpcBackendUrl := serverPreSetup()
+	serverSetup(redisServerAddr, rpcBackendUrl, db)
+
+	var batch []*types.JsonRpcRequest
+	// eth_call intercept
+	req := types.NewJsonRpcRequest(1, "eth_call", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a",
+	}})
+	batch = append(batch, req)
+	// eth_call passthrough
+	req2 := types.NewJsonRpcRequest(1, "eth_callxvssfa", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1b",
+	}})
+	batch = append(batch, req2)
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, req_getTransactionCount)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, req_sendRawTransaction)
+	// call getTxReceipt to trigger query to Tx API
+	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, req_getTransactionReceipt)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 5)
+	require.Equal(t, 1, len(requests))
+	require.Equal(t, 1, len(ethSendRawTxs))
+}
+
+//TODO:validate model
+func Test_StoreValidateTxs(t *testing.T) {}
