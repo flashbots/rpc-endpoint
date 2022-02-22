@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/ecdsa"
 	"flag"
-	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
@@ -22,8 +21,7 @@ var (
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
 	defaultRedisUrl      = "localhost:6379"
-	defaultPostgresDSN   = fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
-		"127.0.0.1", 5432, "test", "postgres", "postgres")
+	defaultPostgresDSN   = "postgres://postgres:postgres@localhost:5432/test?sslmode=disable"
 
 	// cli flags
 	versionPtr      = flag.Bool("version", false, "just print the program version")

@@ -1,7 +1,6 @@
 BEGIN;
-CREATE SCHEMA IF NOT EXISTS requests;
-CREATE TABLE requests.main(
-    id uuid not null unique primary key,
+CREATE TABLE rpc_endpoint_requests(
+    id uuid not null unique primary key default gen_random_uuid(),
     received_at timestamp with time zone not null default now(),
     inserted_at timestamp with time zone not null default now(),
     request_duration interval,
@@ -16,13 +15,13 @@ CREATE TABLE requests.main(
     host varchar,
     error varchar
 );
-CREATE TABLE requests.eth_send_raw_txs (
+CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     id uuid not null unique primary key,
     request_id uuid not null,
     is_on_oafc_list boolean,
     is_white_hat_bundle_collection boolean,
     white_hat_bundle_id varchar,
-    is_cancel_tx varchar,
+    is_cancel_tx boolean,
     needs_front_running_protection boolean,
     was_sent_to_relay boolean,
     is_tx_sent_to_relay boolean,
@@ -34,7 +33,7 @@ CREATE TABLE requests.eth_send_raw_txs (
     tx_from varchar,
     tx_to varchar,
     tx_nonce integer,
-    tx_data bytea,
-    tx_smart_contract_method bytea
+    tx_data varchar(256),
+    tx_smart_contract_method varchar
 );
 COMMIT;

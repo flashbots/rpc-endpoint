@@ -41,7 +41,7 @@ type RpcRequest struct {
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 }
 
-func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, id, requestId uuid.UUID) *RpcRequest {
+func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, id, requestId uuid.UUID, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		db:                         db,
@@ -54,6 +54,7 @@ func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, 
 		whitehatBundleId:           whitehatBundleId,
 		id:                         id,
 		requestId:                  requestId,
+		ethSendRawTxEntry:          ethSendRawTxEntry,
 	}
 }
 
@@ -62,14 +63,10 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
-		r.ethSendRawTxEntry = &database.EthSendRawTxEntry{
-			IsWhiteHatBundleCollection: r.isWhitehatBundleCollection,
-			WhiteHatBundleId:           r.whitehatBundleId,
-			Id:                         r.id,
-			RequestId:                  r.requestId,
-		}
+		r.ethSendRawTxEntry.Id = r.id
+		r.ethSendRawTxEntry.RequestId = r.requestId
+		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
-		r.db.SaveEthSendRawTxEntry(r.ethSendRawTxEntry)
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
 	case r.jsonReq.Method == "net_version": // don't need to proxy to node, it's always 1 (mainnet)

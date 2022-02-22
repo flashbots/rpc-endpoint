@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -151,16 +150,4 @@ func AddressPtrToStr(a *common.Address) string {
 		return ""
 	}
 	return a.Hex()
-}
-
-func UpdateRequestEntry(requestEntry *database.RequestEntry, req *http.Request, reqStatus int, error string) {
-	// TODO:Error should be converted to enum
-	requestEntry.HttpMethod = req.Method
-	requestEntry.IpHash = GetIPHash(req)
-	requestEntry.Error = error
-	requestEntry.HttpUrl = req.URL.Path
-	requestEntry.HttpQueryParam = req.URL.RawQuery
-	requestEntry.HttpResponseStatus = reqStatus
-	requestEntry.Origin = req.Header.Get("Origin")
-	requestEntry.Host = req.Header.Get("Host")
 }
