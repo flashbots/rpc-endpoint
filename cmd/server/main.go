@@ -60,8 +60,7 @@ func main() {
 	log.Info("Init rpc-endpoint", "version", version)
 
 	if *relaySigningKey == "" {
-		log.Error("Cannot use the relay without a signing key.")
-		return
+		log.Crit("Cannot use the relay without a signing key.")
 	}
 
 	pkHex := strings.Replace(*relaySigningKey, "0x", "", 1)
@@ -73,18 +72,19 @@ func main() {
 	}
 
 	if err != nil {
-		log.Error("Error with relay signing key", "error", err)
-		return
+		log.Crit("Error with relay signing key", "error", err)
 	}
 
 	// Setup database
-	db := database.NewPostgresStore(*psqlDsn)
+	db, err := database.NewPostgresStore(*psqlDsn)
+	if err != nil {
+		log.Crit("postgres store init error", "error", err)
+	}
 
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)
 	if err != nil {
-		log.Error("Server init error", "error", err)
-		return
+		log.Crit("Server init error", "error", err)
 	}
 	s.Start()
 }
