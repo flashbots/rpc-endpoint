@@ -1,5 +1,13 @@
 version: "3.8"
 services:
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis:/data
   database:
     image: postgres:latest
     container_name:
@@ -35,5 +43,7 @@ services:
         condition: service_healthy
 volumes:
   db-data:
+  redis:
+    driver: local
 networks:
   new:

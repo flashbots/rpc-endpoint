@@ -155,7 +155,7 @@ func (r *RpcRequestHandler) finishRequest() {
 	r.requestRecord.requestEntry.RequestDuration = timeRequestNeeded
 	r.db.SaveRequestEntry(r.requestRecord.requestEntry)
 	if r.requestRecord.ethSendRawTxEntries != nil && len(r.requestRecord.ethSendRawTxEntries) != 0 {
-		r.db.SaveEthSendRawTxEntries(r.requestRecord.ethSendRawTxEntries)
+		r.db.SaveRawTxEntries(r.requestRecord.ethSendRawTxEntries)
 	}
 	r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
 }

@@ -26,7 +26,7 @@ func (m *memStore) SaveRequestEntry(in *RequestEntry) error {
 	return nil
 }
 
-func (m *memStore) SaveEthSendRawTxEntries(in []*EthSendRawTxEntry) error {
+func (m *memStore) SaveRawTxEntries(in []*EthSendRawTxEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for _, tx := range in {

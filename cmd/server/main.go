@@ -76,10 +76,7 @@ func main() {
 	}
 
 	// Setup database
-	db, err := database.NewPostgresStore(*psqlDsn)
-	if err != nil {
-		log.Crit("postgres store init error", "error", err)
-	}
+	db := database.NewPostgresStore(*psqlDsn)
 
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)

@@ -10,6 +10,6 @@ func NewMockStore() database.Store {
 func (m *mockStore) SaveRequestEntry(in *database.RequestEntry) error {
 	return nil
 }
-func (m *mockStore) SaveEthSendRawTxEntries(in []*database.EthSendRawTxEntry) error {
+func (m *mockStore) SaveRawTxEntries(in []*database.EthSendRawTxEntry) error {
 	return nil
 }

@@ -38,7 +38,6 @@ type RpcEndPointServer struct {
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
 	db              database.Store
-	requestRecord   *requestRecord
 }
 
 func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
@@ -72,7 +71,6 @@ func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, rel
 		proxyUrl:        proxyUrl,
 		relaySigningKey: relaySigningKey,
 		db:              db,
-		requestRecord:   NewRequestRecord(),
 	}, nil
 }
 
@@ -99,23 +97,24 @@ func (s *RpcEndPointServer) Start() {
 }
 
 func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
+	requestRecord := NewRequestRecord()
 	setCorsHeaders(respw)
 
 	if req.Method == http.MethodGet {
-		s.requestRecord.UpdateRequestEntry(req, http.StatusFound, "requestRedirected")
-		s.db.SaveRequestEntry(s.requestRecord.requestEntry)
+		requestRecord.UpdateRequestEntry(req, http.StatusFound, "requestRedirected")
+		s.db.SaveRequestEntry(requestRecord.requestEntry)
 		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
 		return
 	}
 
 	if req.Method == http.MethodOptions {
-		s.requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
-		s.db.SaveRequestEntry(s.requestRecord.requestEntry)
+		requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		s.db.SaveRequestEntry(requestRecord.requestEntry)
 		respw.WriteHeader(http.StatusOK)
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db, s.requestRecord)
+	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db, requestRecord)
 	request.process()
 }
 
@@ -139,14 +138,15 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 }
 
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
+	requestRecord := NewRequestRecord()
 	defer func() {
-		s.db.SaveRequestEntry(s.requestRecord.requestEntry)
+		s.db.SaveRequestEntry(requestRecord.requestEntry)
 	}()
 
 	setCorsHeaders(respw)
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
-		s.requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, "no bundle id")
+		requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, "no bundle id")
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
@@ -154,7 +154,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 	if req.Method == http.MethodGet {
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
-			s.requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
+			requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
 			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
@@ -167,24 +167,24 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 		jsonResp, err := json.Marshal(res)
 		if err != nil {
-			s.requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
-			s.db.SaveRequestEntry(s.requestRecord.requestEntry)
+			requestRecord.UpdateRequestEntry(req, http.StatusInternalServerError, err.Error())
+			s.db.SaveRequestEntry(requestRecord.requestEntry)
 			log.Info("[handleBundleRequest] Json marshal failed", "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		s.requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
 		respw.Header().Set("Content-Type", "application/json")
 		respw.WriteHeader(http.StatusOK)
 		respw.Write(jsonResp)
 
 	} else if req.Method == http.MethodDelete {
-		s.requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
+		requestRecord.UpdateRequestEntry(req, http.StatusOK, "")
 		RState.DelWhitehatBundleTx(bundleId)
 		respw.WriteHeader(http.StatusOK)
 
 	} else {
-		s.requestRecord.UpdateRequestEntry(req, http.StatusMethodNotAllowed, "")
+		requestRecord.UpdateRequestEntry(req, http.StatusMethodNotAllowed, "")
 		respw.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
