@@ -34,7 +34,7 @@ services:
     networks:
       - new
     volumes:
-      - ./sql:/migrations
+      - ./sql/psql:/migrations
     command: [ "-path", "/migrations", "-database",  "postgres://postgres:postgres@pg-rpc-endpoint:5432/test?sslmode=disable", "up" ]
     links:
       - database

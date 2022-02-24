@@ -34,7 +34,7 @@ func (d *postgresStore) SaveRequestEntry(in *RequestEntry) error {
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeOut)
 	defer cancel()
 	if _, err := d.DB.NamedExecContext(ctx, query, in); err != nil {
-		log.Error("[postgresStore] SaveRequestEntry failed", "error", err)
+		log.Error("[postgresStore] SaveRequestEntry failed", "id", in.Id, "error", err)
 		return err
 	}
 	log.Info("[postgresStore] SaveRequestEntry succeeded", "RequestEntry", in) // TODO:Remove logging

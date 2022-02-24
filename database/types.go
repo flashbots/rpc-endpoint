@@ -27,6 +27,7 @@ type RequestEntry struct {
 type EthSendRawTxEntry struct {
 	Id                          uuid.UUID `db:"id"`
 	RequestId                   uuid.UUID `db:"request_id"` // id from RequestEntry table
+	InsertedAt                  time.Time `db:"inserted_at"`
 	IsOnOafcList                bool      `db:"is_on_oafc_list"`
 	IsWhiteHatBundleCollection  bool      `db:"is_white_hat_bundle_collection"`
 	WhiteHatBundleId            string    `db:"white_hat_bundle_id"`
