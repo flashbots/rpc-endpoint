@@ -3,7 +3,7 @@ CREATE TABLE rpc_endpoint_requests(
     id uuid not null unique primary key default gen_random_uuid(),
     received_at timestamp with time zone not null default now(),
     inserted_at timestamp with time zone not null default now(),
-    request_duration interval,
+    request_duration_ms interval,
     is_batch_request boolean,
     num_request_in_batch integer,
     http_method varchar,
@@ -33,7 +33,7 @@ CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     tx_from varchar,
     tx_to varchar,
     tx_nonce integer,
-    tx_data varchar(256),
+    tx_data varchar,
     tx_smart_contract_method varchar
 );
 COMMIT;

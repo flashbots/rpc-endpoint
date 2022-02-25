@@ -152,9 +152,9 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 
 func (r *RpcRequestHandler) finishRequest() {
 	timeRequestNeeded := time.Since(r.timeStarted) // At end of request, log the time it needed
-	r.requestRecord.requestEntry.RequestDuration = timeRequestNeeded
-	r.db.SaveRequestEntry(r.requestRecord.requestEntry)
-	if r.requestRecord.ethSendRawTxEntries != nil && len(r.requestRecord.ethSendRawTxEntries) != 0 {
+	r.requestRecord.requestEntry.RequestDurationMs = timeRequestNeeded.Milliseconds()
+	if len(r.requestRecord.ethSendRawTxEntries) > 0 {
+		r.db.SaveRequestEntry(r.requestRecord.requestEntry)
 		r.db.SaveRawTxEntries(r.requestRecord.ethSendRawTxEntries)
 	}
 	r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())

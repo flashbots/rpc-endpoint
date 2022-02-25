@@ -7,13 +7,13 @@ CREATE TABLE rpc_endpoint_requests(
     is_batch_request boolean,
     num_request_in_batch integer,
     http_method varchar(10),
-    http_url varchar,
+    http_url varchar(20),
     http_query_param varchar,
     http_response_status integer,
-    ip_hash varchar,
+    ip_hash varchar(32),
     origin varchar,
     host varchar,
-    error varchar
+    error varchar(1000)
 );
 CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     id varchar(128) not null distkey,
@@ -27,14 +27,14 @@ CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     was_sent_to_relay boolean,
     is_tx_sent_to_relay boolean,
     is_blocked_bcz_already_sent boolean,
-    error varchar(max),
+    error varchar(1000),
     error_code integer,
-    tx_raw varchar,
-    tx_hash varchar,
-    tx_from varchar,
-    tx_to varchar,
+    tx_raw varchar(max),
+    tx_hash varchar(66),
+    tx_from varchar(42),
+    tx_to varchar(42),
     tx_nonce integer,
-    tx_data varchar(256),
-    tx_smart_contract_method varchar
+    tx_data varchar(10000),
+    tx_smart_contract_method varchar(8)
 );
 COMMIT;

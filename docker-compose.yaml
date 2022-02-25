@@ -5,24 +5,17 @@ services:
     restart: always
     ports:
       - '6379:6379'
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redis:/data
   database:
     image: postgres:latest
     container_name:
       pg-rpc-endpoint
-    networks:
-      new:
-        aliases:
-          - database
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=test
     healthcheck:
       test:  [ "CMD", "pg_isready", "-q", "-d", "test", "-U", "postgres" ]
-      interval: 5s
+      interval: 3s
       timeout: 3s
       retries: 5
     ports:
@@ -31,8 +24,6 @@ services:
       - db-data:/var/lib/postgresql/data
   migrate:
     image: migrate/migrate
-    networks:
-      - new
     volumes:
       - ./sql/psql:/migrations
     command: [ "-path", "/migrations", "-database",  "postgres://postgres:postgres@pg-rpc-endpoint:5432/test?sslmode=disable", "up" ]
@@ -43,7 +34,3 @@ services:
         condition: service_healthy
 volumes:
   db-data:
-  redis:
-    driver: local
-networks:
-  new:

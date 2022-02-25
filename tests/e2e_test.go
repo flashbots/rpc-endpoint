@@ -47,7 +47,7 @@ var bundleJsonApi *httptest.Server
 
 // Setup RPC endpoint and mock backend servers
 func testSetup() {
-	db := testutils.NewMockStore()
+	db := database.NewMockStore()
 	serverSetup(db)
 }
 
@@ -575,7 +575,7 @@ func Test_StoreRequests(t *testing.T) {
 	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, reqSendRawTransaction2)
 	require.Nil(t, r1.Error)
 
-	require.Equal(t, 3, len(memStore.Requests))
+	require.Equal(t, 2, len(memStore.Requests))
 	require.Equal(t, 2, len(memStore.EthSendRawTxs))
 	for _, tx := range memStore.EthSendRawTxs {
 		assert.Equal(t, true, tx.NeedsFrontRunningProtection)

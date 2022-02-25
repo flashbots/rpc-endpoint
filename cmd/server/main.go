@@ -21,7 +21,6 @@ var (
 	defaultProxyUrl      = "http://127.0.0.1:8545"
 	defaultRelayUrl      = "https://relay.flashbots.net"
 	defaultRedisUrl      = "localhost:6379"
-	defaultPostgresDSN   = "postgres://postgres:postgres@localhost:5432/test?sslmode=disable"
 
 	// cli flags
 	versionPtr      = flag.Bool("version", false, "just print the program version")
@@ -30,7 +29,7 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
-	psqlDsn         = flag.String("psqlDsn", getEnvOrDefault("POSTGRES_DSN", defaultPostgresDSN), "Postgres DSN")
+	psqlDsn         = flag.String("psqlDsn", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
 	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
 )
@@ -76,7 +75,12 @@ func main() {
 	}
 
 	// Setup database
-	db := database.NewPostgresStore(*psqlDsn)
+	var db database.Store
+	if *psqlDsn == "" {
+		db = database.NewMockStore()
+	} else {
+		db = database.NewPostgresStore(*psqlDsn)
+	}
 
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)
