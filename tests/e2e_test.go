@@ -602,14 +602,14 @@ func Test_StoreBatchRequests(t *testing.T) {
 		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1b",
 	}})
 	batch = append(batch, req2)
-	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
-	batch = append(batch, req_getTransactionCount)
+	reqGetTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, reqGetTransactionCount)
 	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
-	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
-	batch = append(batch, req_sendRawTransaction)
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, reqSendRawTransaction)
 	// call getTxReceipt to trigger query to Tx API
-	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
-	batch = append(batch, req_getTransactionReceipt)
+	reqGetTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, reqGetTransactionReceipt)
 
 	res, err := testutils.SendBatchRpcAndParseResponse(batch)
 	require.Nil(t, err, err)
@@ -618,5 +618,33 @@ func Test_StoreBatchRequests(t *testing.T) {
 	require.Equal(t, 1, len(memStore.EthSendRawTxs))
 }
 
-//TODO:validate model
-func Test_StoreValidateTxs(t *testing.T) {}
+func Test_StoreValidateTxs(t *testing.T) {
+	// Store setup
+	memStore := database.NewMemStore()
+
+	// Server setup
+	serverSetup(memStore)
+
+	var batch []*types.JsonRpcRequest
+
+	// call sendRawTx
+	reqSendRawTransactionInvalidNonce1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_Invalid_Nonce_1})
+	batch = append(batch, reqSendRawTransactionInvalidNonce1)
+
+	reqSendRawTransactionInvalidNonce2 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_Invalid_Nonce_2})
+	batch = append(batch, reqSendRawTransactionInvalidNonce2)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 2)
+	require.Equal(t, 1, len(memStore.Requests))
+	require.Equal(t, 2, len(memStore.EthSendRawTxs))
+
+	for _, v := range memStore.EthSendRawTxs {
+		require.Equal(t, true, v.NeedsFrontRunningProtection)
+		require.Equal(t, true, v.IsTxSentToRelay)
+		require.Equal(t, "invalid nonce", v.Error)
+		require.Equal(t, -32603, v.ErrorCode)
+	}
+
+}
