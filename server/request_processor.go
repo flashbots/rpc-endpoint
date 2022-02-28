@@ -183,7 +183,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		r.logger.Error("[sendTxToRelay] Redis:SetTxSentToRelay failed", "error", err)
 	}
-	r.ethSendRawTxEntry.IsTxSentToRelay = true
+	r.ethSendRawTxEntry.ShouldSendToRelay = true
 	txTo := r.tx.To()
 	if txTo == nil {
 		r.writeRpcError("invalid target", types.JsonRpcInternalError)

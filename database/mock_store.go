@@ -8,9 +8,9 @@ func NewMockStore() Store {
 
 func (m *mockStore) SaveRequest(reqEntry *RequestEntry, rawTxEntries []*EthSendRawTxEntry) {}
 
-func (m *mockStore) SaveRequestEntry(in *RequestEntry) error {
+func (m *mockStore) SaveRequestEntry(entry *RequestEntry) error {
 	return nil
 }
-func (m *mockStore) SaveRawTxEntries(in []*EthSendRawTxEntry) error {
+func (m *mockStore) SaveRawTxEntries(entries []*EthSendRawTxEntry) error {
 	return nil
 }

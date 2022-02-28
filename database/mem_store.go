@@ -26,17 +26,17 @@ func (m *memStore) SaveRequest(reqEntry *RequestEntry, rawTxEntries []*EthSendRa
 	}
 }
 
-func (m *memStore) SaveRequestEntry(in *RequestEntry) error {
+func (m *memStore) SaveRequestEntry(entry *RequestEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.Requests[in.Id] = in
+	m.Requests[entry.Id] = entry
 	return nil
 }
 
-func (m *memStore) SaveRawTxEntries(in []*EthSendRawTxEntry) error {
+func (m *memStore) SaveRawTxEntries(entries []*EthSendRawTxEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	for _, tx := range in {
+	for _, tx := range entries {
 		m.EthSendRawTxs[tx.Id] = tx
 	}
 	return nil

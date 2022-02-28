@@ -25,7 +25,7 @@ CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     is_cancel_tx boolean,
     needs_front_running_protection boolean,
     was_sent_to_relay boolean,
-    is_tx_sent_to_relay boolean,
+    should_send_to_relay boolean,
     is_blocked_bcz_already_sent boolean,
     error varchar(1000),
     error_code integer,

@@ -52,10 +52,10 @@ func (d *postgresStore) SaveRequestEntry(entry *RequestEntry) error {
 	return err
 }
 
-func (d *postgresStore) SaveRawTxEntries(entry []*EthSendRawTxEntry) error {
-	query := `INSERT INTO rpc_endpoint_eth_send_raw_txs (id, request_id, is_on_oafc_list, is_white_hat_bundle_collection, white_hat_bundle_id, is_cancel_tx, needs_front_running_protection, was_sent_to_relay, is_tx_sent_to_relay, is_blocked_bcz_already_sent, error, error_code, tx_raw, tx_hash, tx_from, tx_to, tx_nonce, tx_data, tx_smart_contract_method) VALUES (:id, :request_id, :is_on_oafc_list, :is_white_hat_bundle_collection, :white_hat_bundle_id, :is_cancel_tx, :needs_front_running_protection, :was_sent_to_relay, :is_tx_sent_to_relay, :is_blocked_bcz_already_sent, :error, :error_code, :tx_raw, :tx_hash, :tx_from, :tx_to, :tx_nonce, :tx_data, :tx_smart_contract_method)`
+func (d *postgresStore) SaveRawTxEntries(entries []*EthSendRawTxEntry) error {
+	query := `INSERT INTO rpc_endpoint_eth_send_raw_txs (id, request_id, is_on_oafc_list, is_white_hat_bundle_collection, white_hat_bundle_id, is_cancel_tx, needs_front_running_protection, was_sent_to_relay, should_send_to_relay, is_blocked_bcz_already_sent, error, error_code, tx_raw, tx_hash, tx_from, tx_to, tx_nonce, tx_data, tx_smart_contract_method) VALUES (:id, :request_id, :is_on_oafc_list, :is_white_hat_bundle_collection, :white_hat_bundle_id, :is_cancel_tx, :needs_front_running_protection, :was_sent_to_relay, :should_send_to_relay, :is_blocked_bcz_already_sent, :error, :error_code, :tx_raw, :tx_hash, :tx_from, :tx_to, :tx_nonce, :tx_data, :tx_smart_contract_method)`
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeOut)
 	defer cancel()
-	_, err := d.DB.NamedExecContext(ctx, query, entry)
+	_, err := d.DB.NamedExecContext(ctx, query, entries)
 	return err
 }
