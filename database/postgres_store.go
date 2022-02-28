@@ -49,6 +49,5 @@ func (d *postgresStore) SaveRawTxEntries(in []*EthSendRawTxEntry) error {
 		log.Error("[RequestRecord] SaveEthSendRawTxEntryToDB failed", "error", err)
 		return err
 	}
-	log.Info("[RequestRecord] SaveEthSendRawTxEntryToDB succeeded", "EthSendRawTxEntry", in) // TODO:Remove logging
 	return nil
 }
