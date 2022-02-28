@@ -109,7 +109,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db, NewRequestRecord())
+	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db)
 	request.process()
 }
 

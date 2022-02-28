@@ -25,7 +25,7 @@ type RpcRequestHandler struct {
 	requestRecord   *requestRecord
 }
 
-func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, db database.Store, requestRecord *requestRecord) *RpcRequestHandler {
+func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		respw:           respw,
 		req:             req,
@@ -34,7 +34,7 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 		relaySigningKey: relaySigningKey,
 		uid:             uuid.New(),
 		db:              db,
-		requestRecord:   requestRecord,
+		requestRecord:   NewRequestRecord(),
 	}
 }
 
@@ -112,9 +112,12 @@ func (r *RpcRequestHandler) process() {
 
 // processRequest handles single request
 func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
-	entry := r.requestRecord.UpdateEthSendRawTxEntries(jsonReq)
+	var entry *database.EthSendRawTxEntry
+	if jsonReq.Method == "eth_sendRawTransaction" {
+		entry = r.requestRecord.AddEthSendRawTxEntries(uuid.New(), r.uid)
+	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, r.db, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, uuid.New(), r.uid, entry)
+	rpcReq := NewRpcRequest(r.logger, r.db, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
@@ -130,10 +133,14 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 			id := uuid.New()
 			// Create child logger
 			logger := log.New(log.Ctx{"uid": r.uid, "id": id, "count": count})
-
-			entry := r.requestRecord.UpdateEthSendRawTxEntries(rpcReq)
+			// If the request contains eth_sendRawTransaction method, update the request record
+			// This rawTxEntry will be stored for protect analytics
+			var entry *database.EthSendRawTxEntry
+			if rpcReq.Method == "eth_sendRawTransaction" {
+				entry = r.requestRecord.AddEthSendRawTxEntries(id, r.uid)
+			}
 			// Create rpc request
-			req := NewRpcRequest(logger, r.db, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, id, r.uid, entry) // Set each individual request
+			req := NewRpcRequest(logger, r.db, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i], r.requestRecord)
@@ -151,11 +158,9 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 }
 
 func (r *RpcRequestHandler) finishRequest() {
-	timeRequestNeeded := time.Since(r.timeStarted) // At end of request, log the time it needed
-	r.requestRecord.requestEntry.RequestDurationMs = timeRequestNeeded.Milliseconds()
-	if len(r.requestRecord.ethSendRawTxEntries) > 0 {
-		r.db.SaveRequestEntry(r.requestRecord.requestEntry)
-		r.db.SaveRawTxEntries(r.requestRecord.ethSendRawTxEntries)
-	}
-	r.logger.Info("Request finished", "timeTakenInSec", timeRequestNeeded.Seconds())
+	reqDuration := time.Since(r.timeStarted) // At end of request, log the time it needed
+	r.requestRecord.requestEntry.RequestDurationMs = reqDuration.Milliseconds()
+	// Save both request entry and raw tx entries if present
+	r.db.SaveRequest(r.requestRecord.requestEntry, r.requestRecord.ethSendRawTxEntries)
+	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
 }

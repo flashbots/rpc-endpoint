@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/flashbots/rpc-endpoint/database"
-	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/google/uuid"
 	"net/http"
 	"sync"
 )
@@ -21,14 +21,14 @@ func NewRequestRecord() *requestRecord {
 	}
 }
 
-func (r *requestRecord) UpdateEthSendRawTxEntries(rpcReq *types.JsonRpcRequest) *database.EthSendRawTxEntry {
-	var ethSendRawTxEntry *database.EthSendRawTxEntry
-	if rpcReq.Method == "eth_sendRawTransaction" {
-		ethSendRawTxEntry = &database.EthSendRawTxEntry{}
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
-		r.ethSendRawTxEntries = append(r.ethSendRawTxEntries, ethSendRawTxEntry)
+func (r *requestRecord) AddEthSendRawTxEntries(id, requestId uuid.UUID) *database.EthSendRawTxEntry {
+	ethSendRawTxEntry := &database.EthSendRawTxEntry{
+		Id:        id,
+		RequestId: requestId,
 	}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.ethSendRawTxEntries = append(r.ethSendRawTxEntries, ethSendRawTxEntry)
 	return ethSendRawTxEntry
 }
 

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/flashbots/rpc-endpoint/database"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -36,12 +35,10 @@ type RpcRequest struct {
 	origin                     string
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
-	id                         uuid.UUID
-	requestId                  uuid.UUID
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 }
 
-func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, id, requestId uuid.UUID, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
+func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		db:                         db,
@@ -52,8 +49,6 @@ func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, 
 		origin:                     origin,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
-		id:                         id,
-		requestId:                  requestId,
 		ethSendRawTxEntry:          ethSendRawTxEntry,
 	}
 }
@@ -63,8 +58,6 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
-		r.ethSendRawTxEntry.Id = r.id
-		r.ethSendRawTxEntry.RequestId = r.requestId
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user

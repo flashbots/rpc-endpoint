@@ -19,6 +19,13 @@ func NewMemStore() *memStore {
 	}
 }
 
+func (m *memStore) SaveRequest(reqEntry *RequestEntry, rawTxEntries []*EthSendRawTxEntry) {
+	if len(rawTxEntries) > 0 {
+		m.SaveRequestEntry(reqEntry)
+		m.SaveRawTxEntries(rawTxEntries)
+	}
+}
+
 func (m *memStore) SaveRequestEntry(in *RequestEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

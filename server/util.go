@@ -96,12 +96,8 @@ func GetIP(r *http.Request) string {
 }
 
 func GetIPHash(r *http.Request) string {
-	ipHash := md5.New()
-	_, err := ipHash.Write([]byte(GetIP(r)))
-	if err != nil {
-		return ""
-	}
-	return hex.EncodeToString(ipHash.Sum(nil))
+	hash := md5.Sum([]byte(GetIP(r)))
+	return hex.EncodeToString(hash[:])
 }
 
 // CHROME_ID: nkbihfbeogaeaoehlefnkodbefgpgknn
