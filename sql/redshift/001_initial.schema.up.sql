@@ -3,7 +3,7 @@ CREATE TABLE rpc_endpoint_requests(
     id varchar(128) not null distkey,
     received_at timestamptz default sysdate,
     inserted_at timestamptz default sysdate sortkey,
-    request_duration bigint not null,
+    request_duration_ms bigint not null,
     is_batch_request boolean,
     num_request_in_batch integer,
     http_method varchar(10),

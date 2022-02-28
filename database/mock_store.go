@@ -6,8 +6,6 @@ func NewMockStore() Store {
 	return &mockStore{}
 }
 
-func (m *mockStore) SaveRequest(reqEntry *RequestEntry, rawTxEntries []*EthSendRawTxEntry) {}
-
 func (m *mockStore) SaveRequestEntry(entry *RequestEntry) error {
 	return nil
 }

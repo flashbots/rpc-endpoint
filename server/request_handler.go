@@ -112,10 +112,7 @@ func (r *RpcRequestHandler) process() {
 
 // processRequest handles single request
 func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
-	var entry *database.EthSendRawTxEntry
-	if jsonReq.Method == "eth_sendRawTransaction" {
-		entry = r.requestRecord.AddEthSendRawTxEntries(uuid.New(), r.uid)
-	}
+	entry := r.requestRecord.AddEthSendRawTxEntry(jsonReq, uuid.New(), r.uid)
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, r.db, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry)
 	res := rpcReq.ProcessRequest()
@@ -135,10 +132,7 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 			logger := log.New(log.Ctx{"uid": r.uid, "id": id, "count": count})
 			// If the request contains eth_sendRawTransaction method, update the request record
 			// This rawTxEntry will be stored for protect analytics
-			var entry *database.EthSendRawTxEntry
-			if rpcReq.Method == "eth_sendRawTransaction" {
-				entry = r.requestRecord.AddEthSendRawTxEntries(id, r.uid)
-			}
+			entry := r.requestRecord.AddEthSendRawTxEntry(rpcReq, id, r.uid)
 			// Create rpc request
 			req := NewRpcRequest(logger, r.db, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry) // Set each individual request
 			res := req.ProcessRequest()
@@ -160,7 +154,18 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 func (r *RpcRequestHandler) finishRequest() {
 	reqDuration := time.Since(r.timeStarted) // At end of request, log the time it needed
 	r.requestRecord.requestEntry.RequestDurationMs = reqDuration.Milliseconds()
-	// Save both request entry and raw tx entries if present
-	r.db.SaveRequest(r.requestRecord.requestEntry, r.requestRecord.ethSendRawTxEntries)
+	go r.saveRecord() // // Save both request entry and raw tx entries if present
 	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
+}
+
+func (r *RpcRequestHandler) saveRecord() {
+	if len(r.requestRecord.ethSendRawTxEntries) > 0 { // Save entries if the request contains rawTxEntries
+		if err := r.db.SaveRequestEntry(r.requestRecord.requestEntry); err != nil {
+			log.Error("[saveRecord] SaveRequestEntry failed", "id", r.requestRecord.requestEntry.Id, "error", err)
+			return
+		}
+		if err := r.db.SaveRawTxEntries(r.requestRecord.ethSendRawTxEntries); err != nil {
+			log.Error("[saveRecord] SaveRawTxEntries failed", "requestId", r.requestRecord.requestEntry.Id, "error", err)
+		}
+	}
 }

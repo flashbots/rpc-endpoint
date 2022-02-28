@@ -585,7 +585,6 @@ func Test_StoreRequests(t *testing.T) {
 func Test_StoreBatchRequests(t *testing.T) {
 	// Store setup
 	memStore := database.NewMemStore()
-
 	// Server setup
 	serverSetup(memStore)
 

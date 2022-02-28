@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"time"
@@ -25,21 +24,6 @@ func NewPostgresStore(dsn string) *postgresStore {
 
 func (d *postgresStore) Close() {
 	d.DB.Close()
-}
-
-func (d *postgresStore) SaveRequest(reqEntry *RequestEntry, rawTxEntries []*EthSendRawTxEntry) {
-	go func() {
-		if len(rawTxEntries) > 0 { // Save entries if the requet contains rawTxEntries
-			if err := d.SaveRequestEntry(reqEntry); err != nil {
-				log.Error("[SaveRequest] SaveRequestEntry failed", "id", reqEntry.Id, "error", err)
-				return
-			}
-			if err := d.SaveRawTxEntries(rawTxEntries); err != nil {
-				log.Error("[SaveRequest] SaveRawTxEntries failed", "requestId", reqEntry.Id, "error", err)
-				return
-			}
-		}
-	}()
 }
 
 func (d *postgresStore) SaveRequestEntry(entry *RequestEntry) error {
