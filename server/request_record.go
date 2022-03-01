@@ -1,8 +1,8 @@
 package server
 
 import (
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
-	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
 	"net/http"
 	"sync"
@@ -12,27 +12,26 @@ type requestRecord struct {
 	requestEntry        *database.RequestEntry
 	ethSendRawTxEntries []*database.EthSendRawTxEntry
 	mutex               *sync.Mutex
+	db                  database.Store
 }
 
-func NewRequestRecord() *requestRecord {
+func NewRequestRecord(db database.Store) *requestRecord {
 	return &requestRecord{
 		requestEntry:        &database.RequestEntry{},
 		ethSendRawTxEntries: make([]*database.EthSendRawTxEntry, 0),
 		mutex:               &sync.Mutex{},
+		db:                  db,
 	}
 }
 
-func (r *requestRecord) AddEthSendRawTxEntry(jsonReq *types.JsonRpcRequest, id, requestId uuid.UUID) *database.EthSendRawTxEntry {
-	var entry *database.EthSendRawTxEntry
-	if jsonReq.Method == "eth_sendRawTransaction" {
-		entry = &database.EthSendRawTxEntry{
-			Id:        id,
-			RequestId: requestId,
-		}
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
-		r.ethSendRawTxEntries = append(r.ethSendRawTxEntries, entry)
+func (r *requestRecord) AddEthSendRawTxEntry(id, requestId uuid.UUID) *database.EthSendRawTxEntry {
+	entry := &database.EthSendRawTxEntry{
+		Id:        id,
+		RequestId: requestId,
 	}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.ethSendRawTxEntries = append(r.ethSendRawTxEntries, entry)
 	return entry
 }
 
@@ -46,4 +45,16 @@ func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, err
 	r.requestEntry.HttpResponseStatus = reqStatus
 	r.requestEntry.Origin = req.Header.Get("Origin")
 	r.requestEntry.Host = req.Header.Get("Host")
+}
+
+func (r *requestRecord) SaveRecord() {
+	if len(r.ethSendRawTxEntries) > 0 { // Save entries if the request contains rawTxEntries
+		if err := r.db.SaveRequestEntry(r.requestEntry); err != nil {
+			log.Error("[saveRecord] SaveRequestEntry failed", "id", r.requestEntry.Id, "error", err)
+			return
+		}
+		if err := r.db.SaveRawTxEntries(r.ethSendRawTxEntries); err != nil {
+			log.Error("[saveRecord] SaveRawTxEntries failed", "requestId", r.requestEntry.Id, "error", err)
+		}
+	}
 }

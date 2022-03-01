@@ -23,7 +23,6 @@ import (
 
 type RpcRequest struct {
 	logger                     log.Logger
-	db                         database.Store
 	client                     RPCProxyClient
 	jsonReq                    *types.JsonRpcRequest
 	jsonRes                    *types.JsonRpcResponse
@@ -38,10 +37,9 @@ type RpcRequest struct {
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 }
 
-func NewRpcRequest(logger log.Logger, db database.Store, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
-		db:                         db,
 		client:                     client,
 		jsonReq:                    jsonReq,
 		relaySigningKey:            relaySigningKey,
@@ -166,24 +164,22 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
+	r.ethSendRawTxEntry.ShouldSendToRelay = true
 
 	// Check if tx was already forwarded and should be blocked now
-	wasSentToRelay := r.blockResendingTxToRelay(txHash)
-	r.ethSendRawTxEntry.WasSentToRelay = wasSentToRelay
-	if wasSentToRelay {
+	if r.blockResendingTxToRelay(txHash) {
 		r.logger.Info("[sendTxToRelay] Blocked", "tx", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}
 
 	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "ip", r.ip, "fromAddress", r.txFrom, "toAddress", r.tx.To())
-
+	r.ethSendRawTxEntry.WasSentToRelay = true
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
 	if err != nil {
 		r.logger.Error("[sendTxToRelay] Redis:SetTxSentToRelay failed", "error", err)
 	}
-	r.ethSendRawTxEntry.ShouldSendToRelay = true
 	txTo := r.tx.To()
 	if txTo == nil {
 		r.writeRpcError("invalid target", types.JsonRpcInternalError)
