@@ -641,7 +641,6 @@ func Test_StoreValidateTxs(t *testing.T) {
 
 	for _, v := range memStore.EthSendRawTxs {
 		require.Equal(t, true, v.NeedsFrontRunningProtection)
-		require.Equal(t, true, v.ShouldSendToRelay)
 		require.Equal(t, "invalid nonce", v.Error)
 		require.Equal(t, -32603, v.ErrorCode)
 		require.Equal(t, 8, len(v.TxSmartContractMethod))

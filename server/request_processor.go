@@ -164,10 +164,10 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
-	r.ethSendRawTxEntry.ShouldSendToRelay = true
-
 	// Check if tx was already forwarded and should be blocked now
-	if r.blockResendingTxToRelay(txHash) {
+	IsBlockedBczAlreadySent := r.blockResendingTxToRelay(txHash)
+	if IsBlockedBczAlreadySent {
+		r.ethSendRawTxEntry.IsBlockedBczAlreadySent = IsBlockedBczAlreadySent
 		r.logger.Info("[sendTxToRelay] Blocked", "tx", txHash)
 		r.writeRpcResult(txHash)
 		return
@@ -175,6 +175,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "ip", r.ip, "fromAddress", r.txFrom, "toAddress", r.tx.To())
 	r.ethSendRawTxEntry.WasSentToRelay = true
+
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
 	if err != nil {
