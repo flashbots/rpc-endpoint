@@ -158,6 +158,12 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 func (r *RpcRequestHandler) finishRequest() {
 	reqDuration := time.Since(r.timeStarted) // At end of request, log the time it needed
 	r.requestRecord.requestEntry.RequestDurationMs = reqDuration.Milliseconds()
-	go r.requestRecord.SaveRecord() // // Save both request entry and raw tx entries if present
+	go func() {
+		// Save both request entry and raw tx entries if present
+		if err := r.requestRecord.SaveRecord(); err != nil {
+			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err)
+		}
+
+	}()
 	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
 }

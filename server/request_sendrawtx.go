@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/rpc-endpoint/types"
 	"strings"
 
@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	signatureMethodByteLen = 4 // first 4 byte of data field
+	scMethodBytes = 4 // first 4 byte of data field
 )
 
 func (r *RpcRequest) handle_sendRawTransaction() {
@@ -61,10 +61,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.ethSendRawTxEntry.TxFrom = r.txFrom
 	r.ethSendRawTxEntry.TxTo = AddressPtrToStr(r.tx.To())
 	r.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
-	r.ethSendRawTxEntry.TxData = common.Bytes2Hex(r.tx.Data())
+	r.ethSendRawTxEntry.TxData = hexutil.Encode(r.tx.Data())
 
-	if len(r.tx.Data()) >= signatureMethodByteLen {
-		r.ethSendRawTxEntry.TxSmartContractMethod = common.Bytes2Hex(r.tx.Data()[:signatureMethodByteLen])
+	if len(r.tx.Data()) >= scMethodBytes {
+		r.ethSendRawTxEntry.TxSmartContractMethod = hexutil.Encode(r.tx.Data()[:scMethodBytes])
 	}
 
 	if r.tx.Nonce() >= 1e9 {

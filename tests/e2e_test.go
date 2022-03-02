@@ -643,7 +643,7 @@ func Test_StoreValidateTxs(t *testing.T) {
 		require.Equal(t, true, v.NeedsFrontRunningProtection)
 		require.Equal(t, "invalid nonce", v.Error)
 		require.Equal(t, -32603, v.ErrorCode)
-		require.Equal(t, 8, len(v.TxSmartContractMethod))
+		require.Equal(t, 10, len(v.TxSmartContractMethod))
 	}
 
 }

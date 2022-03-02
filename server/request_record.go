@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/ethereum/go-ethereum/log"
+	"fmt"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/google/uuid"
 	"net/http"
@@ -36,7 +36,6 @@ func (r *requestRecord) AddEthSendRawTxEntry(id, requestId uuid.UUID) *database.
 }
 
 func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, error string) {
-	// TODO:Error should be converted to enum
 	r.requestEntry.HttpMethod = req.Method
 	r.requestEntry.IpHash = GetIPHash(req)
 	r.requestEntry.Error = error
@@ -47,14 +46,14 @@ func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, err
 	r.requestEntry.Host = req.Header.Get("Host")
 }
 
-func (r *requestRecord) SaveRecord() {
+func (r *requestRecord) SaveRecord() error {
 	if len(r.ethSendRawTxEntries) > 0 { // Save entries if the request contains rawTxEntries
 		if err := r.db.SaveRequestEntry(r.requestEntry); err != nil {
-			log.Error("[saveRecord] SaveRequestEntry failed", "id", r.requestEntry.Id, "error", err)
-			return
+			return fmt.Errorf("SaveRequestEntry failed %v", err)
 		}
 		if err := r.db.SaveRawTxEntries(r.ethSendRawTxEntries); err != nil {
-			log.Error("[saveRecord] SaveRawTxEntries failed", "requestId", r.requestEntry.Id, "error", err)
+			return fmt.Errorf("SaveRawTxEntries failed %v", err)
 		}
 	}
+	return nil
 }
