@@ -1,4 +1,4 @@
-.PHONY: all build test up down migrate_up migrate_down clean lint cover cover-html
+.PHONY: all build test clean lint cover cover-html up down
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
