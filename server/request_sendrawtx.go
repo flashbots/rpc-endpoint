@@ -130,7 +130,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Proxy to public node now
 	readJsonRpcSuccess := r.proxyRequestRead()
-
+	r.ethSendRawTxEntry.WasSentToMempool = true
 	// Log after proxying
 	if !readJsonRpcSuccess {
 		r.logger.Error("[sendRawTransaction] Proxy to mempool failed")

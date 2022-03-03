@@ -90,7 +90,6 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
 func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	timeProxyStart := Now() // for measuring execution time
-
 	body, err := json.Marshal(r.jsonReq)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to marshal request before making proxy request", "error", err)

@@ -46,8 +46,9 @@ func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, err
 	r.requestEntry.Host = req.Header.Get("Host")
 }
 
+// SaveRecord will insert both requestRecord and rawTxEntries to db
 func (r *requestRecord) SaveRecord() error {
-	if len(r.ethSendRawTxEntries) > 0 { // Save entries if the request contains rawTxEntries
+	if len(r.getForwardedRawTxEntries()) > 0 { // Save entries if the request contains rawTxEntries
 		if err := r.db.SaveRequestEntry(r.requestEntry); err != nil {
 			return fmt.Errorf("SaveRequestEntry failed %v", err)
 		}
@@ -56,4 +57,15 @@ func (r *requestRecord) SaveRecord() error {
 		}
 	}
 	return nil
+}
+
+// getForwardedRawTxEntries returns list of rawTxEntry which are either sent to relay or mempool or entry with error
+func (r *requestRecord) getForwardedRawTxEntries() []*database.EthSendRawTxEntry {
+	entries := make([]*database.EthSendRawTxEntry, 0, len(r.ethSendRawTxEntries))
+	for _, entry := range r.ethSendRawTxEntries {
+		if entry.ErrorCode != 0 || entry.WasSentToRelay || entry.WasSentToMempool {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
 }
