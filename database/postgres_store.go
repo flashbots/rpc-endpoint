@@ -26,7 +26,7 @@ func (d *postgresStore) Close() {
 	d.DB.Close()
 }
 
-func (d *postgresStore) SaveRequestEntry(entry *RequestEntry) error {
+func (d *postgresStore) SaveRequestEntry(entry RequestEntry) error {
 	entry.InsertedAt = time.Now()
 	query := `INSERT INTO rpc_endpoint_requests 
 	(id, received_at, inserted_at, request_duration_ms, is_batch_request, num_request_in_batch, http_method, http_url, http_query_param, http_response_status, ip_hash, origin, host, error) VALUES (:id, :received_at, :inserted_at, :request_duration_ms, :is_batch_request, :num_request_in_batch, :http_method, :http_url, :http_query_param, :http_response_status, :ip_hash, :origin, :host, :error)`

@@ -6,20 +6,20 @@ import (
 )
 
 type memStore struct {
-	Requests      map[uuid.UUID]*RequestEntry
-	EthSendRawTxs map[uuid.UUID]*EthSendRawTxEntry
-	mutex         *sync.Mutex
+	Requests      map[uuid.UUID]RequestEntry
+	EthSendRawTxs map[uuid.UUID][]*EthSendRawTxEntry
+	mutex         sync.Mutex
 }
 
 func NewMemStore() *memStore {
 	return &memStore{
-		Requests:      make(map[uuid.UUID]*RequestEntry),
-		EthSendRawTxs: make(map[uuid.UUID]*EthSendRawTxEntry),
-		mutex:         &sync.Mutex{},
+		Requests:      make(map[uuid.UUID]RequestEntry),
+		EthSendRawTxs: make(map[uuid.UUID][]*EthSendRawTxEntry),
+		mutex:         sync.Mutex{},
 	}
 }
 
-func (m *memStore) SaveRequestEntry(entry *RequestEntry) error {
+func (m *memStore) SaveRequestEntry(entry RequestEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Requests[entry.Id] = entry
@@ -27,10 +27,10 @@ func (m *memStore) SaveRequestEntry(entry *RequestEntry) error {
 }
 
 func (m *memStore) SaveRawTxEntries(entries []*EthSendRawTxEntry) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	for _, tx := range entries {
-		m.EthSendRawTxs[tx.Id] = tx
+	if len(entries) != 0 {
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+		m.EthSendRawTxs[entries[0].RequestId] = entries
 	}
 	return nil
 }

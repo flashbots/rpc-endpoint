@@ -1,7 +1,7 @@
 BEGIN;
 CREATE TABLE rpc_endpoint_requests(
     id uuid not null unique primary key default gen_random_uuid(),
-    received_at timestamp with time zone not null default now(),
+    received_at timestamp with time zone not null,
     inserted_at timestamp with time zone not null default now(),
     request_duration_ms bigint not null,
     is_batch_request boolean,

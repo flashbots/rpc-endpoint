@@ -29,7 +29,7 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
-	psqlDsn         = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
+	psqlDsn         = flag.String("psql", os.Getenv("POSTGRES_DSN_LOCAL"), "Postgres DSN")
 	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
 )

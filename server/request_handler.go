@@ -112,7 +112,7 @@ func (r *RpcRequestHandler) process() {
 func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
-		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New(), r.uid)
+		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry)
@@ -135,7 +135,7 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 			// This rawTxEntry will be stored for protect analytics
 			var entry *database.EthSendRawTxEntry
 			if rpcReq.Method == "eth_sendRawTransaction" {
-				entry = r.requestRecord.AddEthSendRawTxEntry(id, r.uid)
+				entry = r.requestRecord.AddEthSendRawTxEntry(id)
 			}
 			// Create rpc request
 			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry) // Set each individual request
