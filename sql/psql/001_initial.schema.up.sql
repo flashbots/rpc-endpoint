@@ -18,6 +18,7 @@ CREATE TABLE rpc_endpoint_requests(
 CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     id uuid not null unique primary key,
     request_id uuid not null,
+    inserted_at timestamp with time zone not null default now(),
     is_on_oafc_list boolean,
     is_white_hat_bundle_collection boolean,
     white_hat_bundle_id varchar,
