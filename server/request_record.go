@@ -17,10 +17,7 @@ type requestRecord struct {
 
 func NewRequestRecord(db database.Store) *requestRecord {
 	return &requestRecord{
-		requestEntry:        database.RequestEntry{},
-		ethSendRawTxEntries: make([]*database.EthSendRawTxEntry, 0),
-		mutex:               sync.Mutex{},
-		db:                  db,
+		db: db,
 	}
 }
 
