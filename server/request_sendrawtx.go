@@ -7,6 +7,8 @@ import (
 	"github.com/flashbots/rpc-endpoint/types"
 	"strings"
 
+	"github.com/flashbots/rpc-endpoint/types"
+
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -105,7 +107,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Check for cancellation-tx
-	if len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
+	if r.tx.To() != nil && len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
 		r.ethSendRawTxEntry.IsCancelTx = true
 		if requestDone {
