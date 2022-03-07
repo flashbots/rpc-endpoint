@@ -177,12 +177,6 @@ func (r *RpcRequest) sendTxToRelay() {
 		r.logger.Error("[sendTxToRelay] Redis:SetTxSentToRelay failed", "error", err)
 	}
 
-	txTo := r.tx.To()
-	if txTo == nil {
-		r.writeRpcError("invalid target", types.JsonRpcInternalError)
-		return
-	}
-
 	minNonce, maxNonce, err := r.GetAddressNonceRange(r.txFrom)
 	if err != nil {
 		r.logger.Error("[sendTxToRelay] GetAddressNonceRange error", "error", err)
@@ -199,12 +193,16 @@ func (r *RpcRequest) sendTxToRelay() {
 	// only allow large transactions to certain addresses - default max tx size is 128KB
 	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
 	if r.tx.Size() > 131072 {
-		if _, found := allowedLargeTxTargets[txTo.Hex()]; !found {
-			r.logger.Error("[sendTxToRelay] large tx not allowed to target", "tx", txHash, "target", txTo)
+		if r.tx.To() == nil {
+			r.logger.Error("[sendTxToRelay] large tx not allowed to target null", "tx", txHash)
+			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
+			return
+		} else if _, found := allowedLargeTxTargets[r.tx.To().Hex()]; !found {
+			r.logger.Error("[sendTxToRelay] large tx not allowed to target", "tx", txHash, "target", r.tx.To())
 			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
 			return
 		}
-		r.logger.Info("sendTxToRelay] allowed large tx", "tx", txHash, "target", txTo)
+		r.logger.Info("sendTxToRelay] allowed large tx", "tx", txHash, "target", r.tx.To())
 	}
 
 	// remember this tx based on from+nonce (for cancel-tx)
