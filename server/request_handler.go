@@ -3,13 +3,14 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"time"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 // RPC request handler for a single/ batch JSON-RPC request
@@ -161,7 +162,7 @@ func (r *RpcRequestHandler) finishRequest() {
 	go func() {
 		// Save both request entry and raw tx entries if present
 		if err := r.requestRecord.SaveRecord(); err != nil {
-			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err)
+			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err, "requestId", r.uid)
 		}
 
 	}()

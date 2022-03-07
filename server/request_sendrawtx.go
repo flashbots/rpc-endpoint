@@ -62,7 +62,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.ethSendRawTxEntry.TxFrom = r.txFrom
 	r.ethSendRawTxEntry.TxTo = AddressPtrToStr(r.tx.To())
 	r.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
-	r.ethSendRawTxEntry.TxData = hexutil.Encode(r.tx.Data())
+
+	if len(r.tx.Data()) > 0 {
+		r.ethSendRawTxEntry.TxData = hexutil.Encode(r.tx.Data())
+	}
 
 	if len(r.tx.Data()) >= scMethodBytes {
 		r.ethSendRawTxEntry.TxSmartContractMethod = hexutil.Encode(r.tx.Data()[:scMethodBytes])
@@ -143,7 +146,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
 	if r.jsonRes.Error != nil {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "JSON-RPC Error", r.jsonRes.Error.Message)
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message)
 		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
 		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
 	} else {
