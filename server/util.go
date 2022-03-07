@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -92,6 +93,11 @@ func GetIP(r *http.Request) string {
 		return forwarded
 	}
 	return r.RemoteAddr
+}
+
+func GetIPHash(r *http.Request) string {
+	hash := md5.Sum([]byte(GetIP(r)))
+	return hex.EncodeToString(hash[:])
 }
 
 // CHROME_ID: nkbihfbeogaeaoehlefnkodbefgpgknn

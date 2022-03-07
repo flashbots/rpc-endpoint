@@ -1,4 +1,4 @@
-.PHONY: all build test clean lint cover cover-html
+.PHONY: all build test clean lint cover cover-html up down
 
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
@@ -28,3 +28,9 @@ cover-html:
 	go test -coverpkg=github.com/flashbots/rpc-endpoint/server,github.com/flashbots/rpc-endpoint/types,github.com/flashbots/rpc-endpoint/utils -coverprofile=/tmp/go-rpcendpoint.cover.tmp ./...
 	go tool cover -html=/tmp/go-rpcendpoint.cover.tmp
 	unlink /tmp/go-rpcendpoint.cover.tmp
+
+up:
+	docker-compose up -d
+
+down:
+	docker-compose down -v

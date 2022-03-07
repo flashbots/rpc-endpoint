@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"github.com/flashbots/rpc-endpoint/database"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -33,9 +34,10 @@ type RpcRequest struct {
 	origin                     string
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
+	ethSendRawTxEntry          *database.EthSendRawTxEntry
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -45,6 +47,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		origin:                     origin,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
+		ethSendRawTxEntry:          ethSendRawTxEntry,
 	}
 }
 
@@ -53,6 +56,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
+		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
@@ -79,7 +83,6 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 				return r.jsonRes
 			}
 		}
-		// r.logger.Info("[ProcessRequest] Proxy to node successful", "method", r.jsonReq.Method)
 	}
 	return r.jsonRes
 }
@@ -87,7 +90,6 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 // Proxies the incoming request to the target URL, and tries to parse JSON-RPC response (and check for specific)
 func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	timeProxyStart := Now() // for measuring execution time
-
 	body, err := json.Marshal(r.jsonReq)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to marshal request before making proxy request", "error", err)
@@ -161,15 +163,17 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
-
 	// Check if tx was already forwarded and should be blocked now
-	if r.blockResendingTxToRelay(txHash) {
+	IsBlockedBczAlreadySent := r.blockResendingTxToRelay(txHash)
+	if IsBlockedBczAlreadySent {
+		r.ethSendRawTxEntry.IsBlockedBczAlreadySent = IsBlockedBczAlreadySent
 		r.logger.Info("[sendTxToRelay] Blocked", "tx", txHash)
 		r.writeRpcResult(txHash)
 		return
 	}
 
 	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "ip", r.ip, "fromAddress", r.txFrom, "toAddress", r.tx.To())
+	r.ethSendRawTxEntry.WasSentToRelay = true
 
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
@@ -369,6 +373,10 @@ func (r *RpcRequest) WhitehatBalanceCheckerRewrite() {
 }
 
 func (r *RpcRequest) writeRpcError(msg string, errCode int) {
+	if r.jsonReq.Method == "eth_sendRawTransaction" {
+		r.ethSendRawTxEntry.Error = msg
+		r.ethSendRawTxEntry.ErrorCode = errCode
+	}
 	r.jsonRes = &types.JsonRpcResponse{
 		Id:      r.jsonReq.Id,
 		Version: "2.0",

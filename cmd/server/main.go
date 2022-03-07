@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/server"
 	"os"
 	"strings"
@@ -28,6 +29,7 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
+	psqlDsn         = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
 	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
 )
@@ -57,8 +59,7 @@ func main() {
 	log.Info("Init rpc-endpoint", "version", version)
 
 	if *relaySigningKey == "" {
-		log.Error("Cannot use the relay without a signing key.")
-		return
+		log.Crit("Cannot use the relay without a signing key.")
 	}
 
 	pkHex := strings.Replace(*relaySigningKey, "0x", "", 1)
@@ -70,15 +71,21 @@ func main() {
 	}
 
 	if err != nil {
-		log.Error("Error with relay signing key", "error", err)
-		return
+		log.Crit("Error with relay signing key", "error", err)
+	}
+
+	// Setup database
+	var db database.Store
+	if *psqlDsn == "" {
+		db = database.NewMockStore()
+	} else {
+		db = database.NewPostgresStore(*psqlDsn)
 	}
 
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl)
+	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)
 	if err != nil {
-		log.Error("Server init error", "error", err)
-		return
+		log.Crit("Server init error", "error", err)
 	}
 	s.Start()
 }

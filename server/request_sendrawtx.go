@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/rpc-endpoint/types"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+)
+
+const (
+	scMethodBytes = 4 // first 4 byte of data field
 )
 
 func (r *RpcRequest) handle_sendRawTransaction() {
@@ -33,17 +38,18 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
-
+	r.ethSendRawTxEntry.TxRaw = r.rawTxHex
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
 		r.logger.Info("[sendRawTransaction] Reading transaction object failed", "tx", r.rawTxHex)
 		r.writeRpcError(fmt.Sprintf("reading transaction object failed - rawTx: %s", r.rawTxHex), types.JsonRpcInvalidRequest)
 		return
 	}
-
+	r.ethSendRawTxEntry.TxHash = r.tx.Hash().String()
 	// Get address from tx
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
+
 		r.logger.Info("[sendRawTransaction] Couldn't get address from rawTx", "error", err)
 		r.writeRpcError(fmt.Sprintf("couldn't get address from rawTx: %v", err), types.JsonRpcInvalidRequest)
 		return
@@ -51,6 +57,16 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
+
+	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason
+	r.ethSendRawTxEntry.TxFrom = r.txFrom
+	r.ethSendRawTxEntry.TxTo = AddressPtrToStr(r.tx.To())
+	r.ethSendRawTxEntry.TxNonce = int(r.tx.Nonce())
+	r.ethSendRawTxEntry.TxData = hexutil.Encode(r.tx.Data())
+
+	if len(r.tx.Data()) >= scMethodBytes {
+		r.ethSendRawTxEntry.TxSmartContractMethod = hexutil.Encode(r.tx.Data()[:scMethodBytes])
+	}
 
 	if r.tx.Nonce() >= 1e9 {
 		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txHash", r.tx.Hash(), "txFromLower", txFromLower, "origin", r.origin)
@@ -65,8 +81,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	if err != nil {
 		r.logger.Error("[sendRawTransaction] Redis:SetSenderOfTxHash failed: %v", err)
 	}
-
-	if isOnOFACList(r.txFrom) {
+	isOnOfacList := isOnOFACList(r.txFrom)
+	r.ethSendRawTxEntry.IsOnOafcList = isOnOfacList
+	if isOnOfacList {
 		r.logger.Info("[sendRawTransaction] Blocked tx from ofac sanctioned address", "txFrom", r.txFrom)
 		r.writeRpcError("blocked tx from ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
@@ -74,7 +91,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
-
+	r.ethSendRawTxEntry.NeedsFrontRunningProtection = needsProtection
 	// If users specify a bundle ID, cache this transaction
 	if r.isWhitehatBundleCollection {
 		r.logger.Info("[WhitehatBundleCollection] Adding tx to bundle", "whiteHatBundleId", r.whitehatBundleId, "tx", r.rawTxHex)
@@ -91,6 +108,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Check for cancellation-tx
 	if r.tx.To() != nil && len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
+		r.ethSendRawTxEntry.IsCancelTx = true
 		if requestDone {
 			return
 		}
@@ -113,7 +131,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Proxy to public node now
 	readJsonRpcSuccess := r.proxyRequestRead()
-
+	r.ethSendRawTxEntry.WasSentToMempool = true
 	// Log after proxying
 	if !readJsonRpcSuccess {
 		r.logger.Error("[sendRawTransaction] Proxy to mempool failed")
@@ -126,6 +144,8 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if r.jsonRes.Error != nil {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "JSON-RPC Error", r.jsonRes.Error.Message)
+		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
+		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
 	} else {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
 	}

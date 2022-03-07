@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+  database:
+    image: postgres:latest
+    container_name:
+      pg-rpc-endpoint
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=test
+    healthcheck:
+      test:  [ "CMD", "pg_isready", "-q", "-d", "test", "-U", "postgres" ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ./sql/psql:/migrations
+    command: [ "-path", "/migrations", "-database",  "postgres://postgres:postgres@pg-rpc-endpoint:5432/test?sslmode=disable", "up" ]
+    links:
+      - database
+    depends_on:
+      database:
+        condition: service_healthy
+volumes:
+  db-data:
