@@ -3,10 +3,9 @@ package server
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/flashbots/rpc-endpoint/types"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/rpc-endpoint/types"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
