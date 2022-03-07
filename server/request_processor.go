@@ -7,12 +7,13 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"github.com/flashbots/rpc-endpoint/database"
 	"io/ioutil"
 	"math/big"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/flashbots/rpc-endpoint/database"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -284,6 +285,11 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	if cancelTxAlreadySentToRelay { // already sent
 		r.writeRpcResult(cancelTxHash)
 		return true
+	}
+
+	err = RState.SetTxSentToRelay(cancelTxHash)
+	if err != nil {
+		r.logger.Error("[cancelTx] Redis:SetTxSentToRelay failed", "error", err)
 	}
 
 	r.logger.Info("[cancel-tx] sending to relay", "initialTxHash", initialTxHash, "txFromLower", txFromLower, "txNonce", r.tx.Nonce())

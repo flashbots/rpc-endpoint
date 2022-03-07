@@ -1,4 +1,5 @@
 BEGIN;
+
 CREATE TABLE rpc_endpoint_requests(
     id uuid not null unique primary key default gen_random_uuid(),
     received_at timestamp with time zone not null,
@@ -8,13 +9,14 @@ CREATE TABLE rpc_endpoint_requests(
     num_request_in_batch integer,
     http_method varchar(10) not null,
     http_url varchar(100) not null,
-    http_query_param varchar,
+    http_query_param text,
     http_response_status integer,
     ip_hash varchar(32) not null,
-    origin varchar(100),
-    host varchar(100),
-    error varchar(1000)
+    origin text,
+    host text,
+    error text
 );
+
 CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     id uuid not null unique primary key,
     request_id uuid not null,
@@ -27,14 +29,15 @@ CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     was_sent_to_relay boolean,
     was_sent_to_mempool boolean,
     is_blocked_bcz_already_sent boolean,
-    error varchar(1000),
+    error text,
     error_code integer,
-    tx_raw varchar,
+    tx_raw text,
     tx_hash varchar(66),
     tx_from varchar(42),
     tx_to varchar(42),
     tx_nonce integer,
-    tx_data varchar(10000),
+    tx_data text,
     tx_smart_contract_method varchar(10)
 );
+
 COMMIT;
