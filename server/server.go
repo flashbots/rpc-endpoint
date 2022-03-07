@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"github.com/flashbots/rpc-endpoint/database"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -36,11 +37,11 @@ type RpcEndPointServer struct {
 	listenAddress   string
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
+	db              database.Store
 }
 
-func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
 	var err error
-
 	if DebugDontSendTx {
 		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
 	}
@@ -53,7 +54,6 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		}
 		redisUrl = redisServer.Addr()
 	}
-
 	// Setup redis connection
 	log.Info("Connecting to redis...", "redisUrl", redisUrl)
 	RState, err = NewRedisState(redisUrl)
@@ -70,6 +70,7 @@ func NewRpcEndPointServer(version string, listenAddress, proxyUrl, relayUrl stri
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
 		relaySigningKey: relaySigningKey,
+		db:              db,
 	}, nil
 }
 
@@ -85,9 +86,9 @@ func (s *RpcEndPointServer) Start() {
 	}()
 
 	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", http.HandlerFunc(s.HandleHttpRequest))
-	http.HandleFunc("/health", http.HandlerFunc(s.handleHealthRequest))
-	http.HandleFunc("/bundle", http.HandlerFunc(s.HandleBundleRequest))
+	http.HandleFunc("/", s.HandleHttpRequest)
+	http.HandleFunc("/health", s.handleHealthRequest)
+	http.HandleFunc("/bundle", s.HandleBundleRequest)
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
@@ -96,20 +97,19 @@ func (s *RpcEndPointServer) Start() {
 }
 
 func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
-	respw.Header().Set("Access-Control-Allow-Origin", "*")
-	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
+	setCorsHeaders(respw)
 
-	if req.Method == "GET" {
+	if req.Method == http.MethodGet {
 		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
 		return
 	}
 
-	if req.Method == "OPTIONS" {
+	if req.Method == http.MethodOptions {
 		respw.WriteHeader(http.StatusOK)
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey)
+	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db)
 	request.process()
 }
 
@@ -133,16 +133,14 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 }
 
 func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *http.Request) {
-	respw.Header().Set("Access-Control-Allow-Origin", "*")
-	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
-
+	setCorsHeaders(respw)
 	bundleId := req.URL.Query().Get("id")
 	if bundleId == "" {
 		http.Error(respw, "no bundle id", http.StatusBadRequest)
 		return
 	}
 
-	if req.Method == "GET" {
+	if req.Method == http.MethodGet {
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
 			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
@@ -161,12 +159,11 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
 		respw.Header().Set("Content-Type", "application/json")
 		respw.WriteHeader(http.StatusOK)
 		respw.Write(jsonResp)
 
-	} else if req.Method == "DELETE" {
+	} else if req.Method == http.MethodDelete {
 		RState.DelWhitehatBundleTx(bundleId)
 		respw.WriteHeader(http.StatusOK)
 
@@ -182,4 +179,9 @@ func IsBlacklisted(ip string) bool {
 		}
 	}
 	return false
+}
+
+func setCorsHeaders(respw http.ResponseWriter) {
+	respw.Header().Set("Access-Control-Allow-Origin", "*")
+	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
 }

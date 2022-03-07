@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"github.com/flashbots/rpc-endpoint/database"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -44,8 +45,13 @@ func init() {
 
 var bundleJsonApi *httptest.Server
 
-// Reset the RPC endpoint and mock backend servers
-func resetTestServers() {
+// Setup RPC endpoint and mock backend servers
+func testServerSetupWithMockStore() {
+	db := database.NewMockStore()
+	testServerSetup(db)
+}
+
+func testServerSetup(db database.Store) {
 	redisServer, err := miniredis.Run()
 	if err != nil {
 		panic(err)
@@ -61,7 +67,7 @@ func resetTestServers() {
 	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer("test", "", rpcBackendServer.URL, rpcBackendServer.URL, relaySigningKey, redisServer.Addr())
+	rpcServer, err := server.NewRpcEndPointServer("test", "", RpcBackendServerUrl, RpcBackendServerUrl, relaySigningKey, redisServer.Addr(), db)
 	if err != nil {
 		panic(err)
 	}
@@ -70,16 +76,12 @@ func resetTestServers() {
 	testutils.RpcEndpointUrl = rpcEndpointServer.URL
 }
 
-func init() {
-	resetTestServers()
-}
-
 /*
  * HTTP TESTS
  */
 // Check headers: status and content-type
 func TestStandardHeaders(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	rpcRequest := types.NewJsonRpcRequest(1, "null", nil)
 	jsonData, err := json.Marshal(rpcRequest)
@@ -98,7 +100,7 @@ func TestStandardHeaders(t *testing.T) {
 
 // Check json-rpc id and version
 func TestJsonRpc(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	_id1 := float64(84363)
 	rpcRequest := types.NewJsonRpcRequest(_id1, "null", nil)
@@ -118,7 +120,7 @@ func TestJsonRpc(t *testing.T) {
 
 // Test intercepting eth_call for Flashbots RPC contract
 func TestEthCallIntercept(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	var rpcResult string
 
 	// eth_call intercept
@@ -139,7 +141,7 @@ func TestEthCallIntercept(t *testing.T) {
 }
 
 func TestNetVersionIntercept(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	var rpcResult string
 
 	// eth_call intercept
@@ -156,7 +158,7 @@ func TestNetVersionIntercept(t *testing.T) {
 
 // Ensure bundle response is the tx hash, not the bundle id
 func TestSendBundleResponse(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	// should be tx hash
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
@@ -165,7 +167,7 @@ func TestSendBundleResponse(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	expectedResultRaw := `{"id":1,"result":null,"jsonrpc":"2.0"}` + "\n"
 
 	// Build and do RPC call: "null"
@@ -194,7 +196,7 @@ func TestNull(t *testing.T) {
 }
 
 func TestGetTxReceiptNull(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_Hash})
 	jsonResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_getTransactionCount)
@@ -209,7 +211,7 @@ func TestGetTxReceiptNull(t *testing.T) {
 }
 
 func TestMetamaskFix(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	testutils.MockTxApiStatusForHash[testutils.TestTx_MM2_Hash] = types.TxStatusFailed
 
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
@@ -251,7 +253,7 @@ func TestMetamaskFix(t *testing.T) {
 }
 
 func TestRelayTx(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
@@ -288,7 +290,7 @@ func TestRelayTx(t *testing.T) {
 }
 
 func TestRelayCancelTx(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	// sendRawTransaction of the initial TX
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Initial_RawTx})
@@ -316,7 +318,7 @@ func TestRelayCancelTx(t *testing.T) {
 
 // cancel-tx without initial related tx would just go to mempool
 func TestRelayCancelTxWithoutInitialTx(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	// Send cancel-tx to the RPC backend
 	req_cancelTx := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
@@ -334,7 +336,7 @@ func TestRelayCancelTxWithoutInitialTx(t *testing.T) {
 
 // tx with wrong nonce should be rejected
 func TestRelayTxWithWrongNonce(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	nonceOrig := testutils.TestTx_BundleFailedTooManyTimes_Nonce
 	testutils.TestTx_BundleFailedTooManyTimes_Nonce = "0x1f"
@@ -351,7 +353,7 @@ func TestRelayTxWithWrongNonce(t *testing.T) {
 
 // Test batch request with multiple eth raw transaction
 func TestBatch_eth_sendRawTransaction(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	var batch []*types.JsonRpcRequest
 	for i := range "testing" {
@@ -365,7 +367,7 @@ func TestBatch_eth_sendRawTransaction(t *testing.T) {
 
 // Test batch request with different eth transaction
 func TestBatch_eth_transaction(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	var batch []*types.JsonRpcRequest
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
@@ -394,7 +396,7 @@ func TestBatch_eth_transaction(t *testing.T) {
 
 // Test batch request with different eth transaction
 func TestBatch_eth_call(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	var batch []*types.JsonRpcRequest
 	// eth_call intercept
@@ -436,7 +438,7 @@ func TestBatch_eth_call(t *testing.T) {
 
 // Test batch request with different transaction
 func TestBatch_CombinationOfSuccessAndFailure(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	var batch []*types.JsonRpcRequest
 	// eth_call intercept
@@ -467,7 +469,7 @@ func TestBatch_CombinationOfSuccessAndFailure(t *testing.T) {
 
 // Test batch request with multiple eth raw transaction
 func TestBatch_Validate_eth_sendRawTransaction_Error(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	// key=request-id, value=json-rpc error
 	m := map[float64]int{
 		1: types.JsonRpcInvalidParams,
@@ -495,7 +497,7 @@ func TestBatch_Validate_eth_sendRawTransaction_Error(t *testing.T) {
 // Whitehat Tests
 //
 func TestWhitehatBundleCollection(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 
 	bundleId := "123"
 	url := testutils.RpcEndpointUrl + "?bundle=" + bundleId
@@ -540,7 +542,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 }
 
 func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
-	resetTestServers()
+	testServerSetupWithMockStore()
 	bundleId := "123"
 	url := testutils.RpcEndpointUrl + "?bundle=" + bundleId
 
@@ -553,4 +555,100 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	err = json.Unmarshal(resp.Result, &val)
 	require.Nil(t, err, err)
 	require.Equal(t, "0x56bc75e2d63100000", val)
+}
+
+func Test_StoreRequests(t *testing.T) {
+	// Store setup
+	memStore := database.NewMemStore()
+
+	// Server setup
+	testServerSetup(memStore)
+
+	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_Hash})
+	_ = testutils.SendRpcAndParseResponseOrFailNow(t, req_getTransactionCount)
+	// sendRawTransaction of the initial TX
+	reqSendRawTransaction1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Initial_RawTx})
+	testutils.SendRpcAndParseResponseOrFailNow(t, reqSendRawTransaction1)
+
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	reqSendRawTransaction2 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, reqSendRawTransaction2)
+	require.Nil(t, r1.Error)
+
+	require.Equal(t, 2, len(memStore.Requests))
+	require.Equal(t, 2, len(memStore.EthSendRawTxs))
+	for _, txs := range memStore.EthSendRawTxs {
+		for _, tx := range txs {
+			assert.Equal(t, true, tx.NeedsFrontRunningProtection)
+		}
+	}
+}
+
+func Test_StoreBatchRequests(t *testing.T) {
+	// Store setup
+	memStore := database.NewMemStore()
+	// Server setup
+	testServerSetup(memStore)
+
+	var batch []*types.JsonRpcRequest
+	// eth_call intercept
+	req := types.NewJsonRpcRequest(1, "eth_call", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1a",
+	}})
+	batch = append(batch, req)
+	// eth_call passthrough
+	req2 := types.NewJsonRpcRequest(1, "eth_callxvssfa", []interface{}{map[string]string{
+		"from": "0xb60e8dd61c5d32be8058bb8eb970870f07233155",
+		"to":   "0xf1a54b0759b58661cea17cff19dd37940a9b5f1b",
+	}})
+	batch = append(batch, req2)
+	reqGetTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
+	batch = append(batch, reqGetTransactionCount)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
+	batch = append(batch, reqSendRawTransaction)
+	// call getTxReceipt to trigger query to Tx API
+	reqGetTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
+	batch = append(batch, reqGetTransactionReceipt)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 5)
+	require.Equal(t, 1, len(memStore.Requests))
+	require.Equal(t, 1, len(memStore.EthSendRawTxs))
+}
+
+func Test_StoreValidateTxs(t *testing.T) {
+	// Store setup
+	memStore := database.NewMemStore()
+
+	// Server setup
+	testServerSetup(memStore)
+
+	var batch []*types.JsonRpcRequest
+
+	// call sendRawTx
+	reqSendRawTransactionInvalidNonce1 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_Invalid_Nonce_1})
+	batch = append(batch, reqSendRawTransactionInvalidNonce1)
+
+	reqSendRawTransactionInvalidNonce2 := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_Invalid_Nonce_2})
+	batch = append(batch, reqSendRawTransactionInvalidNonce2)
+
+	res, err := testutils.SendBatchRpcAndParseResponse(batch)
+	require.Nil(t, err, err)
+	assert.Equal(t, len(res), 2)
+	require.Equal(t, 1, len(memStore.Requests))
+	require.Equal(t, 1, len(memStore.EthSendRawTxs))
+
+	for _, entries := range memStore.EthSendRawTxs {
+		for _, entry := range entries {
+			require.Equal(t, true, entry.NeedsFrontRunningProtection)
+			require.Equal(t, "invalid nonce", entry.Error)
+			require.Equal(t, -32603, entry.ErrorCode)
+			require.Equal(t, 10, len(entry.TxSmartContractMethod))
+		}
+
+	}
+
 }
