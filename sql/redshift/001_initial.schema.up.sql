@@ -29,7 +29,7 @@ CREATE TABLE rpc_endpoint_eth_send_raw_txs(
     was_sent_to_relay boolean,
     was_sent_to_mempool boolean,
     is_blocked_bcz_already_sent boolean,
-    error varchar(2000),
+    error varchar(max),
     error_code integer,
     tx_raw varchar(max),
     tx_hash varchar(66),
