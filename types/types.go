@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/metachris/flashbotsrpc"
 	"time"
 )
 
@@ -102,4 +103,14 @@ type RelayErrorResponse struct {
 type BundleResponse struct {
 	BundleId string   `json:"bundleId"`
 	RawTxs   []string `json:"rawTxs"`
+}
+
+type SendPrivateTransactionRequestWithPreference struct {
+	SendPrivateTx flashbotsrpc.FlashbotsSendPrivateTransactionRequest
+	Preference    *Preference `json:"preference,omitempty"`
+}
+
+type Preference struct {
+	// If set do not include tx to bundle, directly send tx to miners
+	Fast *bool `json:"fast,omitempty"`
 }
