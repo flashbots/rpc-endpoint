@@ -60,11 +60,10 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	var preferences *types.Preferences
+	var preferences *types.PrivateTxPreferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
-		isFast := true
-		preferences = &types.Preferences{Fast: &isFast}
-		r.logger.Info("[process] Setting fast preference", "isFast", isFast)
+		preferences = &types.PrivateTxPreferences{Fast: true}
+		r.logger.Info("[process] Setting fast preference", "isFast", preferences.Fast)
 	}
 
 	// If users specify a proxy url in their rpc endpoint they can have their requests proxied to that endpoint instead of Infura
@@ -118,7 +117,7 @@ func (r *RpcRequestHandler) process() {
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.Preferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
@@ -131,7 +130,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.Preferences) {
+func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request

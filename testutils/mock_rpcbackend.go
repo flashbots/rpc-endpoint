@@ -23,7 +23,6 @@ var getBundleStatusByTransactionHash_Response = types.GetBundleStatusByTransacti
 var MockBackendLastRawRequest *http.Request
 var MockBackendLastJsonRpcRequest *types.JsonRpcRequest
 var MockBackendLastJsonRpcRequestTimestamp time.Time
-var IsFastPreferenceSet bool
 
 func MockRpcBackendReset() {
 	MockBackendLastRawRequest = nil
@@ -68,11 +67,7 @@ func handleRpcRequest(req *types.JsonRpcRequest) (result interface{}, err error)
 
 		// Relay calls
 	case "eth_sendPrivateTransaction":
-		reqParam := req.Params[0].(map[string]interface{})
-		param := reqParam["SendPrivateTx"].(map[string]interface{})
-		if preference, ok := reqParam["preference"]; ok {
-			IsFastPreferenceSet = preference.(map[string]interface{})["fast"].(bool)
-		}
+		param := req.Params[0].(map[string]interface{})
 		if param["tx"] == TestTx_BundleFailedTooManyTimes_RawTx {
 			return TestTx_BundleFailedTooManyTimes_Hash, nil
 		} else {

@@ -263,13 +263,12 @@ func TestRelayTx(t *testing.T) {
 	// Ensure that request called eth_sendPrivateTransaction with correct param
 	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
 
-	response := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
-	resp := response["SendPrivateTx"].(map[string]interface{})
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
 	require.Equal(t, testutils.TestTx_BundleFailedTooManyTimes_RawTx, resp["tx"])
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0xfa0ee317701425e3e1b5390e682d7b8816a3dd2fb0d29a5ec6274dfd0691128f483af81f89affbbbbed66cf29f265c17796095080adaae75bea0bfb98658591300", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0xc48e6596341d9a32e75f52eabcd700dacd8e15a2c24475b9ff4d4211cc93b2e85e41c58daa6a51a5272835401b3802a134eff90b3d32a9de0c335fbbba5efe1601", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
@@ -302,12 +301,11 @@ func TestRelayTxWithFastPreference(t *testing.T) {
 	// Ensure that request called eth_sendPrivateTransaction with correct param
 	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
 
-	response := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
-	resp := response["SendPrivateTx"].(map[string]interface{})
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
 	require.Equal(t, testutils.TestTx_BundleFailedTooManyTimes_RawTx, resp["tx"])
 	// Ensure fast endpoint is called and fast preference is set
-	require.True(t, testutils.IsFastPreferenceSet)
-
+	preferences := resp["preferences"].(map[string]interface{})["fast"].(bool)
+	require.True(t, preferences)
 }
 
 func TestRelayCancelTx(t *testing.T) {
@@ -321,8 +319,7 @@ func TestRelayCancelTx(t *testing.T) {
 	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
 
 	// Ensure that the RPC backend sent the rawTx to the relay
-	response := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
-	resp := response["SendPrivateTx"].(map[string]interface{})
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
 	require.Equal(t, testutils.TestTx_CancelAtRelay_Initial_RawTx, resp["tx"])
 
 	// Send cancel-tx to the RPC backend
