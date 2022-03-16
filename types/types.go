@@ -107,10 +107,10 @@ type BundleResponse struct {
 
 type SendPrivateTransactionRequestWithPreference struct {
 	SendPrivateTx flashbotsrpc.FlashbotsSendPrivateTransactionRequest
-	Preference    *Preference `json:"preference,omitempty"`
+	Preferences   *Preferences `json:"preference,omitempty"`
 }
 
-type Preference struct {
+type Preferences struct {
 	// If set do not include tx to bundle, directly send tx to miners
 	Fast *bool `json:"fast,omitempty"`
 }
