@@ -63,7 +63,7 @@ func (r *RpcRequestHandler) process() {
 	var preferences *types.PrivateTxPreferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
 		preferences = &types.PrivateTxPreferences{Fast: true}
-		r.logger.Info("[process] Setting fast preference", "isFast", preferences.Fast)
+		r.logger.Info("[process] Setting fast preference")
 	}
 
 	// If users specify a proxy url in their rpc endpoint they can have their requests proxied to that endpoint instead of Infura
