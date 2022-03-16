@@ -60,10 +60,9 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	var isFast bool
 	var preferences *types.Preferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
-		isFast = true
+		isFast := true
 		preferences = &types.Preferences{Fast: &isFast}
 		r.logger.Info("[process] Setting fast preference", "isFast", isFast)
 	}
