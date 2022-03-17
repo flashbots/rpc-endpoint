@@ -23,6 +23,14 @@ func SendRpcAndParseResponse(req *types.JsonRpcRequest) (*types.JsonRpcResponse,
 func SendBatchRpcAndParseResponse(req []*types.JsonRpcRequest) ([]*types.JsonRpcResponse, error) {
 	return SendBatchRpcAndParseResponseTo(RpcEndpointUrl, req)
 }
+func SendRpcWithFastPreferenceAndParseResponse(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
+	url := RpcEndpointUrl + "/fast/"
+	res, err := SendRpcAndParseResponseTo(url, req)
+	if err != nil {
+		t.Fatal("sendRpcAndParseResponse error:", err)
+	}
+	return res
+}
 
 func SendRpcAndParseResponseOrFailNow(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
 	res, err := SendRpcAndParseResponse(req)

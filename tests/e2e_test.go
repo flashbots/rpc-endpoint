@@ -289,6 +289,25 @@ func TestRelayTx(t *testing.T) {
 	require.Equal(t, uint64(30), nonce)
 }
 
+func TestRelayTxWithFastPreference(t *testing.T) {
+	testServerSetupWithMockStore()
+
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
+	// call rpc with fast preference
+	r1 := testutils.SendRpcWithFastPreferenceAndParseResponse(t, reqSendRawTransaction)
+	require.Nil(t, r1.Error)
+
+	// Ensure that request called eth_sendPrivateTransaction with correct param
+	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
+	require.Equal(t, testutils.TestTx_BundleFailedTooManyTimes_RawTx, resp["tx"])
+	// Ensure fast endpoint is called and fast preference is set
+	preferences := resp["preferences"].(map[string]interface{})["fast"].(bool)
+	require.True(t, preferences)
+}
+
 func TestRelayCancelTx(t *testing.T) {
 	testServerSetupWithMockStore()
 

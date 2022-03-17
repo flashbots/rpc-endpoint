@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -59,6 +60,12 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
+	var preferences *types.PrivateTxPreferences
+	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
+		preferences = &types.PrivateTxPreferences{Fast: true}
+		r.logger.Info("[process] Setting fast preference")
+	}
+
 	// If users specify a proxy url in their rpc endpoint they can have their requests proxied to that endpoint instead of Infura
 	// e.g. https://rpc.flashbots.net?url=http://RPC-ENDPOINT.COM
 	customProxyUrl, ok := r.req.URL.Query()["url"]
@@ -101,29 +108,29 @@ func (r *RpcRequestHandler) process() {
 		r.requestRecord.requestEntry.NumRequestInBatch = len(jsonBatchReq)
 		//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 0, len(jsonBatchReq))
 		// Process batch request
-		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId, preferences)
 		return
 	}
 	// Process single request
 	//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 1)
-	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId)
+	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId, preferences)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string) {
+func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request
@@ -139,7 +146,7 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 				entry = r.requestRecord.AddEthSendRawTxEntry(id)
 			}
 			// Create rpc request
-			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry) // Set each individual request
+			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry, preferences) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i], r.requestRecord)

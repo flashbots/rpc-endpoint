@@ -36,9 +36,10 @@ type RpcRequest struct {
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
+	preferences                *types.PrivateTxPreferences
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences *types.PrivateTxPreferences) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -49,6 +50,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
 		ethSendRawTxEntry:          ethSendRawTxEntry,
+		preferences:                preferences,
 	}
 }
 
@@ -150,7 +152,7 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 	}
 
 	// Allow sending to relay if tx has failed, or if it's still unknown after a while
-	txStatus := types.PrivateTxStatus(txStatusApiResponse.Status)
+	txStatus := txStatusApiResponse.Status
 	if txStatus == types.TxStatusFailed {
 		return false // don't block if tx failed
 	} else if txStatus == types.TxStatusUnknown && time.Since(timeSent).Minutes() >= 5 {
@@ -227,8 +229,11 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	sendPrivTxArgs := flashbotsrpc.FlashbotsSendPrivateTransactionRequest{Tx: r.rawTxHex}
-	_, err = FlashbotsRPC.FlashbotsSendPrivateTransaction(r.relaySigningKey, sendPrivTxArgs)
+	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
+	sendPrivateTxArgs.Tx = r.rawTxHex
+	sendPrivateTxArgs.Preferences = r.preferences
+
+	_, err = FlashbotsRPC.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.logger.Info("[sendTxToRelay] Relay error response", "error", err, "rawTx", r.rawTxHex)
