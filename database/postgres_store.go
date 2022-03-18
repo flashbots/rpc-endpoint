@@ -2,9 +2,10 @@ package database
 
 import (
 	"context"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"time"
 )
 
 const (
@@ -17,6 +18,9 @@ type postgresStore struct {
 
 func NewPostgresStore(dsn string) *postgresStore {
 	db := sqlx.MustConnect("postgres", dsn)
+	db.DB.SetMaxOpenConns(50)
+	db.DB.SetMaxIdleConns(10)
+	db.DB.SetConnMaxIdleTime(0)
 	return &postgresStore{
 		DB: db,
 	}
@@ -27,7 +31,7 @@ func (d *postgresStore) Close() {
 }
 
 func (d *postgresStore) SaveRequestEntry(entry RequestEntry) error {
-	query := `INSERT INTO rpc_endpoint_requests 
+	query := `INSERT INTO rpc_endpoint_requests
 	(id, received_at, request_duration_ms, is_batch_request, num_request_in_batch, http_method, http_url, http_query_param, http_response_status, ip_hash, origin, host, error) VALUES (:id, :received_at, :request_duration_ms, :is_batch_request, :num_request_in_batch, :http_method, :http_url, :http_query_param, :http_response_status, :ip_hash, :origin, :host, :error)`
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeOut)
 	defer cancel()
