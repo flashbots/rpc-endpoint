@@ -54,13 +54,13 @@ func TestTxSentToRelay(t *testing.T) {
 	require.True(t, time.Since(timeSent) < time.Second)
 
 	// Invalid key should return found: false but no error
-	timeSent, found, err = redisState.GetTxSentToRelay("XXX")
+	_, found, err = redisState.GetTxSentToRelay("XXX")
 	require.Nil(t, err, err)
 	require.False(t, found)
 
 	// After resetting redis, we shouldn't be able to find the key
 	resetRedis()
-	timeSent, found, err = redisState.GetTxSentToRelay("foo")
+	_, found, err = redisState.GetTxSentToRelay("foo")
 	require.Nil(t, err, err)
 	require.False(t, found)
 }

@@ -37,7 +37,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
+	// r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex, "txHash", r.tx.Hash())
 	r.ethSendRawTxEntry.TxRaw = r.rawTxHex
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
@@ -55,7 +55,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
 	txFromLower := strings.ToLower(r.txFrom)
 
 	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason
@@ -78,10 +78,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+
+	// Check if tx was blocked (eg. "nonce too low")
 	retVal, isBlocked, _ := RState.GetBlockedTxHash(txHashLower)
 	if isBlocked {
 		r.logger.Info("[sendRawTransaction] tx blocked", "txHash", r.tx.Hash(), "retVal", retVal)
-		r.writeRpcResult(retVal)
+		r.writeRpcError(retVal, types.JsonRpcInternalError)
 		return
 	}
 

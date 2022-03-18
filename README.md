@@ -82,7 +82,7 @@ You are welcome here <3.
 
 We appreciate your contributions <3
 
-Please install [`staticcheck`](https://staticcheck.io/) (`go install honnef.co/go/tools/cmd/staticcheck@latest`) and run `make lint` before submitting a PR.
+Please install [`staticcheck`](https://staticcheck.io/) (`go install honnef.co/go/tools/cmd/staticcheck@master`) and run `make lint` before submitting a PR.
 
 ## Security
 
