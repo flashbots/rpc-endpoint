@@ -3,8 +3,9 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/metachris/flashbotsrpc"
 	"time"
+
+	"github.com/metachris/flashbotsrpc"
 )
 
 // As per JSON-RPC 2.0 Specification

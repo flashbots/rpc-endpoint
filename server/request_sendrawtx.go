@@ -55,7 +55,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
 	txFromLower := strings.ToLower(r.txFrom)
 
 	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason
@@ -146,11 +146,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
 	if r.jsonRes.Error != nil {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message)
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message, "txHash", r.tx.Hash())
 		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
 		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
 	} else {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "txHash", r.tx.Hash())
 	}
 }
 
