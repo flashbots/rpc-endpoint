@@ -25,7 +25,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 	}
 
 	txHashLower := strings.ToLower(r.jsonReq.Params[0].(string))
-	r.logger.Info("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx", "tx", txHashLower)
+	r.logger.Info("[post_getTransactionReceipt] eth_getTransactionReceipt is null, check if it was a private tx", "txHash", txHashLower)
 
 	// get tx status from private-tx-api
 	statusApiResponse, err := GetTxStatus(txHashLower)

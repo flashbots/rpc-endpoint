@@ -37,7 +37,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex)
+	// r.logger.Info("[sendRawTransaction] Raw tx value", "tx", r.rawTxHex, "txHash", r.tx.Hash())
 	r.ethSendRawTxEntry.TxRaw = r.rawTxHex
 	r.tx, err = GetTx(r.rawTxHex)
 	if err != nil {
@@ -55,7 +55,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
 	txFromLower := strings.ToLower(r.txFrom)
 
 	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason
@@ -78,6 +78,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+
+	// Check if tx was blocked (eg. "nonce too low")
+	retVal, isBlocked, _ := RState.GetBlockedTxHash(txHashLower)
+	if isBlocked {
+		r.logger.Info("[sendRawTransaction] tx blocked", "txHash", r.tx.Hash(), "retVal", retVal)
+		r.writeRpcError(retVal, types.JsonRpcInternalError)
+		return
+	}
 
 	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
@@ -149,6 +157,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message, "txHash", r.tx.Hash())
 		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
 		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
+		if r.jsonRes.Error.Message == "nonce too low" {
+			RState.SetBlockedTxHash(txHashLower, "nonce too low")
+		}
 	} else {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "txHash", r.tx.Hash())
 	}

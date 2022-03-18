@@ -54,13 +54,13 @@ func TestTxSentToRelay(t *testing.T) {
 	require.True(t, time.Since(timeSent) < time.Second)
 
 	// Invalid key should return found: false but no error
-	timeSent, found, err = redisState.GetTxSentToRelay("XXX")
+	_, found, err = redisState.GetTxSentToRelay("XXX")
 	require.Nil(t, err, err)
 	require.False(t, found)
 
 	// After resetting redis, we shouldn't be able to find the key
 	resetRedis()
-	timeSent, found, err = redisState.GetTxSentToRelay("foo")
+	_, found, err = redisState.GetTxSentToRelay("foo")
 	require.Nil(t, err, err)
 	require.False(t, found)
 }
@@ -233,4 +233,18 @@ func TestWhitehatTx(t *testing.T) {
 	txs, err = redisState.GetWhitehatBundleTx(bundleId)
 	require.Nil(t, err, err)
 	require.Equal(t, 0, len(txs))
+}
+
+func TestBlockedTxHash(t *testing.T) {
+	resetRedis()
+	txHash := "0x123"
+	retVal := "foo"
+
+	err := redisState.SetBlockedTxHash(txHash, retVal)
+	require.Nil(t, err, err)
+
+	val, found, err := redisState.GetBlockedTxHash(txHash)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, retVal, val)
 }
