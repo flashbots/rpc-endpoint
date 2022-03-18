@@ -78,6 +78,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
+	retVal, isBlocked, _ := RState.GetBlockedTxHash(txHashLower)
+	if isBlocked {
+		r.logger.Info("[sendRawTransaction] tx blocked", "txHash", r.tx.Hash(), "retVal", retVal)
+		r.writeRpcResult(retVal)
+		return
+	}
 
 	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
@@ -149,6 +155,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message, "txHash", r.tx.Hash())
 		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
 		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
+		if r.jsonRes.Error.Message == "nonce too low" {
+			RState.SetBlockedTxHash(txHashLower, "nonce too low")
+		}
 	} else {
 		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "txHash", r.tx.Hash())
 	}

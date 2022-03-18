@@ -234,3 +234,17 @@ func TestWhitehatTx(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Equal(t, 0, len(txs))
 }
+
+func TestBlockedTxHash(t *testing.T) {
+	resetRedis()
+	txHash := "0x123"
+	retVal := "foo"
+
+	err := redisState.SetBlockedTxHash(txHash, retVal)
+	require.Nil(t, err, err)
+
+	val, found, err := redisState.GetBlockedTxHash(txHash)
+	require.Nil(t, err, err)
+	require.True(t, found)
+	require.Equal(t, retVal, val)
+}

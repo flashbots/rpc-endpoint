@@ -37,6 +37,10 @@ var RedisExpirySenderMaxNonce = 2 * time.Hour
 var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
 var RedisExpiryWhitehatBundleTransactions = 24 * time.Hour // 1 day
 
+// Enable lookup of bundle txs by bundleId
+var RedisPrefixBlockedTxHash = RedisPrefix + "blocked-tx-hash:"
+var RedisExpiryBlockedTxHash = 24 * time.Hour // 1 day
+
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
 // var RedisExpiryLastPrivTxHashOfAccount = time.Duration(24 * time.Hour) // 1 day
@@ -63,6 +67,10 @@ func RedisKeySenderMaxNonce(txFrom string) string {
 
 func RedisKeyWhitehatBundleTransactions(bundleId string) string {
 	return RedisPrefixWhitehatBundleTransactions + strings.ToLower(bundleId)
+}
+
+func RedisKeyBlockedTxHash(txHash string) string {
+	return RedisPrefixBlockedTxHash + strings.ToLower(txHash)
 }
 
 // func RedisKeyLastPrivTxHashOfAccount(txFrom string) string {
@@ -282,4 +290,25 @@ func (s *RedisState) GetSenderMaxNonce(txFrom string) (senderMaxNonce uint64, fo
 		return 0, true, err
 	}
 	return senderMaxNonce, true, nil
+}
+
+//
+// Block transactions, with a specific return value (eg. "nonce too low")
+//
+func (s *RedisState) SetBlockedTxHash(txHash string, returnValue string) error {
+	key := RedisKeyBlockedTxHash(txHash)
+	err := s.RedisClient.Set(context.Background(), key, returnValue, RedisExpiryBlockedTxHash).Err()
+	return err
+}
+
+func (s *RedisState) GetBlockedTxHash(txHash string) (returnValue string, found bool, err error) {
+	key := RedisKeyBlockedTxHash(txHash)
+	returnValue, err = s.RedisClient.Get(context.Background(), key).Result()
+	if err == redis.Nil { // not found
+		return "", false, nil
+	} else if err != nil {
+		return "", false, err
+	}
+
+	return returnValue, true, nil
 }
