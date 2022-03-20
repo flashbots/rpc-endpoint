@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/flashbots/rpc-endpoint/database"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -37,10 +36,10 @@ type RpcEndPointServer struct {
 	listenAddress   string
 	proxyUrl        string
 	relaySigningKey *ecdsa.PrivateKey
-	db              database.Store
+	reqPusher       *RequestPusher
 }
 
-func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, relaySigningKey *ecdsa.PrivateKey, redisUrl string, reqPusher *RequestPusher) (*RpcEndPointServer, error) {
 	var err error
 	if DebugDontSendTx {
 		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
@@ -70,7 +69,7 @@ func NewRpcEndPointServer(version, listenAddress, proxyUrl, relayUrl string, rel
 		listenAddress:   listenAddress,
 		proxyUrl:        proxyUrl,
 		relaySigningKey: relaySigningKey,
-		db:              db,
+		reqPusher:       reqPusher,
 	}, nil
 }
 
@@ -109,7 +108,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.db)
+	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.relaySigningKey, s.reqPusher)
 	request.process()
 }
 

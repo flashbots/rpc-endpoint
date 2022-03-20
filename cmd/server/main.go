@@ -9,6 +9,7 @@ import (
 	"github.com/flashbots/rpc-endpoint/server"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
@@ -29,9 +30,14 @@ var (
 	redisUrl        = flag.String("redis", getEnvOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
 	relayUrl        = flag.String("relayUrl", getEnvOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
 	relaySigningKey = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
-	psqlDsn         = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
+	psqlDsn         = flag.String("psql", os.Getenv("POSTGRES_DSN_LOCAL"), "Postgres DSN")
 	debugPtr        = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr      = flag.Bool("log-json", defaultLogJSON, "log in JSON")
+)
+
+const (
+	maxItem    = 100
+	maxTimeOut = time.Second * 5
 )
 
 func main() {
@@ -82,11 +88,13 @@ func main() {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
 
+	pusher := server.NewRequestPusher(db, maxItem, maxTimeOut)
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, db)
+	s, err := server.NewRpcEndPointServer(version, *listenAddress, *proxyUrl, *relayUrl, key, *redisUrl, pusher)
 	if err != nil {
 		log.Crit("Server init error", "error", err)
 	}
+	go pusher.Run()
 	s.Start()
 }
 

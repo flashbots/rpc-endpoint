@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/google/uuid"
 	"net/http"
@@ -12,12 +11,12 @@ type requestRecord struct {
 	requestEntry        database.RequestEntry
 	ethSendRawTxEntries []*database.EthSendRawTxEntry
 	mutex               sync.Mutex
-	db                  database.Store
+	reqPusher           *RequestPusher
 }
 
-func NewRequestRecord(db database.Store) *requestRecord {
+func NewRequestRecord(reqPusher *RequestPusher) *requestRecord {
 	return &requestRecord{
-		db: db,
+		reqPusher: reqPusher,
 	}
 }
 
@@ -47,11 +46,9 @@ func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, err
 func (r *requestRecord) SaveRecord() error {
 	entries := r.getValidRawTxEntriesToSave()
 	if len(entries) > 0 { // Save entries if the request contains rawTxEntries
-		if err := r.db.SaveRequestEntry(r.requestEntry); err != nil {
-			return fmt.Errorf("SaveRequestEntry failed %v", err)
-		}
-		if err := r.db.SaveRawTxEntries(entries); err != nil {
-			return fmt.Errorf("SaveRawTxEntries failed %v", err)
+		r.reqPusher.EntryChan <- database.Entry{
+			ReqEntry:     r.requestEntry,
+			RawTxEntries: entries,
 		}
 	}
 	return nil

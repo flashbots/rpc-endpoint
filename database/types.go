@@ -46,3 +46,8 @@ type EthSendRawTxEntry struct {
 	TxData                      string    `db:"tx_data"`
 	TxSmartContractMethod       string    `db:"tx_smart_contract_method"`
 }
+
+type Entry struct {
+	ReqEntry     RequestEntry
+	RawTxEntries []*EthSendRawTxEntry
+}

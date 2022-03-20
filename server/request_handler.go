@@ -26,7 +26,7 @@ type RpcRequestHandler struct {
 	requestRecord   *requestRecord
 }
 
-func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
+func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, requestPusher *RequestPusher) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		respw:           respw,
 		req:             req,
@@ -34,7 +34,7 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 		defaultProxyUrl: proxyUrl,
 		relaySigningKey: relaySigningKey,
 		uid:             uuid.New(),
-		requestRecord:   NewRequestRecord(db),
+		requestRecord:   NewRequestRecord(requestPusher),
 	}
 }
 
