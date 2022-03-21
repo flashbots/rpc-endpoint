@@ -36,10 +36,10 @@ type RpcRequest struct {
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
-	preferences                *types.PrivateTxPreferences
+	preferences                types.PrivateTxPreferences
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences *types.PrivateTxPreferences) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -231,7 +231,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 	sendPrivateTxArgs.Tx = r.rawTxHex
-	sendPrivateTxArgs.Preferences = r.preferences
+	sendPrivateTxArgs.Preferences = &r.preferences
 
 	_, err = FlashbotsRPC.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
