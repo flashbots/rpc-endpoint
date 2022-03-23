@@ -60,9 +60,9 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	var preferences *types.PrivateTxPreferences
+	var preferences types.PrivateTxPreferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
-		preferences = &types.PrivateTxPreferences{Fast: true}
+		preferences.Fast = true
 		r.logger.Info("[process] Setting fast preference")
 	}
 
@@ -117,7 +117,7 @@ func (r *RpcRequestHandler) process() {
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
@@ -130,7 +130,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences *types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request

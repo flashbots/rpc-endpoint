@@ -268,7 +268,7 @@ func TestRelayTx(t *testing.T) {
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0xc48e6596341d9a32e75f52eabcd700dacd8e15a2c24475b9ff4d4211cc93b2e85e41c58daa6a51a5272835401b3802a134eff90b3d32a9de0c335fbbba5efe1601", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0xe1e6438a8cef151ae5cf05c54935c3745a28f47c88638dc0437368c4e4b6021b0dde25af64e0d6902a66fc5af0a7445ff0ecc6b20143798cca34d12b7b02d88801", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
