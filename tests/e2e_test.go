@@ -290,7 +290,11 @@ func TestRelayTx(t *testing.T) {
 }
 
 func TestRelayTxWithFastPreference(t *testing.T) {
-	testServerSetupWithMockStore()
+	// Store setup
+	memStore := database.NewMemStore()
+
+	// Server setup
+	testServerSetup(memStore)
 
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
 	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
@@ -306,6 +310,14 @@ func TestRelayTxWithFastPreference(t *testing.T) {
 	// Ensure fast endpoint is called and fast preference is set
 	preferences := resp["preferences"].(map[string]interface{})["fast"].(bool)
 	require.True(t, preferences)
+	require.Equal(t, 1, len(memStore.EthSendRawTxs))
+
+	for _, entries := range memStore.EthSendRawTxs {
+		for _, entry := range entries {
+			require.True(t, entry.Fast)
+		}
+
+	}
 }
 
 func TestRelayCancelTx(t *testing.T) {
@@ -662,10 +674,11 @@ func Test_StoreValidateTxs(t *testing.T) {
 
 	for _, entries := range memStore.EthSendRawTxs {
 		for _, entry := range entries {
-			require.Equal(t, true, entry.NeedsFrontRunningProtection)
+			require.True(t, entry.NeedsFrontRunningProtection)
 			require.Equal(t, "invalid nonce", entry.Error)
 			require.Equal(t, -32603, entry.ErrorCode)
 			require.Equal(t, 10, len(entry.TxSmartContractMethod))
+			require.False(t, entry.Fast)
 		}
 
 	}
