@@ -78,7 +78,6 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	txHashLower := strings.ToLower(r.tx.Hash().Hex())
-
 	// Check if tx was blocked (eg. "nonce too low")
 	retVal, isBlocked, _ := RState.GetBlockedTxHash(txHashLower)
 	if isBlocked {

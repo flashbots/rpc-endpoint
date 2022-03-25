@@ -60,6 +60,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
+		r.ethSendRawTxEntry.Fast = r.preferences.Fast
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract

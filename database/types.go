@@ -45,4 +45,5 @@ type EthSendRawTxEntry struct {
 	TxNonce                     int       `db:"tx_nonce"`
 	TxData                      string    `db:"tx_data"`
 	TxSmartContractMethod       string    `db:"tx_smart_contract_method"`
+	Fast                        bool      `db:"fast"` // If set, fast preference gets called
 }
