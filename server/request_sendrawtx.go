@@ -117,9 +117,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	// Check for cancellation-tx
 	if r.tx.To() != nil && len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
-		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
 		r.ethSendRawTxEntry.IsCancelTx = true
-		if requestDone && !r.preferences.Fast { // if tx was cancelled and fast endpoint was not called
+		requestDone := r.handleCancelTx()       // returns true if tx was cancelled at the relay and response has been sent to the user
+		if requestDone && !r.preferences.Fast { // a cancel-tx to fast endpoint is also sent to mempool
 			return
 		}
 

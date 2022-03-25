@@ -55,7 +55,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 }
 
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
-	r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "origin", r.origin, "ip", r.ip)
+	r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast)
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
