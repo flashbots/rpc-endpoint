@@ -5,13 +5,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"net/http"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"math/big"
-	"net/http"
 )
 
 func Min(a uint64, b uint64) uint64 {
@@ -90,6 +92,9 @@ func GetTxStatus(txHash string) (*types.PrivateTxApiResponse, error) {
 func GetIP(r *http.Request) string {
 	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
+		if strings.Contains(forwarded, ",") { // return first entry of list of IPs
+			return strings.Split(forwarded, ",")[0]
+		}
 		return forwarded
 	}
 	return r.RemoteAddr

@@ -52,6 +52,7 @@ func (r *RpcRequestHandler) process() {
 
 	ip := GetIP(r.req)
 	origin := r.req.Header.Get("Origin")
+	referer := r.req.Header.Get("Referer")
 
 	// Validate if ip blacklisted
 	if IsBlacklisted(ip) {
@@ -94,43 +95,45 @@ func (r *RpcRequestHandler) process() {
 	client := NewRPCProxyClient(r.defaultProxyUrl)
 
 	r.requestRecord.UpdateRequestEntry(r.req, http.StatusOK, "") // Data analytics
+
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
 			r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
-			r.logger.Error("[process] Parse payload", "error", err)
+			r.logger.Warn("[process] Parse payload", "error", err)
 			(*r.respw).WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		// It's a batch request
 		r.requestRecord.requestEntry.IsBatchRequest = true
 		r.requestRecord.requestEntry.NumRequestInBatch = len(jsonBatchReq)
-		//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 0, len(jsonBatchReq))
-		// Process batch request
-		r.processBatchRequest(client, jsonBatchReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId, preferences)
+		r.logger.Info("batch request", "ip", ip, "requests", len(jsonBatchReq))
+		r.processBatchRequest(client, jsonBatchReq, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
 		return
 	}
 	// Process single request
 	//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 1)
-	r.processRequest(client, jsonReq, ip, origin, isWhitehatBundleCollection, whitehatBundleId, preferences)
+	r.processRequest(client, jsonReq, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
 }
 
 // processBatchRequest handles multiple batch request
-func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
 		// Process each individual request
@@ -146,7 +149,7 @@ func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatch
 				entry = r.requestRecord.AddEthSendRawTxEntry(id)
 			}
 			// Create rpc request
-			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, isWhitehatBundleCollection, whitehatBundleId, entry, preferences) // Set each individual request
+			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences) // Set each individual request
 			res := req.ProcessRequest()
 			resCh <- res
 		}(i, jsonBatchReq[i], r.requestRecord)
