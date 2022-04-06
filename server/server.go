@@ -3,13 +3,14 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"github.com/flashbots/rpc-endpoint/database"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/flashbots/rpc-endpoint/database"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -100,7 +101,11 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 	setCorsHeaders(respw)
 
 	if req.Method == http.MethodGet {
-		http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
+		if strings.Trim(req.URL.Path, "/") == "fast" {
+			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/fast-mode/", http.StatusFound)
+		} else {
+			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
+		}
 		return
 	}
 
