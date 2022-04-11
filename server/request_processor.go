@@ -168,9 +168,9 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
 	// Check if tx was already forwarded and should be blocked now
-	IsBlockedBczAlreadySent := r.blockResendingTxToRelay(txHash)
-	if IsBlockedBczAlreadySent {
-		r.ethSendRawTxEntry.IsBlockedBczAlreadySent = IsBlockedBczAlreadySent
+	IsBlocked := r.blockResendingTxToRelay(txHash)
+	if IsBlocked {
+		r.ethSendRawTxEntry.IsBlocked = IsBlocked
 		r.logger.Info("[sendTxToRelay] Blocked", "tx", txHash)
 		r.writeRpcResult(txHash)
 		return
