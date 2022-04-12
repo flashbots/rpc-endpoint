@@ -1,0 +1,1 @@
+alter table rpc_endpoint_eth_send_raw_txs rename column is_blocked_bcz_already_sent to is_blocked;
