@@ -4,3 +4,4 @@
 /log*.txt
 /run*.sh
 .idea/*
+/.vscode

@@ -33,13 +33,14 @@ type RpcRequest struct {
 	relaySigningKey            *ecdsa.PrivateKey
 	ip                         string
 	origin                     string
+	referer                    string
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 	preferences                types.PrivateTxPreferences
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -47,6 +48,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		relaySigningKey:            relaySigningKey,
 		ip:                         ip,
 		origin:                     origin,
+		referer:                    referer,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
 		ethSendRawTxEntry:          ethSendRawTxEntry,
@@ -54,8 +56,29 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 	}
 }
 
+func (r *RpcRequest) logRequest() {
+	if r.jsonReq.Method == "eth_call" && len(r.jsonReq.Params) > 0 {
+		p := r.jsonReq.Params[0].(map[string]interface{})
+		_to := ""
+		_data := ""
+		_method := _data
+		if p["to"] != nil {
+			_to = p["to"].(string)
+		}
+		if p["data"] != nil {
+			_data = p["data"].(string)
+		}
+		if len(_data) >= 10 {
+			_method = _data[:10]
+		}
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "paramsTo", _to, "paramsDataMethod", _method, "paramsDataLen", len(_data), "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast, "referer", r.referer)
+	} else {
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "params", r.jsonReq.Params, "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast, "referer", r.referer)
+	}
+}
+
 func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
-	r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast)
+	r.logRequest()
 
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
