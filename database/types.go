@@ -35,7 +35,7 @@ type EthSendRawTxEntry struct {
 	NeedsFrontRunningProtection bool      `db:"needs_front_running_protection"`
 	WasSentToRelay              bool      `db:"was_sent_to_relay"`
 	WasSentToMempool            bool      `db:"was_sent_to_mempool"`
-	IsBlockedBczAlreadySent     bool      `db:"is_blocked_bcz_already_sent"`
+	IsBlocked                   bool      `db:"is_blocked"`
 	Error                       string    `db:"error"`
 	ErrorCode                   int       `db:"error_code"`
 	TxRaw                       string    `db:"tx_raw"`
