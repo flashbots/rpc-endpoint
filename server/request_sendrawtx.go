@@ -183,7 +183,7 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 		return false
 	}
 
-	if isOnFunctionWhiteList(data[0:8]) {
+	if isOnFunctionWhitelist(data[0:8]) {
 		return false // function being called is on our whitelist and no protection needed
 	} else {
 		r.logger.Info("[protect-check] Tx needs protection - function", "tx-data", data[0:8])
