@@ -11,15 +11,11 @@ var allowedFunctions = map[string]bool{
 	"f242432a": true, // safe transfer NFT
 }
 
-func isOnFunctionWhiteList(data string) bool {
+func isOnFunctionWhitelist(data string) bool {
 	if len(data) < 8 {
 		return false
 	}
-	if allowedFunctions[data[0:8]] {
-		return true
-	} else {
-		return false
-	}
+	return allowedFunctions[data[0:8]]
 }
 
 var allowedLargeTxTargets = map[string]bool{

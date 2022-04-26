@@ -15,11 +15,6 @@ import (
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
-var getBundleStatusByTransactionHash_Response = types.GetBundleStatusByTransactionHashResponse{
-	TxHash: TestTx_BundleFailedTooManyTimes_Hash,
-	Status: "FAILED_BUNDLE",
-}
-
 var MockBackendLastRawRequest *http.Request
 var MockBackendLastJsonRpcRequest *types.JsonRpcRequest
 var MockBackendLastJsonRpcRequestTimestamp time.Time
