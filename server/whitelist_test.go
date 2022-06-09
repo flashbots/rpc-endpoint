@@ -18,6 +18,6 @@ func TestWhitelistLowercase(t *testing.T) {
 	}
 
 	for v := range allowedLargeTxTargets {
-		require.Equal(t, v, strings.ToLower(v))
+		require.True(t, allowedLargeTxTargets[strings.ToLower(v)])
 	}
 }
