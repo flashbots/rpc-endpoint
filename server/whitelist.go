@@ -1,6 +1,8 @@
 // Whitelist for smart contract functions that never need protection.
 package server
 
+import "strings"
+
 // Functions that never need protection
 var allowedFunctions = map[string]bool{
 	"a9059cbb": true, // transfer
@@ -20,4 +22,11 @@ func isOnFunctionWhitelist(data string) bool {
 
 var allowedLargeTxTargets = map[string]bool{
 	"0xff1f2b4adb9df6fc8eafecdcbf96a2b351680455": true, // Aztec rollup contract
+}
+
+func init() {
+	// Ensure that addresses are also indexed lowercase
+	for target, val := range allowedLargeTxTargets {
+		allowedLargeTxTargets[strings.ToLower(target)] = val
+	}
 }
