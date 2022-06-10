@@ -228,7 +228,7 @@ func (r *RpcRequest) sendTxToRelay() {
 			r.logger.Error("[sendTxToRelay] large tx not allowed to target null", "tx", txHash)
 			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
 			return
-		} else if _, found := allowedLargeTxTargets[r.tx.To().Hex()]; !found {
+		} else if _, found := allowedLargeTxTargets[strings.ToLower(r.tx.To().Hex())]; !found {
 			r.logger.Error("[sendTxToRelay] large tx not allowed to target", "tx", txHash, "target", r.tx.To())
 			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
 			return
