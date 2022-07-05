@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"github.com/ethereum/go-ethereum/log"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,5 +33,8 @@ func (n *rpcProxyClient) ProxyRequest(body []byte) (*http.Response, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
-	return n.httpClient.Do(req)
+	start := time.Now()
+	res, err := n.httpClient.Do(req)
+	log.Info("[ProxyRequest] after making ProxyRequest", "timeNeeded", time.Since(start))
+	return res, err
 }

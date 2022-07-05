@@ -124,9 +124,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	}
 
 	// Proxy request
-	start := time.Now()
 	proxyResp, err := r.client.ProxyRequest(body)
-	r.logger.Info("[proxyRequestRead] after making ProxyRequest", "timeTaken", time.Since(start))
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to make proxy request", "error", err, "response", proxyResp)
 		if proxyResp == nil {
@@ -357,9 +355,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount marshal failed", "error", err)
 		return 0, 0, err
 	}
-	start := time.Now()
 	httpRes, err := r.client.ProxyRequest(jsonData)
-	r.logger.Info("[GetAddressNonceRange] after making ProxyRequest", "timeTaken", time.Since(start))
 	if err != nil {
 		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount proxy request failed", "error", err)
 		return 0, 0, err
