@@ -124,7 +124,9 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	}
 
 	// Proxy request
+	start := time.Now()
 	proxyResp, err := r.client.ProxyRequest(body)
+	r.logger.Warn("after making ProxyRequest", "timeTaken", time.Since(start))
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to make proxy request", "error", err, "response", proxyResp)
 		if proxyResp == nil {
