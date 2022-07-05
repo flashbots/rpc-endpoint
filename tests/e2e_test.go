@@ -67,7 +67,7 @@ func testServerSetup(db database.Store) {
 	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer("test", "", RpcBackendServerUrl, RpcBackendServerUrl, relaySigningKey, redisServer.Addr(), db)
+	rpcServer, err := server.NewRpcEndPointServer("test", "", RpcBackendServerUrl, RpcBackendServerUrl, 10, relaySigningKey, redisServer.Addr(), db)
 	if err != nil {
 		panic(err)
 	}

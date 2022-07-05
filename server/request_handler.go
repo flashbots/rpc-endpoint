@@ -16,25 +16,27 @@ import (
 
 // RPC request handler for a single/ batch JSON-RPC request
 type RpcRequestHandler struct {
-	respw           *http.ResponseWriter
-	req             *http.Request
-	logger          log.Logger
-	timeStarted     time.Time
-	defaultProxyUrl string
-	relaySigningKey *ecdsa.PrivateKey
-	uid             uuid.UUID
-	requestRecord   *requestRecord
+	respw               *http.ResponseWriter
+	req                 *http.Request
+	logger              log.Logger
+	timeStarted         time.Time
+	defaultProxyUrl     string
+	proxyTimeoutSeconds int
+	relaySigningKey     *ecdsa.PrivateKey
+	uid                 uuid.UUID
+	requestRecord       *requestRecord
 }
 
-func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
+func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
 	return &RpcRequestHandler{
-		respw:           respw,
-		req:             req,
-		timeStarted:     Now(),
-		defaultProxyUrl: proxyUrl,
-		relaySigningKey: relaySigningKey,
-		uid:             uuid.New(),
-		requestRecord:   NewRequestRecord(db),
+		respw:               respw,
+		req:                 req,
+		timeStarted:         Now(),
+		defaultProxyUrl:     proxyUrl,
+		proxyTimeoutSeconds: proxyTimeoutSeconds,
+		relaySigningKey:     relaySigningKey,
+		uid:                 uuid.New(),
+		requestRecord:       NewRequestRecord(db),
 	}
 }
 
@@ -92,7 +94,7 @@ func (r *RpcRequestHandler) process() {
 	}
 
 	// create rpc proxy client for making proxy request
-	client := NewRPCProxyClient(r.defaultProxyUrl)
+	client := NewRPCProxyClient(r.defaultProxyUrl, r.proxyTimeoutSeconds)
 
 	r.requestRecord.UpdateRequestEntry(r.req, http.StatusOK, "") // Data analytics
 
