@@ -13,13 +13,15 @@ type RPCProxyClient interface {
 }
 
 type rpcProxyClient struct {
-	httpClient http.Client
-	proxyURL   string
+	httpClient     http.Client
+	proxyURL       string
+	timeoutSeconds int
 }
 
-func NewRPCProxyClient(proxyURL string) RPCProxyClient {
+func NewRPCProxyClient(proxyURL string, timeoutSeconds int) RPCProxyClient {
+	log.Info("timeout seconds", "sec", timeoutSeconds)
 	return &rpcProxyClient{
-		httpClient: http.Client{Timeout: time.Second * 10},
+		httpClient: http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
 		proxyURL:   proxyURL,
 	}
 }
