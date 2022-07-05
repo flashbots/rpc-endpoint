@@ -13,9 +13,8 @@ type RPCProxyClient interface {
 }
 
 type rpcProxyClient struct {
-	httpClient     http.Client
-	proxyURL       string
-	timeoutSeconds int
+	httpClient http.Client
+	proxyURL   string
 }
 
 func NewRPCProxyClient(proxyURL string, timeoutSeconds int) RPCProxyClient {
