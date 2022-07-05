@@ -18,7 +18,7 @@ type rpcProxyClient struct {
 
 func NewRPCProxyClient(proxyURL string) RPCProxyClient {
 	return &rpcProxyClient{
-		httpClient: http.Client{Timeout: time.Second * 5},
+		httpClient: http.Client{Timeout: time.Second * 10},
 		proxyURL:   proxyURL,
 	}
 }
