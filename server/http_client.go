@@ -35,6 +35,6 @@ func (n *rpcProxyClient) ProxyRequest(body []byte) (*http.Response, error) {
 	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
 	start := time.Now()
 	res, err := n.httpClient.Do(req)
-	log.Info("[ProxyRequest] completed", "timeNeeded", time.Since(start), "err", err)
+	log.Info("[ProxyRequest] completed", "timeNeeded", time.Since(start))
 	return res, err
 }
