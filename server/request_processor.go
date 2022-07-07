@@ -360,7 +360,14 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount proxy request failed", "error", err)
 		return 0, 0, err
 	}
-	_res, err := ParseJsonRPCResponse(httpRes)
+
+	resBytes, err := ioutil.ReadAll(httpRes.Body)
+	httpRes.Body.Close()
+	if err != nil {
+		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount read response failed", "error", err)
+		return 0, 0, err
+	}
+	_res, err := respBytesToJsonRPCResponse(resBytes)
 	if err != nil {
 		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount parsing response failed", "error", err)
 		return 0, 0, err
