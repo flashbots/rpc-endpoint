@@ -116,6 +116,7 @@ func IsMetamaskMoz(r *http.Request) bool {
 }
 
 func ParseJsonRPCResponse(resp *http.Response) (*types.JsonRpcResponse, error) {
+	defer resp.Body.Close()
 	respData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read")
