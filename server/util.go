@@ -115,24 +115,20 @@ func IsMetamaskMoz(r *http.Request) bool {
 	return r.Header.Get("Origin") == "moz-extension://57f9aaf6-270a-154f-9a8a-632d0db4128c"
 }
 
-func ParseJsonRPCResponse(resp *http.Response) (*types.JsonRpcResponse, error) {
-	respData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(err, "read")
-	}
+func respBytesToJsonRPCResponse(respBytes []byte) (*types.JsonRpcResponse, error) {
 
 	jsonRpcResp := new(types.JsonRpcResponse)
 
 	// Check if returned an error, if so then convert to standard JSON-RPC error
 	errorResp := new(types.RelayErrorResponse)
-	if err := json.Unmarshal(respData, errorResp); err == nil && errorResp.Error != "" {
+	if err := json.Unmarshal(respBytes, errorResp); err == nil && errorResp.Error != "" {
 		// relay returned an error, convert to standard JSON-RPC error now
 		jsonRpcResp.Error = &types.JsonRpcError{Message: errorResp.Error}
 		return jsonRpcResp, nil
 	}
 
 	// Unmarshall JSON-RPC response and check for error inside
-	if err := json.Unmarshal(respData, jsonRpcResp); err != nil {
+	if err := json.Unmarshal(respBytes, jsonRpcResp); err != nil {
 		return nil, errors.Wrap(err, "unmarshal")
 	}
 
