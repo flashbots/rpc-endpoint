@@ -102,7 +102,6 @@ func (r *RpcRequestHandler) process() {
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
-		r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
 		r.logger.Warn("[process] Parse payload", "error", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
