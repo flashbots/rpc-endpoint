@@ -16,7 +16,7 @@ test:
 
 lint:
 	gofmt -d ./
-	go vet ./...
+	go vet -unreachable=false ./... # go vet checks are disabled for unreachable code
 	staticcheck ./...
 
 cover:

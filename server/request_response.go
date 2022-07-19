@@ -22,6 +22,7 @@ func (r *RpcRequestHandler) _writeRpcResponse(res *types.JsonRpcResponse) {
 	}
 }
 
+//lint:ignore U1000 Ignore all unused code, it's generated
 func (r *RpcRequestHandler) _writeRpcBatchResponse(res []*types.JsonRpcResponse) {
 	r.writeHeaderContentTypeJson() // Set content type to json
 	(*r.respw).WriteHeader(http.StatusOK)
