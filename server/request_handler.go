@@ -107,7 +107,7 @@ func (r *RpcRequestHandler) process() {
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 
-		// Deprecate handling batch - DO NO PROCEED
+		// Deprecate handling batch - DO NOT PROCEED
 		// Note: go vet checks are disabled for unreachable code
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
