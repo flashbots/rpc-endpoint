@@ -40,6 +40,7 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 	}
 }
 
+//nolint
 func (r *RpcRequestHandler) process() {
 	r.logger = log.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")
@@ -101,6 +102,12 @@ func (r *RpcRequestHandler) process() {
 	// Parse JSON RPC payload
 	var jsonReq *types.JsonRpcRequest
 	if err = json.Unmarshal(body, &jsonReq); err != nil {
+		r.logger.Warn("[process] Parse payload", "error", err)
+		(*r.respw).WriteHeader(http.StatusBadRequest)
+		return
+
+		// Deprecate handling batch - DO NOT PROCEED
+		// Note: go vet checks are disabled for unreachable code
 		var jsonBatchReq []*types.JsonRpcRequest
 		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
 			r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
@@ -135,6 +142,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 }
 
 // processBatchRequest handles multiple batch request
+//lint:ignore U1000 Ignore all unused code, it's generated
 func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
 	for i := 0; i < cap(resCh); i++ {
