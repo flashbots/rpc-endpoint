@@ -51,11 +51,6 @@ Example Single request:
 ```bash
 curl localhost:9000 -f -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1}'
 ```
-Example Batch/multiple request:
-
-```bash
-curl localhost:9000 -f -d '[{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1},{"jsonrpc":"2.0","method":"net_version","params":[],"id":7},{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":3}]'
-```
 
 ## Maintainers
 
@@ -63,6 +58,7 @@ This project is currently maintained by:
 
 * [@bertcmiller](https://twitter.com/bertcmiller)
 * [@metachris](https://twitter.com/metachris)
+* [@bhakiyarajk](https://twitter.com/bhakiyarajk)
 
 ## Contributing
 
