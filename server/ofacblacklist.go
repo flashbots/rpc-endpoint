@@ -49,6 +49,7 @@ var ofacBlacklist = map[string]bool{
 	"0x2717c5e28cf931547B621a5dddb772Ab6A35B701": true,
 	"0x03893a7c7463AE47D46bc7f091665f1893656003": true,
 	"0xCa0840578f57fE71599D29375e16783424023357": true,
+	"0x8589427373D6D84E98730D7795D8f6f8731FDA16": true,
 }
 
 func isOnOFACList(address string) bool {
