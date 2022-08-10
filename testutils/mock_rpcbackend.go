@@ -7,7 +7,7 @@ package testutils
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -107,7 +107,7 @@ func RpcBackendHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		returnError(-1, fmt.Sprintf("failed to read request body: %v", err))
 		return

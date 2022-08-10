@@ -6,10 +6,11 @@ package testutils
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	"github.com/flashbots/rpc-endpoint/types"
 )
@@ -67,7 +68,7 @@ func SendRpcAndParseResponseTo(url string, req *types.JsonRpcRequest) (*types.Js
 		return nil, errors.Wrap(err, "post")
 	}
 
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read")
 	}
@@ -102,7 +103,7 @@ func SendBatchRpcAndParseResponseTo(url string, req []*types.JsonRpcRequest) ([]
 		return nil, errors.Wrap(err, "post")
 	}
 
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "read")
 	}

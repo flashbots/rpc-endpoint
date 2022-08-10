@@ -8,13 +8,14 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
-	"github.com/flashbots/rpc-endpoint/database"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/flashbots/rpc-endpoint/database"
 
 	"github.com/alicebob/miniredis"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -176,7 +177,7 @@ func TestNull(t *testing.T) {
 	require.Nil(t, err, err)
 	resp, err := http.Post(RpcBackendServerUrl, "application/json", bytes.NewBuffer(jsonData))
 	require.Nil(t, err, err)
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	require.Nil(t, err, err)
 
 	// Check that raw result is expected
@@ -567,7 +568,7 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	fmt.Println("jsonApiUrl: ", jsonApiUrl)
 	res, err := http.Get(jsonApiUrl)
 	require.Nil(t, err, err)
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.Nil(t, err, err)
 	fmt.Println(string(body))
 	bundleResponse := new(types.BundleResponse)

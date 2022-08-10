@@ -3,7 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -80,7 +80,7 @@ func (r *RpcRequestHandler) process() {
 
 	// Decode request JSON RPC
 	defer r.req.Body.Close()
-	body, err := ioutil.ReadAll(r.req.Body)
+	body, err := io.ReadAll(r.req.Body)
 	if err != nil {
 		r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
 		r.logger.Error("[process] Failed to read request body", "error", err)
