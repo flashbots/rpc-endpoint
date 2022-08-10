@@ -7,7 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"reflect"
 	"strings"
@@ -140,7 +140,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 
 	// Read body
 	defer proxyResp.Body.Close()
-	proxyRespBody, err := ioutil.ReadAll(proxyResp.Body)
+	proxyRespBody, err := io.ReadAll(proxyResp.Body)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to read proxy request body", "error", err)
 		return false
@@ -361,7 +361,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 		return 0, 0, err
 	}
 
-	resBytes, err := ioutil.ReadAll(httpRes.Body)
+	resBytes, err := io.ReadAll(httpRes.Body)
 	httpRes.Body.Close()
 	if err != nil {
 		r.logger.Error("[GetAddressNonceRange] eth_getTransactionCount read response failed", "error", err)
