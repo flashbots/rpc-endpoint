@@ -68,7 +68,7 @@ You are welcome here <3.
 
 - If you want to join us, come and say hi in our [Discord chat](https://discord.gg/7hvTycdNcK).
 - If you have a question, feedback or a bug report for this project, please [open a new Issue](https://github.com/flashbots/rpc-endpoint/issues).
-- We ask you to be nice.
+- We ask you to be nice. Read our [code of conduct](CODE_OF_CONDUCT.md).
 
 **Send a pull request**
 
