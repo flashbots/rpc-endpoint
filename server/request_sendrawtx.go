@@ -98,6 +98,13 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.writeRpcError("blocked tx due to ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
+	isOnUkSanctionsList := isOnUKSanctionsList(r.txFrom) || isOnUKSanctionsList(r.tx.To().String())
+	r.ethSendRawTxEntry.IsOnUkSanctionsList = isOnUKSanctionsList
+	if isOnUKSanctionsList {
+		r.logger.Info("[sendRawTransaction] Blocked tx due to UK sanctioned address", "txFrom", r.txFrom, "txTo", r.tx.To().String())
+		r.writeRpcError("blocked tx due to UK sanctioned address", types.JsonRpcInvalidRequest)
+		return
+	}
 
 	// Check if transaction needs protection
 	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
