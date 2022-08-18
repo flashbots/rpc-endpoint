@@ -6,7 +6,7 @@ GIT_VER := $(shell git describe --tags --always --dirty="-dev")
 all: clean build
 
 build:
-	go build -ldflags "-X main.version=${GIT_VER}" -v -o rpc-endpoint cmd/server/main.go
+	CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.version=${GIT_VER}" -v -o rpc-endpoint cmd/server/main.go
 
 clean:
 	rm -rf rpc-endpoint build/
