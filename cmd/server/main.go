@@ -3,13 +3,14 @@ package main
 import (
 	"crypto/ecdsa"
 	"flag"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/server"
-	"os"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -80,6 +81,7 @@ func main() {
 	// Setup database
 	var db database.Store
 	if *psqlDsn == "" {
+		log.Warn("db dsn not provided, using mock store")
 		db = database.NewMockStore()
 	} else {
 		db = database.NewPostgresStore(*psqlDsn)
@@ -90,6 +92,7 @@ func main() {
 	if err != nil {
 		log.Crit("Server init error", "error", err)
 	}
+	log.Info("Starting rpc-endpoint...", "relayUrl", *relayUrl, "proxyUrl", *proxyUrl)
 	s.Start()
 }
 
