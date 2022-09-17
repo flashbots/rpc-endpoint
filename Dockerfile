@@ -1,7 +1,9 @@
-FROM golang:1:18-alpine as builder
+# syntax=docker/dockerfile:1
+FROM golang:1.18-alpine as builder
 WORKDIR /build
 ADD . /build
-RUN --mount=type=cache,target=/root/.cache/go-build make build-for-docker
+RUN apk add --no-cache gcc musl-dev linux-headers git make
+RUN make build-for-docker
 
 FROM alpine:latest
 WORKDIR /app
