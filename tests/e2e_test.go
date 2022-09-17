@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/alicebob/miniredis"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/server"
 	"github.com/flashbots/rpc-endpoint/testutils"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -34,7 +35,7 @@ func init() {
 	var err error
 	relaySigningKey, err = crypto.HexToECDSA("7bdeed70a07d5a45546e83a88dd430f71348592e747d2d3eb23f32db003eb0e1")
 	if err != nil {
-		log.Fatal(err)
+		log.Crit("failed to create signing key", "err", err)
 	}
 }
 
@@ -68,7 +69,7 @@ func testServerSetup(db database.Store) {
 	server.ProtectTxApiHost = txApiServer.URL
 
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer("test", "", RpcBackendServerUrl, RpcBackendServerUrl, 10, relaySigningKey, redisServer.Addr(), db)
+	rpcServer, err := server.NewRpcEndPointServer(log.New("testlogger"), "test", "", RpcBackendServerUrl, RpcBackendServerUrl, 10, relaySigningKey, redisServer.Addr(), db)
 	if err != nil {
 		panic(err)
 	}
