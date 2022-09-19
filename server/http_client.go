@@ -2,10 +2,11 @@ package server
 
 import (
 	"bytes"
-	"github.com/ethereum/go-ethereum/log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type RPCProxyClient interface {
@@ -13,12 +14,14 @@ type RPCProxyClient interface {
 }
 
 type rpcProxyClient struct {
+	logger     log.Logger
 	httpClient http.Client
 	proxyURL   string
 }
 
-func NewRPCProxyClient(proxyURL string, timeoutSeconds int) RPCProxyClient {
+func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int) RPCProxyClient {
 	return &rpcProxyClient{
+		logger:     logger,
 		httpClient: http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
 		proxyURL:   proxyURL,
 	}
@@ -35,6 +38,6 @@ func (n *rpcProxyClient) ProxyRequest(body []byte) (*http.Response, error) {
 	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
 	start := time.Now()
 	res, err := n.httpClient.Do(req)
-	log.Info("[ProxyRequest] completed", "timeNeeded", time.Since(start))
+	n.logger.Info("[ProxyRequest] completed", "timeNeeded", time.Since(start))
 	return res, err
 }

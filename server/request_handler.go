@@ -96,7 +96,7 @@ func (r *RpcRequestHandler) process() {
 	}
 
 	// create rpc proxy client for making proxy request
-	client := NewRPCProxyClient(r.defaultProxyUrl, r.proxyTimeoutSeconds)
+	client := NewRPCProxyClient(r.logger, r.defaultProxyUrl, r.proxyTimeoutSeconds)
 
 	r.requestRecord.UpdateRequestEntry(r.req, http.StatusOK, "") // Data analytics
 

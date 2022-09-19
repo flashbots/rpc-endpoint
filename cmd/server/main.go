@@ -24,7 +24,7 @@ var (
 	defaultProxyTimeoutSeconds = 10
 	defaultRelayUrl            = "https://relay.flashbots.net"
 	defaultRedisUrl            = "localhost:6379"
-	defaultServiceName         = getEnvAsStrOrDefault("SERVICE_NAME", "rpc-endpoint")
+	defaultServiceName         = os.Getenv("SERVICE_NAME")
 
 	// cli flags
 	versionPtr          = flag.Bool("version", false, "just print the program version")
@@ -56,7 +56,10 @@ func main() {
 	}
 
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
-	logger := log.New(log.Ctx{"service": *serviceName})
+	logger := log.New()
+	if *serviceName != "" {
+		logger = logger.New(log.Ctx{"service": *serviceName})
+	}
 	// Perhaps print only the version
 	if *versionPtr {
 		logger.Info("rpc-endpoint", "version", version)
