@@ -36,7 +36,7 @@ var (
 	relaySigningKey     = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
 	psqlDsn             = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
 	debugPtr            = flag.Bool("debug", defaultDebug, "print debug output")
-	logJSONPtr          = flag.Bool("log-json", defaultLogJSON, "log in JSON")
+	logJSONPtr          = flag.Bool("logJSON", defaultLogJSON, "log in JSON")
 	serviceName         = flag.String("serviceName", defaultServiceName, "name of the service which will be used in the logs")
 )
 
