@@ -24,7 +24,7 @@ var (
 	defaultProxyTimeoutSeconds = 10
 	defaultRelayUrl            = "https://relay.flashbots.net"
 	defaultRedisUrl            = "localhost:6379"
-	defaultServiceName         = getEnvAsStrOrDefault("Service_Name", "rpc-endpoint")
+	defaultServiceName         = getEnvAsStrOrDefault("SERVICE_NAME", "rpc-endpoint")
 
 	// cli flags
 	versionPtr          = flag.Bool("version", false, "just print the program version")
@@ -37,7 +37,7 @@ var (
 	psqlDsn             = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
 	debugPtr            = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr          = flag.Bool("log-json", defaultLogJSON, "log in JSON")
-	ServiceName         = flag.String("Service-Name", defaultServiceName, " ServiceName/deployment name")
+	serviceName         = flag.String("serviceName", defaultServiceName, "name of the service which will be used in the logs")
 )
 
 func main() {
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
-	logger := log.New(log.Ctx{"service": *ServiceName})
+	logger := log.New(log.Ctx{"service": *serviceName})
 	// Perhaps print only the version
 	if *versionPtr {
 		logger.Info("rpc-endpoint", "version", version)
@@ -88,12 +88,12 @@ func main() {
 	} else {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
-
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(logger, version, *listenAddress, *relayUrl, *proxyUrl, *proxyTimeoutSeconds, key, *redisUrl, db)
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
 	}
+	logger.Info("Starting rpc-endpoint...", "relayUrl", *relayUrl, "proxyUrl", *proxyUrl)
 	s.Start()
 }
 
