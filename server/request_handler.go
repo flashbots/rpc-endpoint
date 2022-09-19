@@ -27,8 +27,9 @@ type RpcRequestHandler struct {
 	requestRecord       *requestRecord
 }
 
-func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
+func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
 	return &RpcRequestHandler{
+		logger:              logger,
 		respw:               respw,
 		req:                 req,
 		timeStarted:         Now(),
@@ -42,7 +43,7 @@ func NewRpcRequestHandler(respw *http.ResponseWriter, req *http.Request, proxyUr
 
 //nolint
 func (r *RpcRequestHandler) process() {
-	r.logger = log.New(log.Ctx{"uid": r.uid})
+	r.logger = r.logger.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")
 
 	defer r.finishRequest()
@@ -95,7 +96,7 @@ func (r *RpcRequestHandler) process() {
 	}
 
 	// create rpc proxy client for making proxy request
-	client := NewRPCProxyClient(r.defaultProxyUrl, r.proxyTimeoutSeconds)
+	client := NewRPCProxyClient(r.logger, r.defaultProxyUrl, r.proxyTimeoutSeconds)
 
 	r.requestRecord.UpdateRequestEntry(r.req, http.StatusOK, "") // Data analytics
 

@@ -33,6 +33,7 @@ var RState *RedisState
 var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
 
 type RpcEndPointServer struct {
+	logger              log.Logger
 	version             string
 	startTime           time.Time
 	listenAddress       string
@@ -42,14 +43,14 @@ type RpcEndPointServer struct {
 	db                  database.Store
 }
 
-func NewRpcEndPointServer(version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
 	var err error
 	if DebugDontSendTx {
-		log.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
+		logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
 	}
 
 	if redisUrl == "dev" {
-		log.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
+		logger.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
 		redisServer, err := miniredis.Run()
 		if err != nil {
 			return nil, err
@@ -57,7 +58,7 @@ func NewRpcEndPointServer(version, listenAddress, relayUrl, proxyUrl string, pro
 		redisUrl = redisServer.Addr()
 	}
 	// Setup redis connection
-	log.Info("Connecting to redis...", "redisUrl", redisUrl)
+	logger.Info("Connecting to redis...", "redisUrl", redisUrl)
 	RState, err = NewRedisState(redisUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")
@@ -67,6 +68,7 @@ func NewRpcEndPointServer(version, listenAddress, relayUrl, proxyUrl string, pro
 	// FlashbotsRPC.Debug = true
 
 	return &RpcEndPointServer{
+		logger:              logger,
 		startTime:           Now(),
 		version:             version,
 		listenAddress:       listenAddress,
@@ -78,12 +80,12 @@ func NewRpcEndPointServer(version, listenAddress, relayUrl, proxyUrl string, pro
 }
 
 func (s *RpcEndPointServer) Start() {
-	log.Info("Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
+	s.logger.Info("Starting rpc endpoint...", "version", s.version, "listenAddress", s.listenAddress)
 
 	// Regularly log debug info
 	go func() {
 		for {
-			log.Info("[stats] num-goroutines", "count", runtime.NumGoroutine())
+			s.logger.Info("[stats] num-goroutines", "count", runtime.NumGoroutine())
 			time.Sleep(10 * time.Second)
 		}
 	}()
@@ -95,7 +97,7 @@ func (s *RpcEndPointServer) Start() {
 
 	// Start serving
 	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
-		log.Error("http server failed", "error", err)
+		s.logger.Error("http server failed", "error", err)
 	}
 }
 
@@ -116,7 +118,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(&respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.db)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.db)
 	request.process()
 }
 
@@ -129,7 +131,7 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 
 	jsonResp, err := json.Marshal(res)
 	if err != nil {
-		log.Info("[healthCheck] Json error", "error", err)
+		s.logger.Info("[healthCheck] Json error", "error", err)
 		respw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -150,7 +152,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 	if req.Method == http.MethodGet {
 		txs, err := RState.GetWhitehatBundleTx(bundleId)
 		if err != nil {
-			log.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
+			s.logger.Info("[handleBundleRequest] GetWhitehatBundleTx failed", "bundleId", bundleId, "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -162,7 +164,7 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 		jsonResp, err := json.Marshal(res)
 		if err != nil {
-			log.Info("[handleBundleRequest] Json marshal failed", "error", err)
+			s.logger.Info("[handleBundleRequest] Json marshal failed", "error", err)
 			respw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
