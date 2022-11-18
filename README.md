@@ -10,7 +10,7 @@ The endpoint is live at **https://rpc.flashbots.net/**
 
 It does two basic things:
 - It receives JSON-RPC requests, proxies those to a node, and responds with the result of the proxied request.
-- On receiving an `eth_sendRawTransaction` call with 42000 gas or more (and not on whitelisted method), the call is sent to the Flashbots relay as a private transaction, and submitted as bundles for up to 25 blocks.
+- On receiving an `eth_sendRawTransaction` call which has data and is not on whitelisted methods, the call is sent to the Flashbots relay as a private transaction, and submitted as bundles for up to 25 blocks.
 
 There are a few key benefits to using the Flashbots RPC endpoint:
 

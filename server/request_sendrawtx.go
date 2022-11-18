@@ -170,12 +170,6 @@ func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) 
 	gas := tx.Gas()
 	r.logger.Info("[protect-check]", "gas", gas)
 
-	// Flashbots Relay will reject anything less than 42000 gas, so we just send those to the mempool
-	// Anyway things with that low of gas probably don't need frontrunning protection regardless
-	if gas < 42000 {
-		return false
-	}
-
 	data := hex.EncodeToString(tx.Data())
 	r.logger.Info("[protect-check] ", "tx-data", data)
 
