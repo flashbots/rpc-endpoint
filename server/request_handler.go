@@ -54,16 +54,8 @@ func (r *RpcRequestHandler) process() {
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
 	isWhitehatBundleCollection := whitehatBundleId != ""
 
-	ip := GetIP(r.req)
 	origin := r.req.Header.Get("Origin")
 	referer := r.req.Header.Get("Referer")
-
-	// Validate if ip blacklisted
-	if IsBlacklisted(ip) {
-		r.logger.Info("[process] Blocked IP", "ip", ip)
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
-		return
-	}
 
 	var preferences types.PrivateTxPreferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
@@ -109,17 +101,18 @@ func (r *RpcRequestHandler) process() {
 	}
 	// Process single request
 	//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 1)
-	r.processRequest(client, jsonReq, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
+	//TODO remove ip from down stream
+	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)

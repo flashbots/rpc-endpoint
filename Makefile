@@ -1,16 +1,8 @@
 .PHONY: all build test clean lint cover cover-html up down
-include .env
+
 APP_NAME := rpc-endpoint
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
-COMMIT := $(shell git rev-parse --short HEAD)
-DATE := $(shell git log -1 --format=%cd --date=format:"%Y%m%d")
-DIFF_HASH := $(shell git diff HEAD -- . | sha1sum | head -c 7)
-EMPTY_DIFF_HASH := da39a3e
-
-GIT_VER := $(COMMIT)-$(DATE)
-ifneq ($(DIFF_HASH), $(EMPTY_DIFF_HASH))
-	GIT_VER := $(GIT_VER)-$(DIFF_HASH)
-endif
+GIT_VER := $(shell git describe --tags --always --dirty="-dev")
 
 all: clean build
 

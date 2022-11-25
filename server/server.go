@@ -24,9 +24,6 @@ var Now = time.Now // used to mock time in tests
 
 var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
 
-// No IPs blacklisted right now
-var blacklistedIps = []string{"127.0.0.2"}
-
 // Metamask fix helper
 var RState *RedisState
 
@@ -179,15 +176,6 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 	} else {
 		respw.WriteHeader(http.StatusMethodNotAllowed)
 	}
-}
-
-func IsBlacklisted(ip string) bool {
-	for i := range blacklistedIps {
-		if strings.HasPrefix(ip, blacklistedIps[i]) {
-			return true
-		}
-	}
-	return false
 }
 
 func setCorsHeaders(respw http.ResponseWriter) {

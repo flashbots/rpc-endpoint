@@ -11,7 +11,6 @@ CREATE TABLE rpc_endpoint_requests(
     http_url varchar(100) not null,
     http_query_param varchar(1024),
     http_response_status integer,
-    ip_hash varchar(32) not null,
     origin varchar(100),
     host varchar(100),
     error varchar(1000)

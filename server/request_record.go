@@ -2,10 +2,11 @@ package server
 
 import (
 	"fmt"
-	"github.com/flashbots/rpc-endpoint/database"
-	"github.com/google/uuid"
 	"net/http"
 	"sync"
+
+	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/google/uuid"
 )
 
 type requestRecord struct {
@@ -34,7 +35,6 @@ func (r *requestRecord) AddEthSendRawTxEntry(id uuid.UUID) *database.EthSendRawT
 
 func (r *requestRecord) UpdateRequestEntry(req *http.Request, reqStatus int, error string) {
 	r.requestEntry.HttpMethod = req.Method
-	r.requestEntry.IpHash = GetIPHash(req)
 	r.requestEntry.Error = error
 	r.requestEntry.HttpUrl = req.URL.Path
 	r.requestEntry.HttpQueryParam = req.URL.RawQuery
