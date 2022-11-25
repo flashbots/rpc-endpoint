@@ -100,8 +100,6 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 	// Process single request
-	//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 1)
-	//TODO remove ip from down stream
 	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
 }
 
