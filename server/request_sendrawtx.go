@@ -55,7 +55,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()), "ip", r.ip)
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason

@@ -54,16 +54,8 @@ func (r *RpcRequestHandler) process() {
 	whitehatBundleId := r.req.URL.Query().Get("bundle")
 	isWhitehatBundleCollection := whitehatBundleId != ""
 
-	ip := GetIP(r.req)
 	origin := r.req.Header.Get("Origin")
 	referer := r.req.Header.Get("Referer")
-
-	// Validate if ip blacklisted
-	if IsBlacklisted(ip) {
-		r.logger.Info("[process] Blocked IP", "ip", ip)
-		(*r.respw).WriteHeader(http.StatusUnauthorized)
-		return
-	}
 
 	var preferences types.PrivateTxPreferences
 	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
@@ -106,75 +98,22 @@ func (r *RpcRequestHandler) process() {
 		r.logger.Warn("[process] Parse payload", "error", err)
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
-
-		// Deprecate handling batch - DO NOT PROCEED
-		// Note: go vet checks are disabled for unreachable code
-		var jsonBatchReq []*types.JsonRpcRequest
-		if err = json.Unmarshal(body, &jsonBatchReq); err != nil {
-			r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
-			r.logger.Warn("[process] Parse payload", "error", err)
-			(*r.respw).WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		// It's a batch request
-		r.requestRecord.requestEntry.IsBatchRequest = true
-		r.requestRecord.requestEntry.NumRequestInBatch = len(jsonBatchReq)
-		r.logger.Info("batch request", "ip", ip, "requests", len(jsonBatchReq))
-		r.processBatchRequest(client, jsonBatchReq, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
-		return
 	}
 	// Process single request
-	//r.ethSendRawTxEntries = make([]*database.EthSendRawTxEntry, 1)
-	r.processRequest(client, jsonReq, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
+	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
-}
-
-// processBatchRequest handles multiple batch request
-//lint:ignore U1000 Ignore all unused code, it's generated
-func (r *RpcRequestHandler) processBatchRequest(client RPCProxyClient, jsonBatchReq []*types.JsonRpcRequest, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
-	resCh := make(chan *types.JsonRpcResponse, len(jsonBatchReq)) // Chan to hold response from each go routine
-	for i := 0; i < cap(resCh); i++ {
-		// Process each individual request
-		// Scatter worker
-		go func(count int, rpcReq *types.JsonRpcRequest, record *requestRecord) {
-			id := uuid.New()
-			// Create child logger
-			logger := log.New(log.Ctx{"uid": r.uid, "id": id, "count": count})
-			// If the request contains eth_sendRawTransaction method, update the request record
-			// This rawTxEntry will be stored for protect analytics
-			var entry *database.EthSendRawTxEntry
-			if rpcReq.Method == "eth_sendRawTransaction" {
-				entry = r.requestRecord.AddEthSendRawTxEntry(id)
-			}
-			// Create rpc request
-			req := NewRpcRequest(logger, client, rpcReq, r.relaySigningKey, ip, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences) // Set each individual request
-			res := req.ProcessRequest()
-			resCh <- res
-		}(i, jsonBatchReq[i], r.requestRecord)
-	}
-
-	response := make([]*types.JsonRpcResponse, 0)
-	// Gather responses
-	for i := 0; i < cap(resCh); i++ {
-		res := <-resCh
-		response = append(response, res) // Add it to batch response list
-	}
-	close(resCh)
-	// Write consolidated response
-	r._writeRpcBatchResponse(response)
 }
 
 func (r *RpcRequestHandler) finishRequest() {

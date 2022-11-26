@@ -31,7 +31,6 @@ type RpcRequest struct {
 	tx                         *ethtypes.Transaction
 	txFrom                     string
 	relaySigningKey            *ecdsa.PrivateKey
-	ip                         string
 	origin                     string
 	referer                    string
 	isWhitehatBundleCollection bool
@@ -40,13 +39,12 @@ type RpcRequest struct {
 	preferences                types.PrivateTxPreferences
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, ip, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
 		jsonReq:                    jsonReq,
 		relaySigningKey:            relaySigningKey,
-		ip:                         ip,
 		origin:                     origin,
 		referer:                    referer,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
@@ -71,9 +69,9 @@ func (r *RpcRequest) logRequest() {
 		if len(_data) >= 10 {
 			_method = _data[:10]
 		}
-		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "paramsTo", _to, "paramsDataMethod", _method, "paramsDataLen", len(_data), "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast, "referer", r.referer)
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "paramsTo", _to, "paramsDataMethod", _method, "paramsDataLen", len(_data), "origin", r.origin, "fast", r.preferences.Fast, "referer", r.referer)
 	} else {
-		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "params", r.jsonReq.Params, "origin", r.origin, "ip", r.ip, "fast", r.preferences.Fast, "referer", r.referer)
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "params", r.jsonReq.Params, "origin", r.origin, "fast", r.preferences.Fast, "referer", r.referer)
 	}
 }
 
@@ -199,7 +197,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		return
 	}
 
-	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "ip", r.ip, "fromAddress", r.txFrom, "toAddress", r.tx.To())
+	r.logger.Info("[sendTxToRelay] sending transaction to relay", "tx", txHash, "fromAddress", r.txFrom, "toAddress", r.tx.To())
 	r.ethSendRawTxEntry.WasSentToRelay = true
 
 	// mark tx as sent to relay

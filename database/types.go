@@ -1,8 +1,9 @@
 package database
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // RequestEntry to store each request
@@ -17,7 +18,6 @@ type RequestEntry struct {
 	HttpUrl            string    `db:"http_url"`
 	HttpQueryParam     string    `db:"http_query_param"`
 	HttpResponseStatus int       `db:"http_response_status"`
-	IpHash             string    `db:"ip_hash"`
 	Origin             string    `db:"origin"`
 	Host               string    `db:"host"`
 	Error              string    `db:"error"`
