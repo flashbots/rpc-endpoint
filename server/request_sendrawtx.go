@@ -91,7 +91,11 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	if err != nil {
 		r.logger.Error("[sendRawTransaction] Redis:SetSenderOfTxHash failed: %v", err)
 	}
-	isOnOfacList := isOnOFACList(r.txFrom) || isOnOFACList(r.tx.To().String())
+	var txToAddr string
+	if r.tx.To() != nil { // to address will be nil for contract creation tx
+		txToAddr = r.tx.To().String()
+	}
+	isOnOfacList := isOnOFACList(r.txFrom) || isOnOFACList(txToAddr)
 	r.ethSendRawTxEntry.IsOnOafcList = isOnOfacList
 	if isOnOfacList {
 		r.logger.Info("[sendRawTransaction] Blocked tx due to ofac sanctioned address", "txHash", txHashLower, "txFrom", r.txFrom, "txTo", r.tx.To().String())
