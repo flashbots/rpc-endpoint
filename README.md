@@ -18,6 +18,8 @@ There are a few key benefits to using the Flashbots RPC endpoint:
 - No failed transactions: your transaction will only be mined if it doesn't include any reverts, so you don't pay for failed transactions. Note: your transaction could be uncled, emitted to the mempool, and then included on-chain.
 - Priority in blocks: transactions sent via Flashbots are mined at the top of blocks, giving them priority.
 
+Privacy notice: rpc-endpoint does not track, store or log any kind of user information (i.e. IP, location, etc.).
+
 ## Transaction Status Check
 
 If a transaction is sent to the Flashbots relay instead of the public mempool, you cannot see the status on Etherscan or other explorers. Flashbots provides a Protect Transaction API to get the status of these private transactions: **https://protect.flashbots.net/**
