@@ -98,7 +98,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	isOnOfacList := isOnOFACList(r.txFrom) || isOnOFACList(txToAddr)
 	r.ethSendRawTxEntry.IsOnOafcList = isOnOfacList
 	if isOnOfacList {
-		r.logger.Info("[sendRawTransaction] Blocked tx due to ofac sanctioned address", "txHash", txHashLower, "txFrom", r.txFrom, "txTo", r.tx.To().String())
+		r.logger.Info("[sendRawTransaction] Blocked tx due to ofac sanctioned address", "txHash", txHashLower, "txFrom", r.txFrom, "txTo", txToAddr)
 		r.writeRpcError("blocked tx due to ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
