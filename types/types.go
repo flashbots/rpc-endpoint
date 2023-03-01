@@ -108,10 +108,15 @@ type BundleResponse struct {
 
 type SendPrivateTxRequestWithPreferences struct {
 	flashbotsrpc.FlashbotsSendPrivateTransactionRequest
+	OriginID    string                `json:"originId,omitempty"`
 	Preferences *PrivateTxPreferences `json:"preferences,omitempty"`
 }
 
+type TxPrivacyPreferences struct {
+	Hints    []string `json:"hints"`
+	Builders []string `json:"builders"`
+}
+
 type PrivateTxPreferences struct {
-	// If set do not include tx to bundle, directly send tx to miners
-	Fast bool `json:"fast"`
+	Privacy TxPrivacyPreferences `json:"privacy"`
 }

@@ -32,6 +32,14 @@ func SendRpcWithFastPreferenceAndParseResponse(t *testing.T, req *types.JsonRpcR
 	}
 	return res
 }
+func SendRpcWithAuctionPreferenceAndParseResponse(t *testing.T, req *types.JsonRpcRequest, urlSuffix string) *types.JsonRpcResponse {
+	url := RpcEndpointUrl + urlSuffix
+	res, err := SendRpcAndParseResponseTo(url, req)
+	if err != nil {
+		t.Fatal("sendRpcAndParseResponse error:", err)
+	}
+	return res
+}
 
 func SendRpcAndParseResponseOrFailNow(t *testing.T, req *types.JsonRpcRequest) *types.JsonRpcResponse {
 	res, err := SendRpcAndParseResponse(req)

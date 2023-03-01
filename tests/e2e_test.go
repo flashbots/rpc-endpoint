@@ -270,7 +270,7 @@ func TestRelayTx(t *testing.T) {
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0xe1e6438a8cef151ae5cf05c54935c3745a28f47c88638dc0437368c4e4b6021b0dde25af64e0d6902a66fc5af0a7445ff0ecc6b20143798cca34d12b7b02d88801", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0xe3b281c64af71359e93d28d34ba77928cc254bace542df983275a8e5bf65f4a85e530ff38e673fd4cb7c49c52e1ad4934b5d4c6dc2b18dd8e379675a1c72768a00", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
@@ -291,35 +291,52 @@ func TestRelayTx(t *testing.T) {
 	require.Equal(t, uint64(30), nonce)
 }
 
-func TestRelayTxWithFastPreference(t *testing.T) {
+func TestRelayTxWithAuctionPreference(t *testing.T) {
 	// Store setup
 	memStore := database.NewMemStore()
 
 	// Server setup
 	testServerSetup(memStore)
 
+	tx := testutils.TestTx_BundleFailedTooManyTimes_RawTx
 	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
-	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_BundleFailedTooManyTimes_RawTx})
-	// call rpc with fast preference
-	r1 := testutils.SendRpcWithFastPreferenceAndParseResponse(t, reqSendRawTransaction)
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{tx})
+	// call rpc with auction preference
+	r1 := testutils.SendRpcWithAuctionPreferenceAndParseResponse(t, reqSendRawTransaction, "/?hint=calldata&hint=contract_address")
 	require.Nil(t, r1.Error)
 
 	// Ensure that request called eth_sendPrivateTransaction with correct param
 	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
 
 	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
-	require.Equal(t, testutils.TestTx_BundleFailedTooManyTimes_RawTx, resp["tx"])
+	require.Equal(t, tx, resp["tx"])
 	// Ensure fast endpoint is called and fast preference is set
-	preferences := resp["preferences"].(map[string]interface{})["fast"].(bool)
-	require.True(t, preferences)
-	require.Equal(t, 1, len(memStore.EthSendRawTxs))
+	auctionPref := resp["preferences"].(map[string]interface{})["privacy"].(map[string]interface{})
+	require.NotNil(t, auctionPref)
 
-	for _, entries := range memStore.EthSendRawTxs {
-		for _, entry := range entries {
-			require.True(t, entry.Fast)
-		}
-
+	expectedHints := []string{"calldata", "contract_address", "special_logs"}
+	hintPref := auctionPref["hints"].([]interface{})
+	for i, hint := range hintPref {
+		strHint := hint.(string)
+		require.Equal(t, expectedHints[i], strHint)
 	}
+
+	require.Equal(t, 1, len(memStore.EthSendRawTxs))
+}
+
+func TestRelayTxWithIncorrectAuctionPreference(t *testing.T) {
+	// Store setup
+	memStore := database.NewMemStore()
+
+	// Server setup
+	testServerSetup(memStore)
+
+	tx := testutils.TestTx_BundleFailedTooManyTimes_RawTx
+	// sendRawTransaction adds tx to MM cache entry, to be used at later eth_getTransactionReceipt call
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{tx})
+	// call rpc with auction preference
+	r1 := testutils.SendRpcWithAuctionPreferenceAndParseResponse(t, reqSendRawTransaction, "/?hint=incorrect")
+	require.Contains(t, r1.Error.Message, "Incorrect auction hint")
 }
 
 func TestRelayCancelTx(t *testing.T) {

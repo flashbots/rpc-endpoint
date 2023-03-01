@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -57,12 +56,6 @@ func (r *RpcRequestHandler) process() {
 	origin := r.req.Header.Get("Origin")
 	referer := r.req.Header.Get("Referer")
 
-	var preferences types.PrivateTxPreferences
-	if strings.Trim(r.req.URL.Path, "/") == "fast" { // If fast called, do not include tx to bundle, directly send tx to miners
-		preferences.Fast = true
-		r.logger.Info("[process] Setting fast preference")
-	}
-
 	// If users specify a proxy url in their rpc endpoint they can have their requests proxied to that endpoint instead of Infura
 	// e.g. https://rpc.flashbots.net?url=http://RPC-ENDPOINT.COM
 	customProxyUrl, ok := r.req.URL.Query()["url"]
@@ -99,18 +92,27 @@ func (r *RpcRequestHandler) process() {
 		(*r.respw).WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// mev-share parameters
+	urlParams, err := ExtractParametersFromUrl(r.req.URL)
+	if err != nil {
+		r.logger.Warn("[process] Invalid auction preference", "error", err)
+		res := AuctionPreferenceErrorToJSONRPCResponse(jsonReq, err)
+		r._writeRpcResponse(res)
+		return
+	}
 	// Process single request
-	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, preferences)
+	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, preferences types.PrivateTxPreferences) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, urlParams URLParameters) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, preferences)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)

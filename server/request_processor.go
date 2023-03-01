@@ -36,10 +36,10 @@ type RpcRequest struct {
 	isWhitehatBundleCollection bool
 	whitehatBundleId           string
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
-	preferences                types.PrivateTxPreferences
+	urlParams                  URLParameters
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, preferences types.PrivateTxPreferences) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -50,7 +50,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
 		whitehatBundleId:           whitehatBundleId,
 		ethSendRawTxEntry:          ethSendRawTxEntry,
-		preferences:                preferences,
+		urlParams:                  urlParams,
 	}
 }
 
@@ -69,9 +69,9 @@ func (r *RpcRequest) logRequest() {
 		if len(_data) >= 10 {
 			_method = _data[:10]
 		}
-		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "paramsTo", _to, "paramsDataMethod", _method, "paramsDataLen", len(_data), "origin", r.origin, "fast", r.preferences.Fast, "referer", r.referer)
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "paramsTo", _to, "paramsDataMethod", _method, "paramsDataLen", len(_data), "origin", r.origin, "referer", r.referer)
 	} else {
-		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "params", r.jsonReq.Params, "origin", r.origin, "fast", r.preferences.Fast, "referer", r.referer)
+		r.logger.Info("JSON-RPC request", "method", r.jsonReq.Method, "params", r.jsonReq.Params, "origin", r.origin, "referer", r.referer)
 	}
 }
 
@@ -81,7 +81,6 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
-		r.ethSendRawTxEntry.Fast = r.preferences.Fast
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
@@ -253,7 +252,10 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 	sendPrivateTxArgs.Tx = r.rawTxHex
-	sendPrivateTxArgs.Preferences = &r.preferences
+	sendPrivateTxArgs.Preferences = &types.PrivateTxPreferences{
+		Privacy: r.urlParams.pref,
+	}
+	sendPrivateTxArgs.OriginID = r.urlParams.originId
 
 	_, err = FlashbotsRPC.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
