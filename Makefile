@@ -15,6 +15,9 @@ clean:
 test:
 	go test ./...
 
+gofmt:
+	gofmt -w ./
+
 lint:
 	gofmt -d ./
 	go vet ./...

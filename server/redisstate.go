@@ -96,9 +96,7 @@ func NewRedisState(redisUrl string) (*RedisState, error) {
 	}, nil
 }
 
-//
 // Enable lookup of timeSentToRelay by txHash
-//
 func (s *RedisState) SetTxSentToRelay(txHash string) error {
 	key := RedisKeyTxSentToRelay(txHash)
 	err := s.RedisClient.Set(context.Background(), key, Now().UTC().Unix(), RedisExpiryTxSentToRelay).Err()
@@ -123,9 +121,7 @@ func (s *RedisState) GetTxSentToRelay(txHash string) (timeSent time.Time, found 
 	return t, true, nil
 }
 
-//
 // Enable lookup of txHash by txFrom+nonce
-//
 func (s *RedisState) SetTxHashForSenderAndNonce(txFrom string, nonce uint64, txHash string) error {
 	key := RedisKeyTxHashForSenderAndNonce(txFrom, nonce)
 	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txHash), RedisExpiryTxHashForSenderAndNonce).Err()
@@ -144,9 +140,7 @@ func (s *RedisState) GetTxHashForSenderAndNonce(txFrom string, nonce uint64) (tx
 	return txHash, true, nil
 }
 
-//
 // nonce-fix per account
-//
 func (s *RedisState) SetNonceFixForAccount(txFrom string, numTimesSent uint64) error {
 	key := RedisKeyNonceFixForAccount(txFrom)
 	err := s.RedisClient.Set(context.Background(), key, numTimesSent, RedisExpiryNonceFixForAccount).Err()
@@ -175,9 +169,7 @@ func (s *RedisState) GetNonceFixForAccount(txFrom string) (numTimesSent uint64, 
 	return numTimesSent, true, nil
 }
 
-//
 // Enable lookup of txFrom by txHash
-//
 func (s *RedisState) SetSenderOfTxHash(txHash string, txFrom string) error {
 	key := RedisKeySenderOfTxHash(txHash)
 	err := s.RedisClient.Set(context.Background(), key, strings.ToLower(txFrom), RedisExpirySenderOfTxHash).Err()
@@ -196,9 +188,7 @@ func (s *RedisState) GetSenderOfTxHash(txHash string) (txSender string, found bo
 	return strings.ToLower(txSender), true, nil
 }
 
-//
 // Enable lookup of tx bundles by bundle ID
-//
 func (s *RedisState) AddTxToWhitehatBundle(bundleId string, signedTx string) error {
 	key := RedisKeyWhitehatBundleTransactions(bundleId)
 
@@ -292,9 +282,7 @@ func (s *RedisState) GetSenderMaxNonce(txFrom string) (senderMaxNonce uint64, fo
 	return senderMaxNonce, true, nil
 }
 
-//
 // Block transactions, with a specific return value (eg. "nonce too low")
-//
 func (s *RedisState) SetBlockedTxHash(txHash string, returnValue string) error {
 	key := RedisKeyBlockedTxHash(txHash)
 	err := s.RedisClient.Set(context.Background(), key, returnValue, RedisExpiryBlockedTxHash).Err()
