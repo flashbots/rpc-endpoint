@@ -41,7 +41,7 @@ func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *ht
 	}
 }
 
-//nolint
+// nolint
 func (r *RpcRequestHandler) process() {
 	r.logger = r.logger.New(log.Ctx{"uid": r.uid})
 	r.logger.Info("[process] POST request received")

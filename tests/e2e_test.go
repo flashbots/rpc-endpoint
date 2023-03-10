@@ -531,9 +531,7 @@ func TestBatch_Validate_eth_sendRawTransaction_Error(t *testing.T) {
 	}
 }
 
-//
 // Whitehat Tests
-//
 func TestWhitehatBundleCollection(t *testing.T) {
 	testServerSetupWithMockStore()
 
