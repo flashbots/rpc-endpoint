@@ -3,6 +3,7 @@
 APP_NAME := rpc-endpoint
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
+PACKAGES := $(shell go list -mod=readonly ./...)
 
 all: clean build
 
@@ -19,7 +20,7 @@ gofmt:
 	gofmt -w ./
 
 lint:
-	gofmt -d ./
+	go fmt -mod=readonly $(PACKAGES)
 	go vet ./...
 	staticcheck ./...
 
