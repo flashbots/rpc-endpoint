@@ -7,7 +7,7 @@ import (
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
-var ProtectTxApiHost = "https://protect.flashbots.net"
+var ProtectTxApiHost = GetEnv("TX_API_HOST", "https://protect.flashbots.net")
 
 // If public getTransactionReceipt of a submitted tx is null, then check internal API to see if tx has failed
 func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcResponse) (requestFinished bool) {
