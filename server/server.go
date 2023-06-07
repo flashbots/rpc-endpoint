@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/flashbots/rpc-endpoint/database"
@@ -92,10 +95,30 @@ func (s *RpcEndPointServer) Start() {
 	http.HandleFunc("/health", s.handleHealthRequest)
 	http.HandleFunc("/bundle", s.HandleBundleRequest)
 
-	// Start serving
-	if err := http.ListenAndServe(s.listenAddress, nil); err != nil {
-		s.logger.Error("http server failed", "error", err)
+	server := &http.Server{
+		Addr:         s.listenAddress,
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			s.logger.Error("http server failed", "error", err)
+		}
+	}()
+
+	notifier := make(chan os.Signal, 1)
+	signal.Notify(notifier, os.Interrupt, syscall.SIGTERM)
+
+	<-notifier
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		s.logger.Error("http server shutdown failed", "error", err)
+	}
+	s.logger.Info("http server stopped")
 }
 
 func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
