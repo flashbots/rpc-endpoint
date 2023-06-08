@@ -20,6 +20,7 @@ var (
 	defaultDebug               = os.Getenv("DEBUG") == "1"
 	defaultLogJSON             = os.Getenv("LOG_JSON") == "1"
 	defaultListenAddress       = "127.0.0.1:9000"
+	defaultDrainAddress        = "127.0.0.1:9001"
 	defaultProxyUrl            = "http://127.0.0.1:8545"
 	defaultProxyTimeoutSeconds = 10
 	defaultRelayUrl            = "https://relay.flashbots.net"
@@ -29,6 +30,7 @@ var (
 	// cli flags
 	versionPtr          = flag.Bool("version", false, "just print the program version")
 	listenAddress       = flag.String("listen", getEnvAsStrOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
+	drainAddress        = flag.String("drain", getEnvAsStrOrDefault("DRAIN_ADDR", defaultDrainAddress), "Drain address")
 	proxyUrl            = flag.String("proxy", getEnvAsStrOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
 	proxyTimeoutSeconds = flag.Int("proxyTimeoutSeconds", getEnvAsIntOrDefault("PROXY_TIMEOUT_SECONDS", defaultProxyTimeoutSeconds), "proxy client timeout in seconds")
 	redisUrl            = flag.String("redis", getEnvAsStrOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
@@ -92,7 +94,18 @@ func main() {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(logger, version, *listenAddress, *relayUrl, *proxyUrl, *proxyTimeoutSeconds, key, *redisUrl, db)
+	s, err := server.NewRpcEndPointServer(server.Configuration{
+		DB:                  db,
+		DrainAddress:        *drainAddress,
+		ListenAddress:       *listenAddress,
+		Logger:              logger,
+		ProxyTimeoutSeconds: *proxyTimeoutSeconds,
+		ProxyUrl:            *proxyUrl,
+		RedisUrl:            *redisUrl,
+		RelaySigningKey:     key,
+		RelayUrl:            *relayUrl,
+		Version:             version,
+	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
 	}
