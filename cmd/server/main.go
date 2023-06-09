@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -25,6 +26,7 @@ var (
 	defaultRelayUrl            = "https://relay.flashbots.net"
 	defaultRedisUrl            = "localhost:6379"
 	defaultServiceName         = os.Getenv("SERVICE_NAME")
+	defaultDrainSeconds        = 0
 
 	// cli flags
 	versionPtr          = flag.Bool("version", false, "just print the program version")
@@ -38,6 +40,7 @@ var (
 	debugPtr            = flag.Bool("debug", defaultDebug, "print debug output")
 	logJSONPtr          = flag.Bool("logJSON", defaultLogJSON, "log in JSON")
 	serviceName         = flag.String("serviceName", defaultServiceName, "name of the service which will be used in the logs")
+	drainSeconds        = flag.Int("drainSeconds", getEnvAsIntOrDefault("DRAIN_SECONDS", defaultDrainSeconds), "seconds to wait for graceful shutdown")
 )
 
 func main() {
@@ -91,8 +94,10 @@ func main() {
 	} else {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
+
+	drainTime := time.Duration(*drainSeconds) * time.Second
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(logger, version, *listenAddress, *relayUrl, *proxyUrl, *proxyTimeoutSeconds, key, *redisUrl, db)
+	s, err := server.NewRpcEndPointServer(logger, version, *listenAddress, *relayUrl, *proxyUrl, *proxyTimeoutSeconds, key, *redisUrl, db, drainTime)
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
 	}

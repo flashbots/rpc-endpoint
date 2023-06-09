@@ -42,11 +42,12 @@ type RpcEndPointServer struct {
 	proxyTimeoutSeconds int
 	relaySigningKey     *ecdsa.PrivateKey
 	db                  database.Store
+	shutdownDrainTime   time.Duration
 	healthy             bool
 	healthyMu           sync.Mutex
 }
 
-func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store, shutdownDrainTime time.Duration) (*RpcEndPointServer, error) {
 	var err error
 	if DebugDontSendTx {
 		logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
@@ -79,6 +80,7 @@ func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, p
 		proxyTimeoutSeconds: proxyTimeoutSeconds,
 		relaySigningKey:     relaySigningKey,
 		db:                  db,
+		shutdownDrainTime:   shutdownDrainTime,
 		healthy:             true,
 		healthyMu:           sync.Mutex{},
 	}, nil
@@ -120,9 +122,9 @@ func (s *RpcEndPointServer) Start() {
 	s.SetUnhealthy()
 	s.logger.Info("http server stopping")
 
-	// Wait for 60 seconds for load balancer to pick up the unhealthy state or for SIGTERM to be sent again
+	// Wait for `shutdownDrainTime` for load balancer to pick up the unhealthy state or for SIGTERM to be sent again
 	select {
-	case <-time.After(60 * time.Second):
+	case <-time.After(s.shutdownDrainTime):
 	case <-notifier:
 		s.logger.Info("http server stopping immediately")
 		return
