@@ -60,7 +60,6 @@ This project is currently maintained by:
 
 * [@bertcmiller](https://twitter.com/bertcmiller)
 * [@metachris](https://twitter.com/metachris)
-* [@bhakiyarajk](https://twitter.com/bhakiyarajk)
 
 ## Contributing
 
