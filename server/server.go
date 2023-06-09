@@ -47,40 +47,42 @@ type RpcEndPointServer struct {
 	healthyMu           sync.Mutex
 }
 
-func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store, shutdownDrainTime time.Duration) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
+	logger := cfg.Logger
+
 	var err error
 	if DebugDontSendTx {
-		logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
+		logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", cfg.RedisUrl)
 	}
 
-	if redisUrl == "dev" {
-		logger.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
+	if cfg.RedisUrl == "dev" {
+		logger.Info("Using integrated in-memory Redis instance", "redisUrl", cfg.RedisUrl)
 		redisServer, err := miniredis.Run()
 		if err != nil {
 			return nil, err
 		}
-		redisUrl = redisServer.Addr()
+		cfg.RedisUrl = redisServer.Addr()
 	}
 	// Setup redis connection
-	logger.Info("Connecting to redis...", "redisUrl", redisUrl)
-	RState, err = NewRedisState(redisUrl)
+	logger.Info("Connecting to redis...", "redisUrl", cfg.RedisUrl)
+	RState, err = NewRedisState(cfg.RedisUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")
 	}
 
-	FlashbotsRPC = flashbotsrpc.New(relayUrl)
+	FlashbotsRPC = flashbotsrpc.New(cfg.RelayUrl)
 	// FlashbotsRPC.Debug = true
 
 	return &RpcEndPointServer{
 		logger:              logger,
 		startTime:           Now(),
-		version:             version,
-		listenAddress:       listenAddress,
-		proxyUrl:            proxyUrl,
-		proxyTimeoutSeconds: proxyTimeoutSeconds,
-		relaySigningKey:     relaySigningKey,
-		db:                  db,
-		shutdownDrainTime:   shutdownDrainTime,
+		version:             cfg.Version,
+		listenAddress:       cfg.ListenAddress,
+		proxyUrl:            cfg.ProxyUrl,
+		proxyTimeoutSeconds: cfg.ProxyTimeoutSeconds,
+		relaySigningKey:     cfg.RelaySigningKey,
+		db:                  cfg.DB,
+		shutdownDrainTime:   cfg.ShutdownDrainTime,
 		healthy:             true,
 		healthyMu:           sync.Mutex{},
 	}, nil

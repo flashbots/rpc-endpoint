@@ -96,8 +96,22 @@ func main() {
 	}
 
 	drainTime := time.Duration(*drainSeconds) * time.Second
+
+	config := server.Configuration{
+		DB:                  db,
+		ListenAddress:       *listenAddress,
+		Logger:              logger,
+		ProxyTimeoutSeconds: *proxyTimeoutSeconds,
+		ProxyUrl:            *proxyUrl,
+		RedisUrl:            *redisUrl,
+		RelaySigningKey:     key,
+		RelayUrl:            *relayUrl,
+		Version:             version,
+		ShutdownDrainTime:   drainTime,
+	}
+
 	// Start the endpoint
-	s, err := server.NewRpcEndPointServer(logger, version, *listenAddress, *relayUrl, *proxyUrl, *proxyTimeoutSeconds, key, *redisUrl, db, drainTime)
+	s, err := server.NewRpcEndPointServer(config)
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
 	}

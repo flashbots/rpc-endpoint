@@ -68,8 +68,20 @@ func testServerSetup(db database.Store) {
 	txApiServer := httptest.NewServer(http.HandlerFunc(testutils.MockTxApiHandler))
 	server.ProtectTxApiHost = txApiServer.URL
 
+	config := server.Configuration{
+		DB:                  db,
+		ListenAddress:       "",
+		Logger:              log.New("testlogger"),
+		ProxyTimeoutSeconds: 10,
+		ProxyUrl:            RpcBackendServerUrl,
+		RedisUrl:            redisServer.Addr(),
+		RelaySigningKey:     relaySigningKey,
+		RelayUrl:            RpcBackendServerUrl,
+		Version:             "test",
+		ShutdownDrainTime:   0,
+	}
 	// Create a fresh RPC endpoint server
-	rpcServer, err := server.NewRpcEndPointServer(log.New("testlogger"), "test", "", RpcBackendServerUrl, RpcBackendServerUrl, 10, relaySigningKey, redisServer.Addr(), db, 0)
+	rpcServer, err := server.NewRpcEndPointServer(config)
 	if err != nil {
 		panic(err)
 	}
