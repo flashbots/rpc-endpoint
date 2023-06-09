@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,6 +42,8 @@ type RpcEndPointServer struct {
 	proxyTimeoutSeconds int
 	relaySigningKey     *ecdsa.PrivateKey
 	db                  database.Store
+	healthy             bool
+	healthyMu           sync.Mutex
 }
 
 func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
@@ -76,6 +79,8 @@ func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, p
 		proxyTimeoutSeconds: proxyTimeoutSeconds,
 		relaySigningKey:     relaySigningKey,
 		db:                  db,
+		healthy:             true,
+		healthyMu:           sync.Mutex{},
 	}, nil
 }
 
@@ -112,8 +117,25 @@ func (s *RpcEndPointServer) Start() {
 
 	<-notifier
 
+	s.SetUnhealthy()
+	s.logger.Info("http server stopping")
+
+	// Wait for 60 seconds for load balancer to pick up the unhealthy state or for SIGTERM to be sent again
+	select {
+	case <-time.After(60 * time.Second):
+	case <-notifier:
+		s.logger.Info("http server stopping immediately")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	go func() {
+		<-notifier
+		s.logger.Info("http server shutdown interrupted by signal")
+		cancel()
+	}()
 
 	if err := server.Shutdown(ctx); err != nil {
 		s.logger.Error("http server shutdown failed", "error", err)
@@ -143,6 +165,13 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	s.healthyMu.Lock()
+	defer s.healthyMu.Unlock()
+	if !s.healthy {
+		respw.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	res := types.HealthResponse{
 		Now:       Now(),
 		StartTime: s.startTime,
@@ -204,4 +233,10 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 func setCorsHeaders(respw http.ResponseWriter) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
 	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
+}
+
+func (s *RpcEndPointServer) SetUnhealthy() {
+	s.healthyMu.Lock()
+	defer s.healthyMu.Unlock()
+	s.healthy = false
 }
