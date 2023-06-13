@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -40,6 +41,7 @@ type RpcEndPointServer struct {
 	drainSeconds        int
 	db                  database.Store
 	isHealthy           bool
+	isHealthyMx         sync.RWMutex
 	listenAddress       string
 	logger              log.Logger
 	proxyTimeoutSeconds int
@@ -196,17 +198,27 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 }
 
 func (s *RpcEndPointServer) handleDrain(respw http.ResponseWriter, req *http.Request) {
-	if s.isHealthy {
-		s.isHealthy = false
-		s.logger.Info("Server marked as unhealthy")
-		// Give LB enough time to detect us unhealthy
-		time.Sleep(
-			time.Duration(s.drainSeconds) * time.Second,
-		)
+	s.isHealthyMx.Lock()
+	if !s.isHealthy {
+		s.isHealthyMx.Unlock()
+		return
 	}
+
+	s.isHealthy = false
+	s.logger.Info("Server marked as unhealthy")
+
+	// Let's not hold onto the lock in our sleep
+	s.isHealthyMx.Unlock()
+
+	// Give LB enough time to detect us unhealthy
+	time.Sleep(
+		time.Duration(s.drainSeconds) * time.Second,
+	)
 }
 
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	s.isHealthyMx.RLock()
+	defer s.isHealthyMx.RUnlock()
 	res := types.HealthResponse{
 		Now:       Now(),
 		StartTime: s.startTime,
