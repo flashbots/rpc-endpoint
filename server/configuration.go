@@ -10,6 +10,7 @@ import (
 type Configuration struct {
 	DB                  database.Store
 	DrainAddress        string
+	DrainSeconds        int
 	ListenAddress       string
 	Logger              log.Logger
 	ProxyTimeoutSeconds int

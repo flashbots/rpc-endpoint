@@ -37,6 +37,7 @@ type RpcEndPointServer struct {
 	drain  *http.Server
 
 	drainAddress        string
+	drainSeconds        int
 	db                  database.Store
 	isHealthy           bool
 	listenAddress       string
@@ -75,6 +76,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
+		drainSeconds:        cfg.DrainSeconds,
 		isHealthy:           true,
 		listenAddress:       cfg.ListenAddress,
 		logger:              cfg.Logger,
@@ -197,7 +199,10 @@ func (s *RpcEndPointServer) handleDrain(respw http.ResponseWriter, req *http.Req
 	if s.isHealthy {
 		s.isHealthy = false
 		s.logger.Info("Server marked as unhealthy")
-		time.Sleep(60 * time.Second) // Give LB enough time to detect us unhealthy
+		// Give LB enough time to detect us unhealthy
+		time.Sleep(
+			time.Duration(s.drainSeconds) * time.Second,
+		)
 	}
 }
 
