@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,49 +34,59 @@ var RState *RedisState
 var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
 
 type RpcEndPointServer struct {
-	logger              log.Logger
-	version             string
-	startTime           time.Time
-	listenAddress       string
-	proxyUrl            string
-	proxyTimeoutSeconds int
-	relaySigningKey     *ecdsa.PrivateKey
+	server *http.Server
+	drain  *http.Server
+
+	drainAddress        string
+	drainSeconds        int
 	db                  database.Store
+	isHealthy           bool
+	isHealthyMx         sync.RWMutex
+	listenAddress       string
+	logger              log.Logger
+	proxyTimeoutSeconds int
+	proxyUrl            string
+	relaySigningKey     *ecdsa.PrivateKey
+	startTime           time.Time
+	version             string
 }
 
-func NewRpcEndPointServer(logger log.Logger, version, listenAddress, relayUrl, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, redisUrl string, db database.Store) (*RpcEndPointServer, error) {
+func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 	var err error
 	if DebugDontSendTx {
-		logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", redisUrl)
+		cfg.Logger.Info("DEBUG MODE: raw transactions will not be sent out!", "redisUrl", cfg.RedisUrl)
 	}
 
-	if redisUrl == "dev" {
-		logger.Info("Using integrated in-memory Redis instance", "redisUrl", redisUrl)
+	if cfg.RedisUrl == "dev" {
+		cfg.Logger.Info("Using integrated in-memory Redis instance", "redisUrl", cfg.RedisUrl)
 		redisServer, err := miniredis.Run()
 		if err != nil {
 			return nil, err
 		}
-		redisUrl = redisServer.Addr()
+		cfg.RedisUrl = redisServer.Addr()
 	}
 	// Setup redis connection
-	logger.Info("Connecting to redis...", "redisUrl", redisUrl)
-	RState, err = NewRedisState(redisUrl)
+	cfg.Logger.Info("Connecting to redis...", "redisUrl", cfg.RedisUrl)
+	RState, err = NewRedisState(cfg.RedisUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")
 	}
 
-	FlashbotsRPC = flashbotsrpc.New(relayUrl)
+	FlashbotsRPC = flashbotsrpc.New(cfg.RelayUrl)
 	// FlashbotsRPC.Debug = true
 
 	return &RpcEndPointServer{
-		logger:              logger,
+		db:                  cfg.DB,
+		drainAddress:        cfg.DrainAddress,
+		drainSeconds:        cfg.DrainSeconds,
+		isHealthy:           true,
+		listenAddress:       cfg.ListenAddress,
+		logger:              cfg.Logger,
+		proxyTimeoutSeconds: cfg.ProxyTimeoutSeconds,
+		proxyUrl:            cfg.ProxyUrl,
+		relaySigningKey:     cfg.RelaySigningKey,
 		startTime:           Now(),
-		version:             version,
-		listenAddress:       listenAddress,
-		proxyUrl:            proxyUrl,
-		proxyTimeoutSeconds: proxyTimeoutSeconds,
-		relaySigningKey:     relaySigningKey,
-		db:                  db,
+		version:             cfg.Version,
 	}, nil
 }
 
@@ -90,35 +101,79 @@ func (s *RpcEndPointServer) Start() {
 		}
 	}()
 
-	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
-	http.HandleFunc("/", s.HandleHttpRequest)
-	http.HandleFunc("/health", s.handleHealthRequest)
-	http.HandleFunc("/bundle", s.HandleBundleRequest)
-
-	server := &http.Server{
-		Addr:         s.listenAddress,
-		WriteTimeout: 30 * time.Second,
-		ReadTimeout:  30 * time.Second,
-	}
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			s.logger.Error("http server failed", "error", err)
-		}
-	}()
+	s.startMainServer()
+	s.startDrainServer()
 
 	notifier := make(chan os.Signal, 1)
 	signal.Notify(notifier, os.Interrupt, syscall.SIGTERM)
 
 	<-notifier
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	s.stopDrainServer()
+	s.stopMainServer()
+}
 
-	if err := server.Shutdown(ctx); err != nil {
-		s.logger.Error("http server shutdown failed", "error", err)
+func (s *RpcEndPointServer) startMainServer() {
+	if s.server != nil {
+		panic("http server is already running")
 	}
-	s.logger.Info("http server stopped")
+	// Handler for root URL (JSON-RPC on POST, public/index.html on GET)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.HandleHttpRequest)
+	mux.HandleFunc("/health", s.handleHealthRequest)
+	mux.HandleFunc("/bundle", s.HandleBundleRequest)
+	s.server = &http.Server{
+		Addr:         s.listenAddress,
+		Handler:      mux,
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
+	}
+	go func() {
+		if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.logger.Error("http server failed", "error", err)
+		}
+	}()
+}
+
+func (s *RpcEndPointServer) stopMainServer() {
+	if s.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.server.Shutdown(ctx); err != nil {
+			s.logger.Error("http server shutdown failed", "error", err)
+		}
+		s.logger.Info("http server stopped")
+		s.server = nil
+	}
+}
+
+func (s *RpcEndPointServer) startDrainServer() {
+	if s.drain != nil {
+		panic("drain http server is already running")
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handleDrain)
+	s.drain = &http.Server{
+		Addr:    s.drainAddress,
+		Handler: mux,
+	}
+	go func() {
+		if err := s.drain.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.logger.Error("drain http server failed", "error", err)
+		}
+	}()
+}
+
+func (s *RpcEndPointServer) stopDrainServer() {
+	if s.drain != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.drain.Shutdown(ctx); err != nil {
+			s.logger.Error("drain http server shutdown failed", "error", err)
+		}
+		s.logger.Info("drain http server stopped")
+		s.drain = nil
+	}
 }
 
 func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *http.Request) {
@@ -142,7 +197,28 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 	request.process()
 }
 
+func (s *RpcEndPointServer) handleDrain(respw http.ResponseWriter, req *http.Request) {
+	s.isHealthyMx.Lock()
+	if !s.isHealthy {
+		s.isHealthyMx.Unlock()
+		return
+	}
+
+	s.isHealthy = false
+	s.logger.Info("Server marked as unhealthy")
+
+	// Let's not hold onto the lock in our sleep
+	s.isHealthyMx.Unlock()
+
+	// Give LB enough time to detect us unhealthy
+	time.Sleep(
+		time.Duration(s.drainSeconds) * time.Second,
+	)
+}
+
 func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *http.Request) {
+	s.isHealthyMx.RLock()
+	defer s.isHealthyMx.RUnlock()
 	res := types.HealthResponse{
 		Now:       Now(),
 		StartTime: s.startTime,
@@ -157,7 +233,11 @@ func (s *RpcEndPointServer) handleHealthRequest(respw http.ResponseWriter, req *
 	}
 
 	respw.Header().Set("Content-Type", "application/json")
-	respw.WriteHeader(http.StatusOK)
+	if s.isHealthy {
+		respw.WriteHeader(http.StatusOK)
+	} else {
+		respw.WriteHeader(http.StatusInternalServerError)
+	}
 	respw.Write(jsonResp)
 }
 
