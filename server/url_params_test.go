@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/stretchr/testify/require"
 	"net/url"
@@ -8,6 +9,10 @@ import (
 )
 
 func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
+	ptrInt := func(i int) *int {
+		return &i
+	}
+
 	tests := map[string]struct {
 		url  string
 		want URLParameters
@@ -68,8 +73,63 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			want: URLParameters{
 				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
 				prefWasSet: false,
-				originId: "" +
-					"",
+				originId:   "",
+			},
+			err: nil,
+		},
+		"set refund": {
+			url: "https://rpc.flashbots.net?refund=17",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, WantRefund: ptrInt(17)},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"incorrect refund, -1": {
+			url: "https://rpc.flashbots.net?refund=-1",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundQuery,
+		},
+		"incorrect refund, 120": {
+			url: "https://rpc.flashbots.net?refund=120",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundQuery,
+		},
+		"set refund address": {
+			url: "https://rpc.flashbots.net?refund=17&refundAddress=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			want: URLParameters{
+				pref: types.TxPrivacyPreferences{
+					Hints:        []string{"hash", "special_logs"},
+					WantRefund:   ptrInt(17),
+					RefundConfig: []types.RefundConfig{{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 100}},
+				},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"set refund addresses": {
+			url: "https://rpc.flashbots.net?refund=17&refundAddress=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:80&refundAddress=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:20",
+			want: URLParameters{
+				pref: types.TxPrivacyPreferences{
+					Hints:      []string{"hash", "special_logs"},
+					WantRefund: ptrInt(17),
+					RefundConfig: []types.RefundConfig{
+						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 80},
+						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 20},
+					},
+				},
+				prefWasSet: false,
+				originId:   "",
 			},
 			err: nil,
 		},
