@@ -78,34 +78,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			err: nil,
 		},
 		"set refund": {
-			url: "https://rpc.flashbots.net?refund=17",
-			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, WantRefund: ptrInt(17)},
-				prefWasSet: false,
-				originId:   "",
-			},
-			err: nil,
-		},
-		"incorrect refund, -1": {
-			url: "https://rpc.flashbots.net?refund=-1",
-			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
-				prefWasSet: false,
-				originId:   "",
-			},
-			err: ErrIncorrectRefundQuery,
-		},
-		"incorrect refund, 120": {
-			url: "https://rpc.flashbots.net?refund=120",
-			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
-				prefWasSet: false,
-				originId:   "",
-			},
-			err: ErrIncorrectRefundQuery,
-		},
-		"set refund address": {
-			url: "https://rpc.flashbots.net?refund=17&refundAddress=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:17",
 			want: URLParameters{
 				pref: types.TxPrivacyPreferences{
 					Hints:        []string{"hash", "special_logs"},
@@ -117,21 +90,39 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
-		"set refund addresses": {
-			url: "https://rpc.flashbots.net?refund=17&refundAddress=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:80&refundAddress=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:20",
+		"set refund, two addresses": {
+			url: "https://rpc.flashbots.net?&refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:70&refund=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:10",
 			want: URLParameters{
 				pref: types.TxPrivacyPreferences{
 					Hints:      []string{"hash", "special_logs"},
-					WantRefund: ptrInt(17),
+					WantRefund: ptrInt(80),
 					RefundConfig: []types.RefundConfig{
-						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 80},
-						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 20},
+						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 88},
+						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 12},
 					},
 				},
 				prefWasSet: false,
 				originId:   "",
 			},
 			err: nil,
+		},
+		"set refund, incorrect 110": {
+			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:110",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundQuery,
+		},
+		"set refund, incorrect address": {
+			url: "https://rpc.flashbots.net?refund=0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:80",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundQuery,
 		},
 	}
 

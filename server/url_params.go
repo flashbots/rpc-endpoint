@@ -13,12 +13,11 @@ import (
 var (
 	DefaultAuctionHint = []string{"hash"}
 
-	ErrEmptyHintQuery              = errors.New("Hint query must be non-empty if set.")
-	ErrEmptyTargetBuilderQuery     = errors.New("Target builder query must be non-empty if set.")
-	ErrIncorrectAuctionHints       = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata.")
-	ErrIncorrectOriginId           = errors.New("Incorrect origin id, must be less then 255 char.")
-	ErrIncorrectRefundQuery        = errors.New("Incorrect refund.")
-	ErrIncorrectRefundAddressQuery = errors.New("Incorrect refundAddress.")
+	ErrEmptyHintQuery          = errors.New("Hint query must be non-empty if set.")
+	ErrEmptyTargetBuilderQuery = errors.New("Target builder query must be non-empty if set.")
+	ErrIncorrectAuctionHints   = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata.")
+	ErrIncorrectOriginId       = errors.New("Incorrect origin id, must be less then 255 char.")
+	ErrIncorrectRefundQuery    = errors.New("Incorrect refund.")
 )
 
 type URLParameters struct {
@@ -68,51 +67,75 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 		params.pref.Builders = targetBuildersQuery
 	}
 
-	refundQuery, ok := url.Query()["refund"]
-	if ok {
-		if len(refundQuery) != 1 {
-			return params, ErrIncorrectRefundQuery
-		}
-		// parse refund as int
-		refund, err := strconv.Atoi(refundQuery[0])
-		if err != nil {
-			return params, ErrIncorrectRefundQuery
-		}
-		if refund < 0 || refund > 100 {
-			return params, ErrIncorrectRefundQuery
-		}
-		params.pref.WantRefund = &refund
-	}
-
-	refundAddressQuery, ok := url.Query()["refundAddress"]
+	refundAddressQuery, ok := url.Query()["refund"]
 	if ok {
 		if len(refundAddressQuery) == 0 {
-			return params, ErrIncorrectRefundAddressQuery
-		} else if len(refundAddressQuery) == 1 {
-			if !common.IsHexAddress(refundAddressQuery[0]) {
-				return params, ErrIncorrectRefundAddressQuery
-			}
-			address := common.HexToAddress(refundAddressQuery[0])
-			params.pref.RefundConfig = []types.RefundConfig{{Address: address, Percent: 100}}
-		} else {
-			var refundConfig []types.RefundConfig
-			for _, refundAddress := range refundAddressQuery {
-				split := strings.Split(refundAddress, ":")
-				if len(split) != 2 {
-					return params, ErrIncorrectRefundAddressQuery
-				}
-				if !common.IsHexAddress(split[0]) {
-					return params, ErrIncorrectRefundAddressQuery
-				}
-				address := common.HexToAddress(split[0])
-				percent, err := strconv.Atoi(split[1])
-				if err != nil {
-					return params, ErrIncorrectRefundAddressQuery
-				}
-				refundConfig = append(refundConfig, types.RefundConfig{Address: address, Percent: percent})
-			}
-			params.pref.RefundConfig = refundConfig
+			return params, ErrIncorrectRefundQuery
 		}
+
+		var (
+			addresses = make([]common.Address, len(refundAddressQuery))
+			percents  = make([]int, len(refundAddressQuery))
+		)
+
+		for i, refundAddress := range refundAddressQuery {
+			split := strings.Split(refundAddress, ":")
+			if len(split) != 2 {
+				return params, ErrIncorrectRefundQuery
+			}
+			if !common.IsHexAddress(split[0]) {
+				return params, ErrIncorrectRefundQuery
+			}
+			address := common.HexToAddress(split[0])
+			percent, err := strconv.Atoi(split[1])
+			if err != nil {
+				return params, ErrIncorrectRefundQuery
+			}
+			if percent <= 0 || percent >= 100 {
+				return params, ErrIncorrectRefundQuery
+			}
+			addresses[i] = address
+			percents[i] = percent
+		}
+
+		totalRefund := 0
+		for _, percent := range percents {
+			totalRefund += percent
+		}
+		if totalRefund <= 0 || totalRefund >= 100 {
+			return params, ErrIncorrectRefundQuery
+		}
+
+		// normalize refund config percentages
+		for i, percent := range percents {
+			percents[i] = (percent * 100) / totalRefund
+		}
+
+		// should sum to 100
+		totalRefundConfDelta := 0
+		for _, percent := range percents {
+			totalRefundConfDelta += percent
+		}
+		totalRefundConfDelta = 100 - totalRefundConfDelta
+
+		// try to remove delta
+		for i, percent := range percents {
+			if fixed := totalRefundConfDelta + percent; fixed <= 100 && fixed >= 0 {
+				percents[i] = fixed
+				break
+			}
+		}
+
+		refundConfig := make([]types.RefundConfig, len(percents))
+		for i, percent := range percents {
+			refundConfig[i] = types.RefundConfig{
+				Address: addresses[i],
+				Percent: percent,
+			}
+		}
+
+		params.pref.RefundConfig = refundConfig
+		params.pref.WantRefund = &totalRefund
 	}
 
 	return params, nil
