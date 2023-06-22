@@ -114,10 +114,9 @@ type SendPrivateTxRequestWithPreferences struct {
 }
 
 type TxPrivacyPreferences struct {
-	Hints        []string       `json:"hints"`
-	Builders     []string       `json:"builders"`
-	WantRefund   *int           `json:"wantRefund,omitempty"`
-	RefundConfig []RefundConfig `json:"refundConfig,omitempty"`
+	Hints    []string       `json:"hints"`
+	Builders []string       `json:"builders"`
+	Refund   []RefundConfig `json:"refund,omitempty"`
 }
 
 type RefundConfig struct {

@@ -105,32 +105,13 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 			percents[i] = percent
 		}
 
-		totalRefund := 0
+		// should not exceed 100%
+		var totalRefund int
 		for _, percent := range percents {
 			totalRefund += percent
 		}
-		if totalRefund <= 0 || totalRefund >= 100 {
+		if totalRefund > 100 {
 			return params, ErrIncorrectRefundTotalPercentageQuery
-		}
-
-		// normalize refund config percentages
-		for i, percent := range percents {
-			percents[i] = (percent * 100) / totalRefund
-		}
-
-		// should sum to 100
-		totalRefundConfDelta := 0
-		for _, percent := range percents {
-			totalRefundConfDelta += percent
-		}
-		totalRefundConfDelta = 100 - totalRefundConfDelta
-
-		// try to remove delta
-		for i, percent := range percents {
-			if fixed := totalRefundConfDelta + percent; fixed <= 100 && fixed >= 0 {
-				percents[i] = fixed
-				break
-			}
 		}
 
 		refundConfig := make([]types.RefundConfig, len(percents))
@@ -141,8 +122,7 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 			}
 		}
 
-		params.pref.RefundConfig = refundConfig
-		params.pref.WantRefund = &totalRefund
+		params.pref.Refund = refundConfig
 	}
 
 	return params, nil

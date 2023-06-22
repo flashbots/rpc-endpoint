@@ -9,10 +9,6 @@ import (
 )
 
 func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
-	ptrInt := func(i int) *int {
-		return &i
-	}
-
 	tests := map[string]struct {
 		url  string
 		want URLParameters
@@ -81,9 +77,8 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:17",
 			want: URLParameters{
 				pref: types.TxPrivacyPreferences{
-					Hints:        []string{"hash", "special_logs"},
-					WantRefund:   ptrInt(17),
-					RefundConfig: []types.RefundConfig{{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 100}},
+					Hints:  []string{"hash", "special_logs"},
+					Refund: []types.RefundConfig{{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 17}},
 				},
 				prefWasSet: false,
 				originId:   "",
@@ -94,11 +89,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net?&refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:70&refund=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:10",
 			want: URLParameters{
 				pref: types.TxPrivacyPreferences{
-					Hints:      []string{"hash", "special_logs"},
-					WantRefund: ptrInt(80),
-					RefundConfig: []types.RefundConfig{
-						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 88},
-						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 12},
+					Hints: []string{"hash", "special_logs"},
+					Refund: []types.RefundConfig{
+						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 70},
+						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 10},
 					},
 				},
 				prefWasSet: false,
