@@ -30,8 +30,12 @@ type URLParameters struct {
 }
 
 // ExtractParametersFromUrl extracts the auction preference from the url query
-// If the auction preference is not set, it will default to disabled
-// if no hints are set and auction is enabled we use default hints
+// Allowed query params:
+//   - hint: mev share hints, can be set multiple times, default: hash, special_logs
+//   - originId: origin id, default: ""
+//   - builder: target builder, can be set multiple times, default: empty (only send to flashbots builders)
+//   - refund: refund in the form of 0xaddress:percentage, default: empty (will be set by default when backrun is produced)
+//     example: 0x123:80 - will refund 80% of the backrun profit to 0x123
 func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 	var hint []string
 	hintQuery, ok := url.Query()["hint"]
