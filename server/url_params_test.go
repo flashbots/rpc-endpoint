@@ -106,6 +106,15 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
+		"set refund, incorrect query": {
+			url: "https://rpc.flashbots.net?refund",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundQuery,
+		},
 		"set refund, incorrect 110": {
 			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:110",
 			want: URLParameters{
@@ -113,7 +122,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 				prefWasSet: false,
 				originId:   "",
 			},
-			err: ErrIncorrectRefundQuery,
+			err: ErrIncorrectRefundPercentageQuery,
 		},
 		"set refund, incorrect address": {
 			url: "https://rpc.flashbots.net?refund=0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:80",
@@ -122,7 +131,16 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 				prefWasSet: false,
 				originId:   "",
 			},
-			err: ErrIncorrectRefundQuery,
+			err: ErrIncorrectRefundAddressQuery,
+		},
+		"set refund, incorrect 50 + 60": {
+			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:50&refund=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:60",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrIncorrectRefundTotalPercentageQuery,
 		},
 	}
 

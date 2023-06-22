@@ -13,11 +13,14 @@ import (
 var (
 	DefaultAuctionHint = []string{"hash"}
 
-	ErrEmptyHintQuery          = errors.New("Hint query must be non-empty if set.")
-	ErrEmptyTargetBuilderQuery = errors.New("Target builder query must be non-empty if set.")
-	ErrIncorrectAuctionHints   = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata.")
-	ErrIncorrectOriginId       = errors.New("Incorrect origin id, must be less then 255 char.")
-	ErrIncorrectRefundQuery    = errors.New("Incorrect refund.")
+	ErrEmptyHintQuery                      = errors.New("Hint query must be non-empty if set.")
+	ErrEmptyTargetBuilderQuery             = errors.New("Target builder query must be non-empty if set.")
+	ErrIncorrectAuctionHints               = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata.")
+	ErrIncorrectOriginId                   = errors.New("Incorrect origin id, must be less then 255 char.")
+	ErrIncorrectRefundQuery                = errors.New("Incorrect refund query, must be 0xaddress:percentage.")
+	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
+	ErrIncorrectRefundPercentageQuery      = errors.New("Incorrect refund percentage.")
+	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be bellow 100%.")
 )
 
 type URLParameters struct {
@@ -84,15 +87,15 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 				return params, ErrIncorrectRefundQuery
 			}
 			if !common.IsHexAddress(split[0]) {
-				return params, ErrIncorrectRefundQuery
+				return params, ErrIncorrectRefundAddressQuery
 			}
 			address := common.HexToAddress(split[0])
 			percent, err := strconv.Atoi(split[1])
 			if err != nil {
-				return params, ErrIncorrectRefundQuery
+				return params, ErrIncorrectRefundPercentageQuery
 			}
 			if percent <= 0 || percent >= 100 {
-				return params, ErrIncorrectRefundQuery
+				return params, ErrIncorrectRefundPercentageQuery
 			}
 			addresses[i] = address
 			percents[i] = percent
@@ -103,7 +106,7 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 			totalRefund += percent
 		}
 		if totalRefund <= 0 || totalRefund >= 100 {
-			return params, ErrIncorrectRefundQuery
+			return params, ErrIncorrectRefundTotalPercentageQuery
 		}
 
 		// normalize refund config percentages
