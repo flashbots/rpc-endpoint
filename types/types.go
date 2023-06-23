@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"time"
 
 	"github.com/metachris/flashbotsrpc"
@@ -113,8 +114,14 @@ type SendPrivateTxRequestWithPreferences struct {
 }
 
 type TxPrivacyPreferences struct {
-	Hints    []string `json:"hints"`
-	Builders []string `json:"builders"`
+	Hints    []string       `json:"hints"`
+	Builders []string       `json:"builders"`
+	Refund   []RefundConfig `json:"refund,omitempty"`
+}
+
+type RefundConfig struct {
+	Address common.Address `json:"address"`
+	Percent int            `json:"percent"`
 }
 
 type PrivateTxPreferences struct {
