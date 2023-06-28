@@ -20,7 +20,6 @@ import (
 
 	"github.com/alicebob/miniredis"
 	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/metachris/flashbotsrpc"
 	"github.com/pkg/errors"
 )
 
@@ -30,8 +29,6 @@ var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
 
 // Metamask fix helper
 var RState *RedisState
-
-var FlashbotsRPC *flashbotsrpc.FlashbotsRPC
 
 type RpcEndPointServer struct {
 	server *http.Server
@@ -47,6 +44,7 @@ type RpcEndPointServer struct {
 	proxyTimeoutSeconds int
 	proxyUrl            string
 	relaySigningKey     *ecdsa.PrivateKey
+	relayUrl            string
 	startTime           time.Time
 	version             string
 }
@@ -72,9 +70,6 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		return nil, errors.Wrap(err, "Redis init error")
 	}
 
-	FlashbotsRPC = flashbotsrpc.New(cfg.RelayUrl)
-	// FlashbotsRPC.Debug = true
-
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
@@ -85,6 +80,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		proxyTimeoutSeconds: cfg.ProxyTimeoutSeconds,
 		proxyUrl:            cfg.ProxyUrl,
 		relaySigningKey:     cfg.RelaySigningKey,
+		relayUrl:            cfg.RelayUrl,
 		startTime:           Now(),
 		version:             cfg.Version,
 	}, nil
@@ -193,7 +189,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.db)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db)
 	request.process()
 }
 

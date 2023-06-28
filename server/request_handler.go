@@ -22,11 +22,12 @@ type RpcRequestHandler struct {
 	defaultProxyUrl     string
 	proxyTimeoutSeconds int
 	relaySigningKey     *ecdsa.PrivateKey
+	relayUrl            string
 	uid                 uuid.UUID
 	requestRecord       *requestRecord
 }
 
-func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, db database.Store) *RpcRequestHandler {
+func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, relayUrl string, db database.Store) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		logger:              logger,
 		respw:               respw,
@@ -35,6 +36,7 @@ func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *ht
 		defaultProxyUrl:     proxyUrl,
 		proxyTimeoutSeconds: proxyTimeoutSeconds,
 		relaySigningKey:     relaySigningKey,
+		relayUrl:            relayUrl,
 		uid:                 uuid.New(),
 		requestRecord:       NewRequestRecord(db),
 	}
@@ -112,7 +114,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
