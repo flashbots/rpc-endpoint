@@ -31,6 +31,7 @@ type RpcRequest struct {
 	tx                         *ethtypes.Transaction
 	txFrom                     string
 	relaySigningKey            *ecdsa.PrivateKey
+	relayUrl                   string
 	origin                     string
 	referer                    string
 	isWhitehatBundleCollection bool
@@ -39,12 +40,13 @@ type RpcRequest struct {
 	urlParams                  URLParameters
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, relayUrl, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
 		jsonReq:                    jsonReq,
 		relaySigningKey:            relaySigningKey,
+		relayUrl:                   relayUrl,
 		origin:                     origin,
 		referer:                    referer,
 		isWhitehatBundleCollection: isWhitehatBundleCollection,
@@ -255,9 +257,14 @@ func (r *RpcRequest) sendTxToRelay() {
 	sendPrivateTxArgs.Preferences = &types.PrivateTxPreferences{
 		Privacy: r.urlParams.pref,
 	}
-	sendPrivateTxArgs.OriginID = r.urlParams.originId
 
-	_, err = FlashbotsRPC.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
+	fbRpc := flashbotsrpc.New(r.relayUrl, func(rpc *flashbotsrpc.FlashbotsRPC) {
+		if r.urlParams.originId != "" {
+			rpc.Headers["X-Flashbots-Origin"] = r.urlParams.originId
+		}
+	})
+
+	_, err = fbRpc.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.logger.Info("[sendTxToRelay] Relay error response", "error", err, "rawTx", r.rawTxHex)
@@ -330,7 +337,9 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	}
 
 	cancelPrivTxArgs := flashbotsrpc.FlashbotsCancelPrivateTransactionRequest{TxHash: initialTxHash}
-	_, err = FlashbotsRPC.FlashbotsCancelPrivateTransaction(r.relaySigningKey, cancelPrivTxArgs)
+
+	fbRpc := flashbotsrpc.New(r.relayUrl)
+	_, err = fbRpc.FlashbotsCancelPrivateTransaction(r.relaySigningKey, cancelPrivTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'

@@ -109,7 +109,6 @@ type BundleResponse struct {
 
 type SendPrivateTxRequestWithPreferences struct {
 	flashbotsrpc.FlashbotsSendPrivateTransactionRequest
-	OriginID    string                `json:"originId,omitempty"`
 	Preferences *PrivateTxPreferences `json:"preferences,omitempty"`
 }
 
