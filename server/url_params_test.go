@@ -23,10 +23,19 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
+		"only hash hint": {
+			url: "https://rpc.flashbots.net?hint=hash",
+			want: URLParameters{
+				pref:       types.TxPrivacyPreferences{Hints: []string{"hash"}},
+				prefWasSet: true,
+				originId:   "",
+			},
+			err: nil,
+		},
 		"correct hint preference": {
 			url: "https://rpc.flashbots.net?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash", "special_logs"}},
+				pref:       types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}},
 				prefWasSet: true,
 				originId:   "",
 			},

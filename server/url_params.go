@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	DefaultAuctionHint = []string{"hash"}
+	DefaultAuctionHint = []string{"hash", "special_logs"}
 
 	ErrEmptyHintQuery                      = errors.New("Hint query must be non-empty if set.")
 	ErrEmptyTargetBuilderQuery             = errors.New("Target builder query must be non-empty if set.")
@@ -54,8 +54,6 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 	} else {
 		hint = DefaultAuctionHint
 	}
-	// append special logs hidden hint, so we can leak swap logs for protect txs
-	hint = append(hint, "special_logs")
 	params.pref.Hints = hint
 
 	originIdQuery, ok := url.Query()["originId"]
