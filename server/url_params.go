@@ -24,7 +24,7 @@ var (
 )
 
 type URLParameters struct {
-	pref       types.TxPrivacyPreferences
+	pref       types.PrivateTxPreferences
 	prefWasSet bool
 	originId   string
 }
@@ -54,7 +54,7 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 	} else {
 		hint = DefaultAuctionHint
 	}
-	params.pref.Hints = hint
+	params.pref.Privacy.Hints = hint
 
 	originIdQuery, ok := url.Query()["originId"]
 	if ok {
@@ -69,7 +69,7 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 		if len(targetBuildersQuery) == 0 {
 			return params, ErrEmptyTargetBuilderQuery
 		}
-		params.pref.Builders = targetBuildersQuery
+		params.pref.Privacy.Builders = targetBuildersQuery
 	}
 
 	refundAddressQuery, ok := url.Query()["refund"]
@@ -120,7 +120,7 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 			}
 		}
 
-		params.pref.Refund = refundConfig
+		params.pref.Validity.Refund = refundConfig
 	}
 
 	return params, nil
