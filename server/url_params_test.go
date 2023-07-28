@@ -17,7 +17,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"no auction preference": {
 			url: "https://rpc.flashbots.net",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -26,7 +29,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"only hash hint": {
 			url: "https://rpc.flashbots.net?hint=hash",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: true,
 				originId:   "",
 			},
@@ -35,7 +41,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"correct hint preference": {
 			url: "https://rpc.flashbots.net?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: true,
 				originId:   "",
 			},
@@ -49,7 +58,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"fast url works": {
 			url: "https://rpc.flashbots.net/fast",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -58,7 +70,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"rpc endpoint set": {
 			url: "https://rpc.flashbots.net?rpc=https://mainnet.infura.io/v3/123",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -67,7 +82,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"origin id": {
 			url: "https://rpc.flashbots.net?originId=123",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: false,
 				originId:   "123",
 			},
@@ -76,7 +94,10 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"target builder": {
 			url: "https://rpc.flashbots.net?builder=builder1&builder=builder2",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+					Validity: types.TxValidityPreferences{},
+				},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -85,9 +106,13 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund": {
 			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:17",
 			want: URLParameters{
-				pref: types.TxPrivacyPreferences{
-					Hints:  []string{"hash", "special_logs"},
-					Refund: []types.RefundConfig{{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 17}},
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{
+						Hints: []string{"hash", "special_logs"},
+					},
+					Validity: types.TxValidityPreferences{
+						Refund: []types.RefundConfig{{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 17}},
+					},
 				},
 				prefWasSet: false,
 				originId:   "",
@@ -97,11 +122,15 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund, two addresses": {
 			url: "https://rpc.flashbots.net?&refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:70&refund=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:10",
 			want: URLParameters{
-				pref: types.TxPrivacyPreferences{
-					Hints: []string{"hash", "special_logs"},
-					Refund: []types.RefundConfig{
-						{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 70},
-						{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 10},
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{
+						Hints: []string{"hash", "special_logs"},
+					},
+					Validity: types.TxValidityPreferences{
+						Refund: []types.RefundConfig{
+							{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 70},
+							{Address: common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), Percent: 10},
+						},
 					},
 				},
 				prefWasSet: false,
@@ -112,7 +141,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund, incorrect query": {
 			url: "https://rpc.flashbots.net?refund",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
+				pref:       types.PrivateTxPreferences{},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -121,7 +150,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund, incorrect 110": {
 			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:110",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
+				pref:       types.PrivateTxPreferences{},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -130,7 +159,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund, incorrect address": {
 			url: "https://rpc.flashbots.net?refund=0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:80",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
+				pref:       types.PrivateTxPreferences{},
 				prefWasSet: false,
 				originId:   "",
 			},
@@ -139,7 +168,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 		"set refund, incorrect 50 + 60": {
 			url: "https://rpc.flashbots.net?refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:50&refund=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:60",
 			want: URLParameters{
-				pref:       types.TxPrivacyPreferences{},
+				pref:       types.PrivateTxPreferences{},
 				prefWasSet: false,
 				originId:   "",
 			},

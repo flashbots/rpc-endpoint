@@ -254,9 +254,7 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 	sendPrivateTxArgs.Tx = r.rawTxHex
-	sendPrivateTxArgs.Preferences = &types.PrivateTxPreferences{
-		Privacy: r.urlParams.pref,
-	}
+	sendPrivateTxArgs.Preferences = &r.urlParams.pref
 
 	fbRpc := flashbotsrpc.New(r.relayUrl, func(rpc *flashbotsrpc.FlashbotsRPC) {
 		if r.urlParams.originId != "" {
