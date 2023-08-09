@@ -34,7 +34,7 @@ We're open to new ways of evaluating what needs frontrunning protection and welc
 
 ## Usage
 
-To send your transactions through the Flashbots Protect RPC please refer to the [quick-start guide](https://docs.flashbots.net/flashbots-protect/rpc/quick-start/).
+To send your transactions through the Flashbots Protect RPC please refer to the [quick-start guide](https://docs.flashbots.net/flashbots-protect/overview).
 
 To run the server, run the following command:
 
