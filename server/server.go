@@ -177,9 +177,9 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 
 	if req.Method == http.MethodGet {
 		if strings.Trim(req.URL.Path, "/") == "fast" {
-			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/fast-mode/", http.StatusFound)
+			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/overview", http.StatusFound)
 		} else {
-			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/rpc/quick-start/", http.StatusFound)
+			http.Redirect(respw, req, "https://docs.flashbots.net/flashbots-protect/overview", http.StatusFound)
 		}
 		return
 	}
