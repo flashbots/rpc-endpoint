@@ -83,6 +83,10 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	switch {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
+		if len(r.urlParams.pref.Privacy.Builders) == 0 || (len(r.urlParams.pref.Privacy.Builders) == 1 && r.urlParams.pref.Privacy.Builders[0] == "flashbots") {
+			r.writeRpcError("internal server error", types.JsonRpcInternalError)
+			return r.jsonRes
+		}
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
