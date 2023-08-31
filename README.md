@@ -54,13 +54,6 @@ Example Single request:
 curl localhost:9000 -f -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", false],"id":1}'
 ```
 
-## Maintainers
-
-This project is currently maintained by:
-
-* [@bertcmiller](https://twitter.com/bertcmiller)
-* [@metachris](https://twitter.com/metachris)
-
 ## Contributing
 
 [Flashbots](https://flashbots.net) is a research and development collective working on mitigating the negative externalities of decentralized economies. We contribute with the larger free software community to illuminate the dark forest.
