@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -42,7 +43,7 @@ func (bis *BuilderInfoService) Builders() []BuilderInfo {
 func (bis *BuilderInfoService) BuilderNames() []string {
 	var names = make([]string, 0, len(bis.builderInfos))
 	for _, builderInfo := range bis.builderInfos {
-		names = append(names, builderInfo.Name)
+		names = append(names, strings.ToLower(builderInfo.Name))
 	}
 	return names
 }

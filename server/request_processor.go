@@ -277,7 +277,7 @@ func (r *RpcRequest) sendTxToRelay() {
 			rpc.Headers["X-Flashbots-Origin"] = r.urlParams.originId
 		}
 	})
-
+	r.logger.Info("[sendTxToRelay] sending transaction", "builders count", len(sendPrivateTxArgs.Preferences.Privacy.Builders), "is_fast", r.urlParams.fast)
 	_, err = fbRpc.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
