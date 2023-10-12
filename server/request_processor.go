@@ -253,6 +253,8 @@ func (r *RpcRequest) sendTxToRelay() {
 	}
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
+	sendPrivateTxArgs.Tx = r.rawTxHex
+	sendPrivateTxArgs.Preferences = &r.urlParams.pref
 	if r.urlParams.fast {
 		if len(sendPrivateTxArgs.Preferences.Validity.Refund) == 0 {
 			addr, err := GetSenderAddressFromTx(r.tx)
@@ -269,8 +271,6 @@ func (r *RpcRequest) sendTxToRelay() {
 			}
 		}
 	}
-	sendPrivateTxArgs.Tx = r.rawTxHex
-	sendPrivateTxArgs.Preferences = &r.urlParams.pref
 
 	fbRpc := flashbotsrpc.New(r.relayUrl, func(rpc *flashbotsrpc.FlashbotsRPC) {
 		if r.urlParams.originId != "" {
