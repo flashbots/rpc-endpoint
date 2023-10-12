@@ -49,6 +49,14 @@ func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
 	return tx, nil
 }
 
+func GetSenderAddressFromTx(tx *ethtypes.Transaction) (common.Address, error) {
+	signer := ethtypes.LatestSignerForChainID(tx.ChainId())
+	sender, err := ethtypes.Sender(signer, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return sender, nil
+}
 func GetSenderFromTx(tx *ethtypes.Transaction) (string, error) {
 	signer := ethtypes.LatestSignerForChainID(tx.ChainId())
 	sender, err := ethtypes.Sender(signer, tx)

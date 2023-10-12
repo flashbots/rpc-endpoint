@@ -253,6 +253,22 @@ func (r *RpcRequest) sendTxToRelay() {
 	}
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
+	if r.urlParams.fast {
+		if len(sendPrivateTxArgs.Preferences.Validity.Refund) == 0 {
+			addr, err := GetSenderAddressFromTx(r.tx)
+			if err != nil {
+				r.logger.Error("[sendTxToRelay] GetSenderAddressFromTx failed", "error", err)
+				r.writeRpcError(err.Error(), types.JsonRpcInternalError)
+				return
+			}
+			sendPrivateTxArgs.Preferences.Validity.Refund = []types.RefundConfig{
+				{
+					Address: addr,
+					Percent: 50,
+				},
+			}
+		}
+	}
 	sendPrivateTxArgs.Tx = r.rawTxHex
 	sendPrivateTxArgs.Preferences = &r.urlParams.pref
 

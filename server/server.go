@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/flashbots/rpc-endpoint/adapters/webfile"
+	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -30,6 +32,9 @@ var DebugDontSendTx = os.Getenv("DEBUG_DONT_SEND_RAWTX") != ""
 // Metamask fix helper
 var RState *RedisState
 
+type BuilderNameProvider interface {
+	BuilderNames() []string
+}
 type RpcEndPointServer struct {
 	server *http.Server
 	drain  *http.Server
@@ -47,6 +52,7 @@ type RpcEndPointServer struct {
 	relayUrl            string
 	startTime           time.Time
 	version             string
+	builderNameProvider BuilderNameProvider
 }
 
 func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
@@ -69,7 +75,14 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Redis init error")
 	}
-
+	var builderInfoFetcher application.Fetcher
+	if cfg.BuilderInfoSource != "" {
+		builderInfoFetcher = webfile.NewFetcher(cfg.BuilderInfoSource)
+	}
+	bis, err := application.StartBuilderInfoService(context.Background(), builderInfoFetcher, time.Second*time.Duration(cfg.FetchInfoInterval))
+	if err != nil {
+		return nil, errors.Wrap(err, "BuilderInfoService init error")
+	}
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
@@ -83,6 +96,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		relayUrl:            cfg.RelayUrl,
 		startTime:           Now(),
 		version:             cfg.Version,
+		builderNameProvider: bis,
 	}, nil
 }
 
@@ -189,7 +203,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames())
 	request.process()
 }
 

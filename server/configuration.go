@@ -19,4 +19,6 @@ type Configuration struct {
 	RelaySigningKey     *ecdsa.PrivateKey
 	RelayUrl            string
 	Version             string
+	BuilderInfoSource   string
+	FetchInfoInterval   int
 }

@@ -2,12 +2,13 @@ package server
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/flashbots/rpc-endpoint/types"
-	"github.com/pkg/errors"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/flashbots/rpc-endpoint/types"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -27,6 +28,7 @@ type URLParameters struct {
 	pref       types.PrivateTxPreferences
 	prefWasSet bool
 	originId   string
+	fast       bool
 }
 
 // ExtractParametersFromUrl extracts the auction preference from the url query
@@ -36,7 +38,10 @@ type URLParameters struct {
 //   - builder: target builder, can be set multiple times, default: empty (only send to flashbots builders)
 //   - refund: refund in the form of 0xaddress:percentage, default: empty (will be set by default when backrun is produced)
 //     example: 0x123:80 - will refund 80% of the backrun profit to 0x123
-func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
+func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLParameters, err error) {
+	if strings.HasPrefix(url.Path, "/fast") {
+		params.fast = true
+	}
 	var hint []string
 	hintQuery, ok := url.Query()["hint"]
 	if ok {
@@ -70,6 +75,10 @@ func ExtractParametersFromUrl(url *url.URL) (params URLParameters, err error) {
 			return params, ErrEmptyTargetBuilderQuery
 		}
 		params.pref.Privacy.Builders = targetBuildersQuery
+	}
+	if params.fast {
+		// set all builders no matter what's in the url
+		params.pref.Privacy.Builders = allBuilders
 	}
 
 	refundAddressQuery, ok := url.Query()["refund"]
