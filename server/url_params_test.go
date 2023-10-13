@@ -1,11 +1,12 @@
 package server
 
 import (
+	"net/url"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/stretchr/testify/require"
-	"net/url"
-	"testing"
 )
 
 func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
@@ -54,18 +55,6 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url:  "https://rpc.flashbots.net?hint=contract_address&hint=function_selector&hint=logs&hint=incorrect",
 			want: URLParameters{},
 			err:  ErrIncorrectAuctionHints,
-		},
-		"fast url works": {
-			url: "https://rpc.flashbots.net/fast",
-			want: URLParameters{
-				pref: types.PrivateTxPreferences{
-					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
-					Validity: types.TxValidityPreferences{},
-				},
-				prefWasSet: false,
-				originId:   "",
-			},
-			err: nil,
 		},
 		"rpc endpoint set": {
 			url: "https://rpc.flashbots.net?rpc=https://mainnet.infura.io/v3/123",
@@ -174,6 +163,42 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: ErrIncorrectRefundTotalPercentageQuery,
 		},
+		"fast": {
+			url: "https://rpc.flashbots.net/fast",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+				},
+				prefWasSet: false,
+				fast:       true,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"fast, ignore builders": {
+			url: "https://rpc.flashbots.net/fast?builder=builder3&builder=builder4",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+				},
+				prefWasSet: false,
+				fast:       true,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"fast, keep hints": {
+			url: "https://rpc.flashbots.net/fast?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}},
+				},
+				prefWasSet: true,
+				fast:       true,
+				originId:   "",
+			},
+			err: nil,
+		},
 	}
 
 	for name, tt := range tests {
@@ -183,7 +208,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 				t.Fatal("failed to parse url: ", err)
 			}
 
-			got, err := ExtractParametersFromUrl(url)
+			got, err := ExtractParametersFromUrl(url, []string{"builder1", "builder2"})
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
