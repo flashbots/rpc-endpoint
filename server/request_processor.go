@@ -255,13 +255,29 @@ func (r *RpcRequest) sendTxToRelay() {
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 	sendPrivateTxArgs.Tx = r.rawTxHex
 	sendPrivateTxArgs.Preferences = &r.urlParams.pref
+	if r.urlParams.fast {
+		if len(sendPrivateTxArgs.Preferences.Validity.Refund) == 0 {
+			addr, err := GetSenderAddressFromTx(r.tx)
+			if err != nil {
+				r.logger.Error("[sendTxToRelay] GetSenderAddressFromTx failed", "error", err)
+				r.writeRpcError(err.Error(), types.JsonRpcInternalError)
+				return
+			}
+			sendPrivateTxArgs.Preferences.Validity.Refund = []types.RefundConfig{
+				{
+					Address: addr,
+					Percent: 50,
+				},
+			}
+		}
+	}
 
 	fbRpc := flashbotsrpc.New(r.relayUrl, func(rpc *flashbotsrpc.FlashbotsRPC) {
 		if r.urlParams.originId != "" {
 			rpc.Headers["X-Flashbots-Origin"] = r.urlParams.originId
 		}
 	})
-
+	r.logger.Info("[sendTxToRelay] sending transaction", "builders count", len(sendPrivateTxArgs.Preferences.Privacy.Builders), "is_fast", r.urlParams.fast)
 	_, err = fbRpc.CallWithFlashbotsSignature("eth_sendPrivateTransaction", r.relaySigningKey, sendPrivateTxArgs)
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {

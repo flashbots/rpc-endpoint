@@ -17,31 +17,34 @@ var (
 	version = "dev" // is set during build process
 
 	// defaults
-	defaultDebug               = os.Getenv("DEBUG") == "1"
-	defaultLogJSON             = os.Getenv("LOG_JSON") == "1"
-	defaultListenAddress       = "127.0.0.1:9000"
-	defaultDrainAddress        = "127.0.0.1:9001"
-	defaultDrainSeconds        = 60
-	defaultProxyUrl            = "http://127.0.0.1:8545"
-	defaultProxyTimeoutSeconds = 10
-	defaultRelayUrl            = "https://relay.flashbots.net"
-	defaultRedisUrl            = "localhost:6379"
-	defaultServiceName         = os.Getenv("SERVICE_NAME")
+	defaultDebug                    = os.Getenv("DEBUG") == "1"
+	defaultLogJSON                  = os.Getenv("LOG_JSON") == "1"
+	defaultListenAddress            = "127.0.0.1:9000"
+	defaultDrainAddress             = "127.0.0.1:9001"
+	defaultDrainSeconds             = 60
+	defaultProxyUrl                 = "http://127.0.0.1:8545"
+	defaultProxyTimeoutSeconds      = 10
+	defaultRelayUrl                 = "https://relay.flashbots.net"
+	defaultRedisUrl                 = "localhost:6379"
+	defaultServiceName              = os.Getenv("SERVICE_NAME")
+	defaultFetchInfoIntervalSeconds = 600
 
 	// cli flags
-	versionPtr          = flag.Bool("version", false, "just print the program version")
-	listenAddress       = flag.String("listen", getEnvAsStrOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
-	drainAddress        = flag.String("drain", getEnvAsStrOrDefault("DRAIN_ADDR", defaultDrainAddress), "Drain address")
-	drainSeconds        = flag.Int("drainSeconds", getEnvAsIntOrDefault("DRAIN_SECONDS", defaultDrainSeconds), "seconds to wait for graceful shutdown")
-	proxyUrl            = flag.String("proxy", getEnvAsStrOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
-	proxyTimeoutSeconds = flag.Int("proxyTimeoutSeconds", getEnvAsIntOrDefault("PROXY_TIMEOUT_SECONDS", defaultProxyTimeoutSeconds), "proxy client timeout in seconds")
-	redisUrl            = flag.String("redis", getEnvAsStrOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
-	relayUrl            = flag.String("relayUrl", getEnvAsStrOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
-	relaySigningKey     = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
-	psqlDsn             = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
-	debugPtr            = flag.Bool("debug", defaultDebug, "print debug output")
-	logJSONPtr          = flag.Bool("logJSON", defaultLogJSON, "log in JSON")
-	serviceName         = flag.String("serviceName", defaultServiceName, "name of the service which will be used in the logs")
+	versionPtr           = flag.Bool("version", false, "just print the program version")
+	listenAddress        = flag.String("listen", getEnvAsStrOrDefault("LISTEN_ADDR", defaultListenAddress), "Listen address")
+	drainAddress         = flag.String("drain", getEnvAsStrOrDefault("DRAIN_ADDR", defaultDrainAddress), "Drain address")
+	drainSeconds         = flag.Int("drainSeconds", getEnvAsIntOrDefault("DRAIN_SECONDS", defaultDrainSeconds), "seconds to wait for graceful shutdown")
+	fetchIntervalSeconds = flag.Int("fetchIntervalSeconds", getEnvAsIntOrDefault("FETCH_INFO_INTERVAL_SECONDS", defaultFetchInfoIntervalSeconds), "seconds between builder info fetches")
+	builderInfoSource    = flag.String("builderInfoSource", getEnvAsStrOrDefault("BUILDER_INFO_SOURCE", ""), "URL for json source of actual builder info")
+	proxyUrl             = flag.String("proxy", getEnvAsStrOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
+	proxyTimeoutSeconds  = flag.Int("proxyTimeoutSeconds", getEnvAsIntOrDefault("PROXY_TIMEOUT_SECONDS", defaultProxyTimeoutSeconds), "proxy client timeout in seconds")
+	redisUrl             = flag.String("redis", getEnvAsStrOrDefault("REDIS_URL", defaultRedisUrl), "URL for Redis (use 'dev' to use integrated in-memory redis)")
+	relayUrl             = flag.String("relayUrl", getEnvAsStrOrDefault("RELAY_URL", defaultRelayUrl), "URL for relay")
+	relaySigningKey      = flag.String("signingKey", os.Getenv("RELAY_SIGNING_KEY"), "Signing key for relay requests")
+	psqlDsn              = flag.String("psql", os.Getenv("POSTGRES_DSN"), "Postgres DSN")
+	debugPtr             = flag.Bool("debug", defaultDebug, "print debug output")
+	logJSONPtr           = flag.Bool("logJSON", defaultLogJSON, "log in JSON")
+	serviceName          = flag.String("serviceName", defaultServiceName, "name of the service which will be used in the logs")
 )
 
 func main() {
@@ -108,6 +111,8 @@ func main() {
 		RelaySigningKey:     key,
 		RelayUrl:            *relayUrl,
 		Version:             version,
+		BuilderInfoSource:   *builderInfoSource,
+		FetchInfoInterval:   *fetchIntervalSeconds,
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)

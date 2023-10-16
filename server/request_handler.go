@@ -25,9 +25,10 @@ type RpcRequestHandler struct {
 	relayUrl            string
 	uid                 uuid.UUID
 	requestRecord       *requestRecord
+	builderNames        []string
 }
 
-func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, relayUrl string, db database.Store) *RpcRequestHandler {
+func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, relayUrl string, db database.Store, builderNames []string) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		logger:              logger,
 		respw:               respw,
@@ -39,6 +40,7 @@ func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *ht
 		relayUrl:            relayUrl,
 		uid:                 uuid.New(),
 		requestRecord:       NewRequestRecord(db),
+		builderNames:        builderNames,
 	}
 }
 
@@ -96,7 +98,7 @@ func (r *RpcRequestHandler) process() {
 	}
 
 	// mev-share parameters
-	urlParams, err := ExtractParametersFromUrl(r.req.URL)
+	urlParams, err := ExtractParametersFromUrl(r.req.URL, r.builderNames)
 	if err != nil {
 		r.logger.Warn("[process] Invalid auction preference", "error", err)
 		res := AuctionPreferenceErrorToJSONRPCResponse(jsonReq, err)
