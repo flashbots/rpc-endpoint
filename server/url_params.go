@@ -16,7 +16,7 @@ var (
 
 	ErrEmptyHintQuery                      = errors.New("Hint query must be non-empty if set.")
 	ErrEmptyTargetBuilderQuery             = errors.New("Target builder query must be non-empty if set.")
-	ErrIncorrectAuctionHints               = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata.")
+	ErrIncorrectAuctionHints               = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata, default_logs.")
 	ErrIncorrectOriginId                   = errors.New("Incorrect origin id, must be less then 255 char.")
 	ErrIncorrectRefundQuery                = errors.New("Incorrect refund query, must be 0xaddress:percentage.")
 	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
@@ -50,7 +50,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 		}
 		for _, hint := range hintQuery {
 			// valid hints are: "hash", "contract_address", "function_selector", "logs", "calldata"
-			if hint != "hash" && hint != "contract_address" && hint != "function_selector" && hint != "logs" && hint != "calldata" {
+			if hint != "hash" && hint != "contract_address" && hint != "function_selector" && hint != "logs" && hint != "calldata" && hint != "default_logs" {
 				return params, ErrIncorrectAuctionHints
 			}
 		}
