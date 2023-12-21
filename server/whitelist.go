@@ -22,6 +22,7 @@ func isOnFunctionWhitelist(data string) bool {
 
 var allowedLargeTxTargets = map[string]bool{
 	"0xff1f2b4adb9df6fc8eafecdcbf96a2b351680455": true, // Aztec rollup contract
+	"0x47312450B3Ac8b5b8e247a6bB6d523e7605bDb60": true, // StarkWare SHARP Verifier
 }
 
 func init() {
