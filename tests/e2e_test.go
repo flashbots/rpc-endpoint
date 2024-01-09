@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -164,7 +163,7 @@ func TestNetVersionIntercept(t *testing.T) {
 
 	rpcResult = testutils.SendRpcAndParseResponseOrFailNowString(t, req)
 	require.Nil(t, res.Error)
-	require.Equal(t, "1", rpcResult, "net_version intercept")
+	require.Equal(t, "3", rpcResult, "net_version intercept")
 }
 
 // Ensure bundle response is the tx hash, not the bundle id
@@ -570,9 +569,8 @@ func TestWhitehatBundleCollection(t *testing.T) {
 	require.Nil(t, err, err)
 	require.Nil(t, resp.Error, resp.Error)
 
-	// Request should never go to node/relay
-	require.Nil(t, testutils.MockBackendLastJsonRpcRequest)
-
+	// Last request should be network version (executed on start)
+	require.Equal(t, &types.JsonRpcRequest{Id: float64(1), Method: "net_version", Params: []interface{}{}, Version: "2.0"}, testutils.MockBackendLastJsonRpcRequest)
 	// Check redis
 	txs, err := server.RState.GetWhitehatBundleTx(bundleId)
 	require.Nil(t, err, err)
