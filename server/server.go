@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -53,6 +54,7 @@ type RpcEndPointServer struct {
 	startTime           time.Time
 	version             string
 	builderNameProvider BuilderNameProvider
+	chainID             []byte
 }
 
 func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
@@ -83,6 +85,12 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "BuilderInfoService init error")
 	}
+
+	bts, err := fetchNetworkIDBytes(cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "fetchNetworkIDBytes error")
+	}
+
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
@@ -96,8 +104,36 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		relayUrl:            cfg.RelayUrl,
 		startTime:           Now(),
 		version:             cfg.Version,
+		chainID:             bts,
 		builderNameProvider: bis,
 	}, nil
+}
+
+func fetchNetworkIDBytes(cfg Configuration) ([]byte, error) {
+
+	cl := NewRPCProxyClient(cfg.Logger, cfg.ProxyUrl, cfg.ProxyTimeoutSeconds)
+
+	_req := types.NewJsonRpcRequest(1, "net_version", []interface{}{})
+	jsonData, err := json.Marshal(_req)
+	if err != nil {
+		return nil, errors.Wrap(err, "network version request failed")
+	}
+	httpRes, err := cl.ProxyRequest(jsonData)
+	if err != nil {
+		return nil, errors.Wrap(err, "cl.NetworkID error")
+	}
+
+	resBytes, err := io.ReadAll(httpRes.Body)
+	httpRes.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	_res, err := respBytesToJsonRPCResponse(resBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return _res.Result, nil
 }
 
 func (s *RpcEndPointServer) Start() {
@@ -203,7 +239,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames())
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID)
 	request.process()
 }
 
