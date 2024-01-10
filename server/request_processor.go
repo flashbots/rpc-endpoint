@@ -38,9 +38,10 @@ type RpcRequest struct {
 	whitehatBundleId           string
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 	urlParams                  URLParameters
+	chainID                    []byte
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, relayUrl, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters) *RpcRequest {
+func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, relayUrl, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters, chainID []byte) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -53,6 +54,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		whitehatBundleId:           whitehatBundleId,
 		ethSendRawTxEntry:          ethSendRawTxEntry,
 		urlParams:                  urlParams,
+		chainID:                    chainID,
 	}
 }
 
@@ -86,8 +88,8 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
-	case r.jsonReq.Method == "net_version": // don't need to proxy to node, it's always 1 (mainnet)
-		r.writeRpcResult("1")
+	case r.jsonReq.Method == "net_version":
+		r.writeRpcResult(json.RawMessage(r.chainID))
 	case r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance":
 		r.writeRpcResult("0x56bc75e2d63100000") // 100 ETH, same as the eth_call SC call above returns
 	default:
