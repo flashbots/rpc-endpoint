@@ -52,20 +52,23 @@ func main() {
 	var err error
 
 	flag.Parse()
-	logFormat := log.TerminalFormat(true)
-	if *logJSONPtr {
-		logFormat = log.JSONFormat()
-	}
 
 	logLevel := log.LvlInfo
 	if *debugPtr {
 		logLevel = log.LvlDebug
 	}
+	termHandler := log.NewTerminalHandlerWithLevel(os.Stderr, logLevel, false)
+	rLogger := log.NewLogger(termHandler)
+	if *logJSONPtr {
+		// NOTE(tymurkh): unfortunately seems to be no way to pass LogLevel in jsonHandler, so level will always be info
+		rLogger = log.NewLogger(log.JSONHandler(os.Stderr))
+	}
 
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, logFormat)))
+	log.SetDefault(rLogger)
+
 	logger := log.New()
 	if *serviceName != "" {
-		logger = logger.New(log.Ctx{"service": *serviceName})
+		logger = logger.New("service", *serviceName)
 	}
 	// Perhaps print only the version
 	if *versionPtr {
