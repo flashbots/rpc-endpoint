@@ -46,6 +46,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 	r.ethSendRawTxEntry.TxHash = r.tx.Hash().String()
+	r.logger = r.logger.New("txHash", r.tx.Hash().String())
 	// Get address from tx
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
@@ -55,7 +56,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "txHash", r.tx.Hash(), "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
+	r.logger.Info("[sendRawTransaction] sending raw transaction", "tx", r.rawTxHex, "fromAddress", r.txFrom, "toAddress", AddressPtrToStr(r.tx.To()), "txNonce", r.tx.Nonce(), "txGasPrice", BigIntPtrToStr(r.tx.GasPrice()))
 	txFromLower := strings.ToLower(r.txFrom)
 
 	// store tx info to ethSendRawTxEntries which will be stored in db for data analytics reason
@@ -72,7 +73,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	if r.tx.Nonce() >= 1e9 {
-		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txHash", r.tx.Hash(), "txFromLower", txFromLower, "origin", r.origin)
+		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txFromLower", txFromLower, "origin", r.origin)
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -81,7 +82,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Check if tx was blocked (eg. "nonce too low")
 	retVal, isBlocked, _ := RState.GetBlockedTxHash(txHashLower)
 	if isBlocked {
-		r.logger.Info("[sendRawTransaction] tx blocked", "txHash", r.tx.Hash(), "retVal", retVal)
+		r.logger.Info("[sendRawTransaction] tx blocked", "retVal", retVal)
 		r.writeRpcError(retVal, types.JsonRpcInternalError)
 		return
 	}
@@ -98,7 +99,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	isOnOfacList := isOnOFACList(r.txFrom) || isOnOFACList(txToAddr)
 	r.ethSendRawTxEntry.IsOnOafcList = isOnOfacList
 	if isOnOfacList {
-		r.logger.Info("[sendRawTransaction] Blocked tx due to ofac sanctioned address", "txHash", txHashLower, "txFrom", r.txFrom, "txTo", txToAddr)
+		r.logger.Info("[sendRawTransaction] Blocked tx due to ofac sanctioned address", "txFrom", r.txFrom, "txTo", txToAddr)
 		r.writeRpcError("blocked tx due to ofac sanctioned address", types.JsonRpcInvalidRequest)
 		return
 	}
@@ -157,14 +158,14 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
 
 	if r.jsonRes.Error != nil {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message, "txHash", r.tx.Hash())
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message)
 		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
 		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
 		if r.jsonRes.Error.Message == "nonce too low" {
 			RState.SetBlockedTxHash(txHashLower, "nonce too low")
 		}
 	} else {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "txHash", r.tx.Hash())
+		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
 	}
 }
 

@@ -107,6 +107,8 @@ func (r *RpcRequestHandler) process() {
 		r._writeRpcResponse(res)
 		return
 	}
+	r.logger = r.logger.New("rpc_method", jsonReq.Method)
+
 	// Process single request
 	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams)
 }
