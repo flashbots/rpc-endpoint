@@ -28,6 +28,7 @@ var (
 	defaultRedisUrl                 = "localhost:6379"
 	defaultServiceName              = os.Getenv("SERVICE_NAME")
 	defaultFetchInfoIntervalSeconds = 600
+	defaultRpcTTLCacheSeconds       = 300
 
 	// cli flags
 	versionPtr           = flag.Bool("version", false, "just print the program version")
@@ -35,6 +36,7 @@ var (
 	drainAddress         = flag.String("drain", getEnvAsStrOrDefault("DRAIN_ADDR", defaultDrainAddress), "Drain address")
 	drainSeconds         = flag.Int("drainSeconds", getEnvAsIntOrDefault("DRAIN_SECONDS", defaultDrainSeconds), "seconds to wait for graceful shutdown")
 	fetchIntervalSeconds = flag.Int("fetchIntervalSeconds", getEnvAsIntOrDefault("FETCH_INFO_INTERVAL_SECONDS", defaultFetchInfoIntervalSeconds), "seconds between builder info fetches")
+	ttlCacheSeconds      = flag.Int("ttlCacheSeconds", getEnvAsIntOrDefault("TTL_CACHE_SECONDS", defaultRpcTTLCacheSeconds), "seconds to cache static requests")
 	builderInfoSource    = flag.String("builderInfoSource", getEnvAsStrOrDefault("BUILDER_INFO_SOURCE", ""), "URL for json source of actual builder info")
 	proxyUrl             = flag.String("proxy", getEnvAsStrOrDefault("PROXY_URL", defaultProxyUrl), "URL for default JSON-RPC proxy target (eth node, Infura, etc.)")
 	proxyTimeoutSeconds  = flag.Int("proxyTimeoutSeconds", getEnvAsIntOrDefault("PROXY_TIMEOUT_SECONDS", defaultProxyTimeoutSeconds), "proxy client timeout in seconds")
@@ -116,6 +118,7 @@ func main() {
 		Version:             version,
 		BuilderInfoSource:   *builderInfoSource,
 		FetchInfoInterval:   *fetchIntervalSeconds,
+		TTLCacheSeconds:     int64(defaultRpcTTLCacheSeconds),
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)

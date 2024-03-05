@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -39,9 +40,22 @@ type RpcRequest struct {
 	ethSendRawTxEntry          *database.EthSendRawTxEntry
 	urlParams                  URLParameters
 	chainID                    []byte
+	rpcCache                   *application.RpcCache
 }
 
-func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.JsonRpcRequest, relaySigningKey *ecdsa.PrivateKey, relayUrl, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, ethSendRawTxEntry *database.EthSendRawTxEntry, urlParams URLParameters, chainID []byte) *RpcRequest {
+func NewRpcRequest(
+	logger log.Logger,
+	client RPCProxyClient,
+	jsonReq *types.JsonRpcRequest,
+	relaySigningKey *ecdsa.PrivateKey,
+	relayUrl, origin, referer string,
+	isWhitehatBundleCollection bool,
+	whitehatBundleId string,
+	ethSendRawTxEntry *database.EthSendRawTxEntry,
+	urlParams URLParameters,
+	chainID []byte,
+	rpcCache *application.RpcCache,
+) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger,
 		client:                     client,
@@ -55,6 +69,7 @@ func NewRpcRequest(logger log.Logger, client RPCProxyClient, jsonReq *types.Json
 		ethSendRawTxEntry:          ethSendRawTxEntry,
 		urlParams:                  urlParams,
 		chainID:                    chainID,
+		rpcCache:                   rpcCache,
 	}
 }
 
@@ -88,6 +103,20 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 		r.handle_sendRawTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
+	case r.jsonReq.Method == "web3_clientVersion":
+		res, ok := r.rpcCache.Get("web3_clientVersion")
+		if ok {
+			r.jsonRes = res
+			return r.jsonRes
+		}
+
+		readJsonRpcSuccess := r.proxyRequestRead()
+		if !readJsonRpcSuccess {
+			r.logger.Info("[ProcessRequest] Proxy to node failed", "method", r.jsonReq.Method)
+			r.writeRpcError("internal server error", types.JsonRpcInternalError)
+			return r.jsonRes
+		}
+		r.rpcCache.Set("web3_clientVersion", r.jsonRes)
 	case r.jsonReq.Method == "net_version":
 		r.writeRpcResult(json.RawMessage(r.chainID))
 	case r.isWhitehatBundleCollection && r.jsonReq.Method == "eth_getBalance":

@@ -55,6 +55,7 @@ type RpcEndPointServer struct {
 	version             string
 	builderNameProvider BuilderNameProvider
 	chainID             []byte
+	rpcCache            *application.RpcCache
 }
 
 func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
@@ -91,6 +92,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		return nil, errors.Wrap(err, "fetchNetworkIDBytes error")
 	}
 
+	rpcCache := application.NewRpcCache(cfg.TTLCacheSeconds)
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
@@ -106,6 +108,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		version:             cfg.Version,
 		chainID:             bts,
 		builderNameProvider: bis,
+		rpcCache:            rpcCache,
 	}, nil
 }
 
@@ -239,7 +242,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache)
 	request.process()
 }
 
