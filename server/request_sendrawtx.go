@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/rpc-endpoint/types"
@@ -48,6 +49,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	r.ethSendRawTxEntry.TxHash = r.tx.Hash().String()
 	r.logger = r.logger.New("txHash", r.tx.Hash().String())
 	// Get address from tx
+	r.logger.Info("[sendRawTransaction] start to process raw tx", "txHash", r.tx.Hash(), "timestamp", time.Now().Unix(), "time", time.Now().UTC())
 	r.txFrom, err = GetSenderFromRawTx(r.tx)
 	if err != nil {
 
