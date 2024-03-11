@@ -118,7 +118,7 @@ func main() {
 		Version:             version,
 		BuilderInfoSource:   *builderInfoSource,
 		FetchInfoInterval:   *fetchIntervalSeconds,
-		TTLCacheSeconds:     int64(defaultRpcTTLCacheSeconds),
+		TTLCacheSeconds:     int64(*ttlCacheSeconds),
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
