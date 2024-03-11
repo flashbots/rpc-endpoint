@@ -21,4 +21,5 @@ type Configuration struct {
 	Version             string
 	BuilderInfoSource   string
 	FetchInfoInterval   int
+	TTLCacheSeconds     int64
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/google/uuid"
@@ -27,9 +28,22 @@ type RpcRequestHandler struct {
 	requestRecord       *requestRecord
 	builderNames        []string
 	chainID             []byte
+	rpcCache            *application.RpcCache
 }
 
-func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *http.Request, proxyUrl string, proxyTimeoutSeconds int, relaySigningKey *ecdsa.PrivateKey, relayUrl string, db database.Store, builderNames []string, chainID []byte) *RpcRequestHandler {
+func NewRpcRequestHandler(
+	logger log.Logger,
+	respw *http.ResponseWriter,
+	req *http.Request,
+	proxyUrl string,
+	proxyTimeoutSeconds int,
+	relaySigningKey *ecdsa.PrivateKey,
+	relayUrl string,
+	db database.Store,
+	builderNames []string,
+	chainID []byte,
+	rpcCache *application.RpcCache,
+) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		logger:              logger,
 		respw:               respw,
@@ -43,6 +57,7 @@ func NewRpcRequestHandler(logger log.Logger, respw *http.ResponseWriter, req *ht
 		requestRecord:       NewRequestRecord(db),
 		builderNames:        builderNames,
 		chainID:             chainID,
+		rpcCache:            rpcCache,
 	}
 }
 
@@ -107,6 +122,8 @@ func (r *RpcRequestHandler) process() {
 		r._writeRpcResponse(res)
 		return
 	}
+	r.logger = r.logger.New("rpc_method", jsonReq.Method)
+
 	// Process single request
 	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams)
 }
@@ -118,7 +135,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)
