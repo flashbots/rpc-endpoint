@@ -1,6 +1,6 @@
 module github.com/flashbots/rpc-endpoint
 
-go 1.18
+go 1.20
 
 require (
 	github.com/alicebob/miniredis v2.5.0+incompatible
