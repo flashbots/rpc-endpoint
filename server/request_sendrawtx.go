@@ -1,15 +1,12 @@
 package server
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/rpc-endpoint/types"
-
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 const (
@@ -107,8 +104,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	}
 
 	// Check if transaction needs protection
-	needsProtection := r.doesTxNeedFrontrunningProtection(r.tx)
-	r.ethSendRawTxEntry.NeedsFrontRunningProtection = needsProtection
+	r.ethSendRawTxEntry.NeedsFrontRunningProtection = true
 	// If users specify a bundle ID, cache this transaction
 	if r.isWhitehatBundleCollection {
 		r.logger.Info("[WhitehatBundleCollection] Adding tx to bundle", "whiteHatBundleId", r.whitehatBundleId, "tx", r.rawTxHex)
@@ -126,68 +122,12 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	if r.tx.To() != nil && len(r.tx.Data()) <= 2 && txFromLower == strings.ToLower(r.tx.To().Hex()) {
 		r.ethSendRawTxEntry.IsCancelTx = true
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
-		if requestDone {                  // a cancel-tx to fast endpoint is also sent to mempool
-			return
+		if !requestDone {
+			r.writeRpcError("cancel-tx failed", types.JsonRpcInternalError)
+			r.logger.Warn("[cancel-tx] Cancellation wasn't sent to relay, but we no longer fallback to mempool", "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
 		}
-
-		// It's a cancel-tx for the mempool
-		needsProtection = false
-		r.logger.Info("[cancel-tx] Sending to mempool", "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
-	}
-
-	if needsProtection {
-		r.sendTxToRelay()
 		return
 	}
 
-	if DebugDontSendTx {
-		r.logger.Info("[sendRawTransaction] Faked sending tx to mempool, did nothing")
-		r.writeRpcResult(r.tx.Hash().Hex())
-		return
-	}
-
-	// Proxy to public node now
-	readJsonRpcSuccess := r.proxyRequestRead()
-	r.ethSendRawTxEntry.WasSentToMempool = true
-	// Log after proxying
-	if !readJsonRpcSuccess {
-		r.logger.Error("[sendRawTransaction] Proxy to mempool failed")
-		r.writeRpcError("internal server error", types.JsonRpcInternalError)
-		return
-	}
-
-	// at the end, save the nonce for further spam protection checks
-	go RState.SetSenderMaxNonce(txFromLower, r.tx.Nonce())
-
-	if r.jsonRes.Error != nil {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool", "jsonRpcError", r.jsonRes.Error.Message)
-		r.ethSendRawTxEntry.Error = r.jsonRes.Error.Message
-		r.ethSendRawTxEntry.ErrorCode = r.jsonRes.Error.Code
-		if r.jsonRes.Error.Message == "nonce too low" {
-			RState.SetBlockedTxHash(txHashLower, "nonce too low")
-		}
-	} else {
-		r.logger.Info("[sendRawTransaction] Proxied eth_sendRawTransaction to mempool")
-	}
-}
-
-// Check if a request needs frontrunning protection. There are many transactions that don't need frontrunning protection,
-// for example simple ERC20 transfers.
-func (r *RpcRequest) doesTxNeedFrontrunningProtection(tx *ethtypes.Transaction) bool {
-	gas := tx.Gas()
-	r.logger.Info("[protect-check]", "gas", gas)
-
-	data := hex.EncodeToString(tx.Data())
-	r.logger.Info("[protect-check] ", "tx-data", data)
-
-	if len(data) < 8 {
-		return false
-	}
-
-	if isOnFunctionWhitelist(data[0:8]) {
-		return false // function being called is on our whitelist and no protection needed
-	} else {
-		r.logger.Info("[protect-check] Tx needs protection - function", "tx-data", data[0:8])
-		return true // needs protection if not on whitelist
-	}
+	r.sendTxToRelay()
 }
