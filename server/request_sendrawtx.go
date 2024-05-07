@@ -123,8 +123,9 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.ethSendRawTxEntry.IsCancelTx = true
 		requestDone := r.handleCancelTx() // returns true if tx was cancelled at the relay and response has been sent to the user
 		if !requestDone {
-			r.writeRpcError("cancel-tx failed", types.JsonRpcInternalError)
-			r.logger.Warn("[cancel-tx] Cancellation wasn't sent to relay, but we no longer fallback to mempool", "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
+			r.ethSendRawTxEntry.IsCancelTx = false
+			r.logger.Warn("[cancel-tx] This is not a cancellation tx, since we don't have original one. So we process it as usual tx", "txFromLower", txFromLower, "txNonce", r.tx.Nonce())
+			r.sendTxToRelay()
 		}
 		return
 	}
