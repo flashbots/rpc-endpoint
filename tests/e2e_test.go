@@ -227,11 +227,11 @@ func TestMetamaskFix(t *testing.T) {
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
 	txCountBefore := testutils.SendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 
-	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	//first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
 	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
-	require.Nil(t, r1.Error, r1.Error)
-	fmt.Printf("\n\n\n\n\n")
+	require.NotNil(t, r1.Error, r1.Error) // tx will actually fail due to incorrect nonce but it's fine for this test, since we mark it as sent to relay
+	//fmt.Printf("\n\n\n\n\n")
 
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
@@ -382,9 +382,8 @@ func TestRelayCancelTxWithoutInitialTx(t *testing.T) {
 	req_cancelTx := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_CancelAtRelay_Cancel_RawTx})
 	cancelResp := testutils.SendRpcAndParseResponseOrFailNow(t, req_cancelTx)
 
-	// Ensure that request called eth_sendRawTransaction on the mempool node, instead of eth_sendPrivateTransaction on the Relay
-	// (since no valid initial tx was found)
-	require.Equal(t, "eth_sendRawTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+	// Ensure that request called eth_sendRawTransaction on the relay, cause we don't send txs to mempool now
+	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
 	var res string
 	json.Unmarshal(cancelResp.Result, &res)
 
