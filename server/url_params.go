@@ -31,6 +31,17 @@ type URLParameters struct {
 	fast       bool
 }
 
+// normalizeQueryParams takes a URL and returns a map of query parameters with all keys normalized to lowercase.
+// This helps in making the parameter extraction case-insensitive.
+func normalizeQueryParams(url *url.URL) map[string][]string {
+	normalizedQuery := make(map[string][]string)
+	for key, values := range url.Query() {
+		normalizedKey := strings.ToLower(key)
+		normalizedQuery[normalizedKey] = values
+	}
+	return normalizedQuery
+}
+
 // ExtractParametersFromUrl extracts the auction preference from the url query
 // Allowed query params:
 //   - hint: mev share hints, can be set multiple times, default: hash, special_logs
@@ -42,8 +53,11 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 	if strings.HasPrefix(url.Path, "/fast") {
 		params.fast = true
 	}
+	// Normalize all query parameters to lowercase keys
+	normalizedQuery := normalizeQueryParams(url)
+
 	var hint []string
-	hintQuery, ok := url.Query()["hint"]
+	hintQuery, ok := normalizedQuery["hint"]
 	if ok {
 		if len(hintQuery) == 0 {
 			return params, ErrEmptyHintQuery
@@ -61,7 +75,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 	}
 	params.pref.Privacy.Hints = hint
 
-	originIdQuery, ok := url.Query()["originId"]
+	originIdQuery, ok := normalizedQuery["originid"]
 	if ok {
 		if len(originIdQuery) == 0 {
 			return params, ErrIncorrectOriginId
@@ -69,7 +83,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 		params.originId = originIdQuery[0]
 	}
 
-	targetBuildersQuery, ok := url.Query()["builder"]
+	targetBuildersQuery, ok := normalizedQuery["builder"]
 	if ok {
 		if len(targetBuildersQuery) == 0 {
 			return params, ErrEmptyTargetBuilderQuery
@@ -81,7 +95,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 		params.pref.Privacy.Builders = allBuilders
 	}
 
-	refundAddressQuery, ok := url.Query()["refund"]
+	refundAddressQuery, ok := normalizedQuery["refund"]
 	if ok {
 		if len(refundAddressQuery) == 0 {
 			return params, ErrIncorrectRefundQuery

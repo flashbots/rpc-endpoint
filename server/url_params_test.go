@@ -80,6 +80,30 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
+		"origin id common spelling 1": {
+			url: "https://rpc.flashbots.net?originid=123",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
+				prefWasSet: false,
+				originId:   "123",
+			},
+			err: nil,
+		},
+		"origin id common spelling 2": {
+			url: "https://rpc.flashbots.net?originID=123",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy:  types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}},
+					Validity: types.TxValidityPreferences{},
+				},
+				prefWasSet: false,
+				originId:   "123",
+			},
+			err: nil,
+		},
 		"target builder": {
 			url: "https://rpc.flashbots.net?builder=builder1&builder=builder2",
 			want: URLParameters{
