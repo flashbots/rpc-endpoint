@@ -3,10 +3,9 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"time"
 
-	"github.com/metachris/flashbotsrpc"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // As per JSON-RPC 2.0 Specification
@@ -108,7 +107,7 @@ type BundleResponse struct {
 }
 
 type SendPrivateTxRequestWithPreferences struct {
-	flashbotsrpc.FlashbotsSendPrivateTransactionRequest
+	Tx          string                `json:"tx"`
 	Preferences *PrivateTxPreferences `json:"preferences,omitempty"`
 }
 
@@ -129,4 +128,5 @@ type RefundConfig struct {
 type PrivateTxPreferences struct {
 	Privacy  TxPrivacyPreferences  `json:"privacy"`
 	Validity TxValidityPreferences `json:"validity"`
+	Fast     bool                  `json:"fast"`
 }
