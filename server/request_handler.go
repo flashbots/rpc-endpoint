@@ -134,7 +134,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
 		// log the full url for debugging
-		r.logger.Info("[processRequest] Request URL", "url", reqURL)
+		r.logger.Info("[processRequest] eth_sendRawTransaction request URL", "url", reqURL)
 	}
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
