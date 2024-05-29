@@ -91,6 +91,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 		params.pref.Privacy.Builders = targetBuildersQuery
 	}
 	if params.fast {
+		params.pref.Fast = true
 		// set all builders no matter what's in the url
 		params.pref.Privacy.Builders = allBuilders
 	}
