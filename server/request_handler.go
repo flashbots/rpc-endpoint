@@ -125,14 +125,16 @@ func (r *RpcRequestHandler) process() {
 	r.logger = r.logger.New("rpc_method", jsonReq.Method)
 
 	// Process single request
-	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams)
+	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams, r.req.URL.String())
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, urlParams URLParameters) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, urlParams URLParameters, reqURL string) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
+		// log the full url for debugging
+		r.logger.Info("[processRequest] eth_sendRawTransaction request URL", "url", reqURL)
 	}
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
@@ -149,7 +151,6 @@ func (r *RpcRequestHandler) finishRequest() {
 		if err := r.requestRecord.SaveRecord(); err != nil {
 			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err, "requestId", r.uid)
 		}
-
 	}()
 	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
 }
