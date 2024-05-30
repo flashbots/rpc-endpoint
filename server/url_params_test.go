@@ -192,6 +192,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
 					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+					Fast:    true,
 				},
 				prefWasSet: false,
 				fast:       true,
@@ -204,6 +205,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
 					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+					Fast:    true,
 				},
 				prefWasSet: false,
 				fast:       true,
@@ -216,6 +218,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
 					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}},
+					Fast:    true,
 				},
 				prefWasSet: true,
 				fast:       true,
