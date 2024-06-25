@@ -19,8 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/metachris/flashbotsrpc"
+
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 type RpcRequest struct {
@@ -251,9 +252,9 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce())
 
-	// only allow large transactions to certain addresses - default max tx size is 128KB
+	// only allow large non-blob transactions to certain addresses - default max tx size is 128KB
 	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
-	if r.tx.Size() > 131072 {
+	if r.tx.Type() != ethtypes.BlobTxType && r.tx.Size() > 131072 {
 		if r.tx.To() == nil {
 			r.logger.Error("[sendTxToRelay] large tx not allowed to target null", "tx", txHash)
 			r.writeRpcError("invalid target for large tx", types.JsonRpcInternalError)
