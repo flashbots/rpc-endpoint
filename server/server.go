@@ -22,8 +22,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/alicebob/miniredis"
-	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
+
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 var Now = time.Now // used to mock time in tests
@@ -241,6 +242,8 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		respw.WriteHeader(http.StatusOK)
 		return
 	}
+
+	s.logger.Info("SOURCE TEST", "X-Forwarded-For", req.Header.Get("X-Forwarded-For"))
 
 	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache)
 	request.process()
