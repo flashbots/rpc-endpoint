@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/cespare/xxhash/v2"
 
 	"github.com/flashbots/rpc-endpoint/adapters/webfile"
 	"github.com/flashbots/rpc-endpoint/application"
@@ -243,7 +246,9 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	s.logger.Info("SOURCE TEST", "X-Forwarded-For", req.Header.Get("X-Forwarded-For"))
+	fingerprintPreimage := fmt.Sprintf("XFF:%s|UA:%s", req.Header.Get("X-Forwarded-For"), req.Header.Get("User-Agent"))
+	fingerprint := xxhash.Sum64String(fingerprintPreimage)
+	s.logger.Info("SOURCE TEST", "fingerprint", fingerprint, "preimage", fingerprintPreimage)
 
 	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache)
 	request.process()
