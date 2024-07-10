@@ -174,7 +174,6 @@ func (r *RpcRequestHandler) getFingerprint() (string, error) {
 	fingerprintPreimage := fmt.Sprintf("XFF:%s|UA:%s", xff, r.req.Header.Get("User-Agent"))
 	sum := xxhash.Sum64String(fingerprintPreimage)
 	fingerprint := fmt.Sprintf("%x", sum)
-	r.logger.Info("SOURCE TEST", "fingerprint", fingerprint, "preimage", fingerprintPreimage)
 	return fingerprint, nil
 }
 
