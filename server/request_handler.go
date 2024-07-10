@@ -106,7 +106,7 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	fingerprint, err := r.getFingerprint()
+	fingerprint, _ := r.getFingerprint()
 	if fingerprint != "" {
 		r.logger = r.logger.New("fingerprint", fingerprint)
 	}
