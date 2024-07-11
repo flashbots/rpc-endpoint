@@ -17,10 +17,10 @@ type rpcProxyClient struct {
 	logger      log.Logger
 	httpClient  http.Client
 	proxyURL    string
-	fingerprint string
+	fingerprint Fingerprint
 }
 
-func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int, fingerprint string) RPCProxyClient {
+func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int, fingerprint Fingerprint) RPCProxyClient {
 	return &rpcProxyClient{
 		logger:      logger,
 		httpClient:  http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
@@ -35,8 +35,11 @@ func (n *rpcProxyClient) ProxyRequest(body []byte) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	if n.fingerprint != "" {
-		req.Header.Set("X-Flashbots-Fingerprint", n.fingerprint)
+	if n.fingerprint != 0 {
+		req.Header.Set(
+			"X-Forwarded-For",
+			n.fingerprint.ToIPv6().String(),
+		)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")

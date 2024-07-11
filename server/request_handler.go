@@ -3,14 +3,10 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
 
@@ -106,9 +102,9 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	fingerprint, _ := r.getFingerprint()
-	if fingerprint != "" {
-		r.logger = r.logger.New("fingerprint", fingerprint)
+	fingerprint, _ := FingerprintFromRequest(r.req, time.Now())
+	if fingerprint != 0 {
+		r.logger = r.logger.New("fingerprint", fingerprint.ToIPv6().String())
 	}
 
 	// create rpc proxy client for making proxy request
@@ -163,70 +159,4 @@ func (r *RpcRequestHandler) finishRequest() {
 		}
 	}()
 	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
-}
-
-func (r *RpcRequestHandler) getFingerprint() (string, error) {
-	// X-Forwarded-For: 2600:8802:4700:bee:d13c:c7fb:8e0f:84ff, 172.70.210.100
-	xff, err := getXForwardedForIP(r.req)
-	if err != nil {
-		return "", err
-	}
-	fingerprintPreimage := fmt.Sprintf("XFF:%s|UA:%s", xff, r.req.Header.Get("User-Agent"))
-	sum := xxhash.Sum64String(fingerprintPreimage)
-	fingerprint := fmt.Sprintf("%x", sum)
-	return fingerprint, nil
-}
-
-func getXForwardedForIP(r *http.Request) (string, error) {
-	// gets the left-most non-private IP in the X-Forwarded-For header
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff == "" {
-		return "", fmt.Errorf("no X-Forwarded-For header")
-	}
-	ips := strings.Split(xff, ",")
-	for _, ip := range ips {
-		if !isPrivateIP(ip) {
-			return ip, nil
-		}
-	}
-	return "", fmt.Errorf("no non-private IP in X-Forwarded-For header")
-}
-
-func isPrivateIP(ip string) bool {
-	// compare ip to RFC-1918 known private IP ranges
-	// https://en.wikipedia.org/wiki/Private_network
-	ipAddr := net.ParseIP(ip)
-	if ipAddr == nil {
-		return false
-	}
-
-	for _, cidr := range cidrs {
-		if cidr.Contains(ipAddr) {
-			return true
-		}
-	}
-	return false
-}
-
-// Taken from https://github.com/tomasen/realip/blob/master/realip.go
-// MIT Licensed, Copyright (c) 2018 SHEN SHENG
-var cidrs []*net.IPNet
-
-func init() {
-	maxCidrBlocks := []string{
-		"127.0.0.1/8",    // localhost
-		"10.0.0.0/8",     // 24-bit block
-		"172.16.0.0/12",  // 20-bit block
-		"192.168.0.0/16", // 16-bit block
-		"169.254.0.0/16", // link local address
-		"::1/128",        // localhost IPv6
-		"fc00::/7",       // unique local address IPv6
-		"fe80::/10",      // link local address IPv6
-	}
-
-	cidrs = make([]*net.IPNet, len(maxCidrBlocks))
-	for i, maxCidrBlock := range maxCidrBlocks {
-		_, cidr, _ := net.ParseCIDR(maxCidrBlock)
-		cidrs[i] = cidr
-	}
 }

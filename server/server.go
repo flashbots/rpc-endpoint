@@ -115,7 +115,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 
 func fetchNetworkIDBytes(cfg Configuration) ([]byte, error) {
 
-	cl := NewRPCProxyClient(cfg.Logger, cfg.ProxyUrl, cfg.ProxyTimeoutSeconds, "")
+	cl := NewRPCProxyClient(cfg.Logger, cfg.ProxyUrl, cfg.ProxyTimeoutSeconds, 0)
 
 	_req := types.NewJsonRpcRequest(1, "net_version", []interface{}{})
 	jsonData, err := json.Marshal(_req)
