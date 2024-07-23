@@ -12,6 +12,30 @@ import (
 
 type Fingerprint uint64
 
+// CIDR parsing code taken from https://github.com/tomasen/realip/blob/master/realip.go
+// MIT Licensed, Copyright (c) 2018 SHEN SHENG
+var (
+	privateIpCidrBlocks     []*net.IPNet
+	rfc1918cidrBlockStrings = []string{
+		"127.0.0.1/8",    // localhost
+		"10.0.0.0/8",     // 24-bit block
+		"172.16.0.0/12",  // 20-bit block
+		"192.168.0.0/16", // 16-bit block
+		"169.254.0.0/16", // link local address
+		"::1/128",        // localhost IPv6
+		"fc00::/7",       // unique local address IPv6
+		"fe80::/10",      // link local address IPv6
+	}
+)
+
+func init() {
+	privateIpCidrBlocks = make([]*net.IPNet, len(rfc1918cidrBlockStrings))
+	for i, maxCidrBlock := range rfc1918cidrBlockStrings {
+		_, cidr, _ := net.ParseCIDR(maxCidrBlock)
+		privateIpCidrBlocks[i] = cidr
+	}
+}
+
 // FingerprintFromRequest returns a fingerprint for the request based on the X-Forwarded-For header
 // and a salted timestamp.  The fingerprint is used to identify unique users sessions
 // over a short period of time, and thus can be used as a key for rate limiting.
@@ -66,7 +90,7 @@ func getXForwardedForIP(r *http.Request) (string, error) {
 	}
 	ips := strings.Split(xff, ",")
 	for _, ip := range ips {
-		if !isPrivateIP(ip) {
+		if !isPrivateIP(strings.TrimSpace(ip)) {
 			return ip, nil
 		}
 	}
@@ -81,33 +105,10 @@ func isPrivateIP(ip string) bool {
 		return false
 	}
 
-	for _, cidr := range cidrs {
+	for _, cidr := range privateIpCidrBlocks {
 		if cidr.Contains(ipAddr) {
 			return true
 		}
 	}
 	return false
-}
-
-// Taken from https://github.com/tomasen/realip/blob/master/realip.go
-// MIT Licensed, Copyright (c) 2018 SHEN SHENG
-var cidrs []*net.IPNet
-
-func init() {
-	maxCidrBlocks := []string{
-		"127.0.0.1/8",    // localhost
-		"10.0.0.0/8",     // 24-bit block
-		"172.16.0.0/12",  // 20-bit block
-		"192.168.0.0/16", // 16-bit block
-		"169.254.0.0/16", // link local address
-		"::1/128",        // localhost IPv6
-		"fc00::/7",       // unique local address IPv6
-		"fe80::/10",      // link local address IPv6
-	}
-
-	cidrs = make([]*net.IPNet, len(maxCidrBlocks))
-	for i, maxCidrBlock := range maxCidrBlocks {
-		_, cidr, _ := net.ParseCIDR(maxCidrBlock)
-		cidrs[i] = cidr
-	}
 }
