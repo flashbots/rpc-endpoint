@@ -9,11 +9,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
+	"golang.org/x/exp/rand"
 
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
 	"github.com/flashbots/rpc-endpoint/types"
 )
+
+var seed uint64 = uint64(rand.Int63())
 
 // RPC request handler for a single/ batch JSON-RPC request
 type RpcRequestHandler struct {
@@ -102,7 +105,7 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 
-	fingerprint, _ := FingerprintFromRequest(r.req, time.Now())
+	fingerprint, _ := FingerprintFromRequest(r.req, time.Now(), seed)
 	if fingerprint != 0 {
 		r.logger = r.logger.New("fingerprint", fingerprint.ToIPv6().String())
 	}

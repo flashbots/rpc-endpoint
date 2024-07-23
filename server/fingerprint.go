@@ -39,7 +39,16 @@ func init() {
 // FingerprintFromRequest returns a fingerprint for the request based on the X-Forwarded-For header
 // and a salted timestamp.  The fingerprint is used to identify unique users sessions
 // over a short period of time, and thus can be used as a key for rate limiting.
-func FingerprintFromRequest(req *http.Request, at time.Time) (Fingerprint, error) {
+// The seed param is additional entropy to make the fingerprint resistant to rainbow table lookups.
+// Without the seed a malicious rpc operator could reverse a client IP address to a fingerprint
+// by exhausting all possible IP addresses and comparing the resulting fingerprints.
+//
+// We considered adding the User-Agent header to the fingerprint, but decided
+// against it because it would make the fingerprint gameable.  Instead, we
+// will salt the fingerprint with the current timestamp rounded to the
+// latest hour. This will make sure fingerprints rotate every hour so we
+// cannot reasonably track user behavior over time.
+func FingerprintFromRequest(req *http.Request, at time.Time, seed uint64) (Fingerprint, error) {
 	// X-Forwarded-For header contains a comma-separated list of IP addresses when
 	// the request has been forwarded through multiple proxies.  For example:
 	//
@@ -48,16 +57,11 @@ func FingerprintFromRequest(req *http.Request, at time.Time) (Fingerprint, error
 	if err != nil {
 		return 0, err
 	}
-	// We considered adding the User-Agent header to the fingerprint, but decided
-	// against it because it would make the fingerprint gameable.  Instead, we
-	// will salt the fingerprint with the current timestamp rounded to the
-	// latest hour. This will make sure fingerprints rotate every hour so we
-	// cannot reasonably track user behavior over time.
 	if at.IsZero() {
 		at = time.Now().UTC()
 	}
-	currentHour := at.Truncate(time.Hour)
-	fingerprintPreimage := fmt.Sprintf("XFF:%s|SALT:%d", xff, currentHour.Unix())
+	salt := uint64(at.Truncate(time.Hour).Unix()) ^ seed
+	fingerprintPreimage := fmt.Sprintf("XFF:%s|SALT:%d", xff, salt)
 	return Fingerprint(xxhash.Sum64String(fingerprintPreimage)), nil
 }
 
