@@ -22,8 +22,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/alicebob/miniredis"
-	"github.com/flashbots/rpc-endpoint/types"
 	"github.com/pkg/errors"
+
+	"github.com/flashbots/rpc-endpoint/types"
 )
 
 var Now = time.Now // used to mock time in tests
@@ -114,7 +115,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 
 func fetchNetworkIDBytes(cfg Configuration) ([]byte, error) {
 
-	cl := NewRPCProxyClient(cfg.Logger, cfg.ProxyUrl, cfg.ProxyTimeoutSeconds)
+	cl := NewRPCProxyClient(cfg.Logger, cfg.ProxyUrl, cfg.ProxyTimeoutSeconds, 0)
 
 	_req := types.NewJsonRpcRequest(1, "net_version", []interface{}{})
 	jsonData, err := json.Marshal(_req)

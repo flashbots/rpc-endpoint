@@ -14,16 +14,18 @@ type RPCProxyClient interface {
 }
 
 type rpcProxyClient struct {
-	logger     log.Logger
-	httpClient http.Client
-	proxyURL   string
+	logger      log.Logger
+	httpClient  http.Client
+	proxyURL    string
+	fingerprint Fingerprint
 }
 
-func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int) RPCProxyClient {
+func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int, fingerprint Fingerprint) RPCProxyClient {
 	return &rpcProxyClient{
-		logger:     logger,
-		httpClient: http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
-		proxyURL:   proxyURL,
+		logger:      logger,
+		httpClient:  http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
+		proxyURL:    proxyURL,
+		fingerprint: fingerprint,
 	}
 }
 
@@ -32,6 +34,12 @@ func (n *rpcProxyClient) ProxyRequest(body []byte) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPost, n.proxyURL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
+	}
+	if n.fingerprint != 0 {
+		req.Header.Set(
+			"X-Forwarded-For",
+			n.fingerprint.ToIPv6().String(),
+		)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
