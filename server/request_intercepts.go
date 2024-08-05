@@ -192,7 +192,8 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 		return false
 	}
 
-	resp := fmt.Sprintf("0x%x", nonce)
+	r.logger.Info("[eth_getTransactionCount] intercept", "nonce", nonce)
+	resp := fmt.Sprintf("0x%x", nonce+1)
 	r.writeRpcResult(resp)
 	return true
 }
