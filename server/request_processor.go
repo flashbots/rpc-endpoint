@@ -60,7 +60,7 @@ func NewRpcRequest(
 	rpcCache *application.RpcCache,
 ) *RpcRequest {
 	return &RpcRequest{
-		logger:                     logger,
+		logger:                     logger.With("method", jsonReq.Method),
 		client:                     client,
 		jsonReq:                    jsonReq,
 		relaySigningKey:            relaySigningKey,

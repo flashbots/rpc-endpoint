@@ -156,24 +156,29 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished bool) {
 	signingAddress, err := flashbots.ParseSignature(r.flashbotsSignature, r.flashbotsSignatureBody)
 	if errors.Is(err, flashbots.ErrNoSignature) {
+		r.logger.Info("[eth_getTransactionCount] No signature found")
 		return false
 	}
 
 	if len(r.jsonReq.Params) != 2 {
+		r.logger.Info("[eth_getTransactionCount] Invalid params")
 		return false
 	}
 
 	blockSpecifier, ok := r.jsonReq.Params[1].(string)
 	if !ok || blockSpecifier != "pending" {
+		r.logger.Info("[eth_getTransactionCount] non-pending blockSpecifier")
 		return false
 	}
 
 	addr, ok := r.jsonReq.Params[0].(string)
 	if !ok {
+		r.logger.Info("[eth_getTransactionCount] non-string address")
 		return false
 	}
 	addr = strings.ToLower(addr)
 	if addr != strings.ToLower(signingAddress) {
+		r.logger.Info("[eth_getTransactionCount] address mismatch", "addr", addr, "signingAddress", signingAddress)
 		return false
 	}
 
@@ -183,6 +188,7 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 		return false
 	}
 	if !found {
+		r.logger.Info("[eth_getTransactionCount] No nonce found")
 		return false
 	}
 
