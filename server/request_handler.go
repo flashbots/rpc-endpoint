@@ -134,11 +134,11 @@ func (r *RpcRequestHandler) process() {
 	r.logger = r.logger.New("rpc_method", jsonReq.Method)
 
 	// Process single request
-	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams, r.req.URL.String())
+	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams, r.req.URL.String(), body)
 }
 
 // processRequest handles single request
-func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, urlParams URLParameters, reqURL string) {
+func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types.JsonRpcRequest, origin, referer string, isWhitehatBundleCollection bool, whitehatBundleId string, urlParams URLParameters, reqURL string, body []byte) {
 	var entry *database.EthSendRawTxEntry
 	if jsonReq.Method == "eth_sendRawTransaction" {
 		entry = r.requestRecord.AddEthSendRawTxEntry(uuid.New())
@@ -147,6 +147,11 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 	}
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
+
+	if r.req.Header.Get("X-Flashbots-Signature") != "" {
+		rpcReq.flashbotsSignature = r.req.Header.Get("X-Flashbots-Signature")
+		rpcReq.flashbotsSignatureBody = body
+	}
 	res := rpcReq.ProcessRequest()
 	// Write response
 	r._writeRpcResponse(res)

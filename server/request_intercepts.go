@@ -1,9 +1,11 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -148,5 +150,43 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 
 	r.writeRpcResult("0x0000000000000000000000000000000000000000000000000000000000000001")
 	r.logger.Info("Intercepted eth_call to FlashRPC contract")
+	return true
+}
+
+func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished bool) {
+	signingAddress, err := flashbots.ParseSignature(r.flashbotsSignature, r.flashbotsSignatureBody)
+	if errors.Is(err, flashbots.ErrNoSignature) {
+		return false
+	}
+
+	if len(r.jsonReq.Params) != 2 {
+		return false
+	}
+
+	blockSpecifier, ok := r.jsonReq.Params[1].(string)
+	if !ok || blockSpecifier != "pending" {
+		return false
+	}
+
+	addr, ok := r.jsonReq.Params[0].(string)
+	if !ok {
+		return false
+	}
+	addr = strings.ToLower(addr)
+	if addr != strings.ToLower(signingAddress) {
+		return false
+	}
+
+	nonce, found, err := RState.GetSenderMaxNonce(addr)
+	if err != nil {
+		r.logger.Error("[eth_getTransactionCount] Redis:GetSenderMaxNonce error", "error", err)
+		return false
+	}
+	if !found {
+		return false
+	}
+
+	resp := fmt.Sprintf("0x%x", nonce)
+	r.writeRpcResult(resp)
 	return true
 }

@@ -42,6 +42,8 @@ type RpcRequest struct {
 	urlParams                  URLParameters
 	chainID                    []byte
 	rpcCache                   *application.RpcCache
+	flashbotsSignature         string
+	flashbotsSignatureBody     []byte
 }
 
 func NewRpcRequest(
@@ -102,6 +104,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
+	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_signed_eth_getTransactionCount():
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
 	case r.jsonReq.Method == "web3_clientVersion":
