@@ -150,3 +150,47 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 	r.logger.Info("Intercepted eth_call to FlashRPC contract")
 	return true
 }
+
+func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished bool) {
+	if r.flashbotsSigningAddress == "" {
+		r.logger.Info("[eth_getTransactionCount] No signature found")
+		return false
+	}
+
+	if len(r.jsonReq.Params) != 2 {
+		r.logger.Info("[eth_getTransactionCount] Invalid params")
+		return false
+	}
+
+	blockSpecifier, ok := r.jsonReq.Params[1].(string)
+	if !ok || blockSpecifier != "pending" {
+		r.logger.Info("[eth_getTransactionCount] non-pending blockSpecifier")
+		return false
+	}
+
+	addr, ok := r.jsonReq.Params[0].(string)
+	if !ok {
+		r.logger.Info("[eth_getTransactionCount] non-string address")
+		return false
+	}
+	addr = strings.ToLower(addr)
+	if addr != strings.ToLower(r.flashbotsSigningAddress) {
+		r.logger.Info("[eth_getTransactionCount] address mismatch", "addr", addr, "signingAddress", r.flashbotsSigningAddress)
+		return false
+	}
+
+	nonce, found, err := RState.GetSenderMaxNonce(addr)
+	if err != nil {
+		r.logger.Error("[eth_getTransactionCount] Redis:GetSenderMaxNonce error", "error", err)
+		return false
+	}
+	if !found {
+		r.logger.Info("[eth_getTransactionCount] No nonce found")
+		return false
+	}
+
+	r.logger.Info("[eth_getTransactionCount] intercept", "nonce", nonce)
+	resp := fmt.Sprintf("0x%x", nonce+1)
+	r.writeRpcResult(resp)
+	return true
+}

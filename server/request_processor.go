@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
 
@@ -42,6 +43,7 @@ type RpcRequest struct {
 	urlParams                  URLParameters
 	chainID                    []byte
 	rpcCache                   *application.RpcCache
+	flashbotsSigningAddress    string
 }
 
 func NewRpcRequest(
@@ -58,7 +60,7 @@ func NewRpcRequest(
 	rpcCache *application.RpcCache,
 ) *RpcRequest {
 	return &RpcRequest{
-		logger:                     logger,
+		logger:                     logger.With("method", jsonReq.Method),
 		client:                     client,
 		jsonReq:                    jsonReq,
 		relaySigningKey:            relaySigningKey,
@@ -102,6 +104,7 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
+	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_signed_eth_getTransactionCount():
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
 	case r.jsonReq.Method == "web3_clientVersion":
@@ -497,4 +500,24 @@ func (r *RpcRequest) writeRpcResult(result interface{}) {
 		Version: "2.0",
 		Result:  resBytes,
 	}
+}
+
+// CheckFlashbotsSignature parses and validates the Flashbots signature if present,
+// returning an error if the signature is invalid.  If the signature is present and valid
+// the signing address is stored in the request.
+func (r *RpcRequest) CheckFlashbotsSignature(signature string, body []byte) error {
+	// Most requests don't have a signature, so avoid parsing it if it's empty
+	if signature == "" {
+		return nil
+	}
+	signingAddress, err := flashbots.ParseSignature(signature, body)
+	if err != nil {
+		if errors.Is(err, flashbots.ErrNoSignature) {
+			return nil
+		} else {
+			return err
+		}
+	}
+	r.flashbotsSigningAddress = signingAddress
+	return nil
 }
