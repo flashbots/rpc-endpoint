@@ -16,7 +16,7 @@ var (
 	ErrInvalidSignature = errors.New("invalid signature provided")
 )
 
-func ParseSignature(header string, body []byte) (string, error) {
+func ParseSignature(header string, body []byte) (signingAddress string, err error) {
 	if header == "" {
 		return "", ErrNoSignature
 	}
@@ -29,7 +29,7 @@ func ParseSignature(header string, body []byte) (string, error) {
 	return VerifySignature(body, splitSig[0], splitSig[1])
 }
 
-func VerifySignature(body []byte, signingAddressStr, signatureStr string) (string, error) {
+func VerifySignature(body []byte, signingAddressStr, signatureStr string) (signingAddress string, err error) {
 	signature, err := hexutil.Decode(signatureStr)
 	if err != nil || len(signature) == 0 {
 		return "", fmt.Errorf("%w: %w", ErrInvalidSignature, err)

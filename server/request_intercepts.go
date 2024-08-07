@@ -1,11 +1,9 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -154,8 +152,7 @@ func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished 
 }
 
 func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished bool) {
-	signingAddress, err := flashbots.ParseSignature(r.flashbotsSignature, r.flashbotsSignatureBody)
-	if errors.Is(err, flashbots.ErrNoSignature) {
+	if r.flashbotsSigningAddress == "" {
 		r.logger.Info("[eth_getTransactionCount] No signature found")
 		return false
 	}
@@ -177,8 +174,8 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 		return false
 	}
 	addr = strings.ToLower(addr)
-	if addr != strings.ToLower(signingAddress) {
-		r.logger.Info("[eth_getTransactionCount] address mismatch", "addr", addr, "signingAddress", signingAddress)
+	if addr != strings.ToLower(r.flashbotsSigningAddress) {
+		r.logger.Info("[eth_getTransactionCount] address mismatch", "addr", addr, "signingAddress", r.flashbotsSigningAddress)
 		return false
 	}
 

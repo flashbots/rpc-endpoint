@@ -148,9 +148,11 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 	// Handle single request
 	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
 
-	if r.req.Header.Get("X-Flashbots-Signature") != "" {
-		rpcReq.flashbotsSignature = r.req.Header.Get("X-Flashbots-Signature")
-		rpcReq.flashbotsSignatureBody = body
+	if err := rpcReq.CheckFlashbotsSignature(r.req.Header.Get("X-Flashbots-Signature"), body); err != nil {
+		r.logger.Warn("[processRequest] CheckFlashbotsSignature", "error", err)
+		rpcReq.writeRpcError(err.Error(), types.JsonRpcInvalidRequest)
+		r._writeRpcResponse(rpcReq.jsonRes)
+		return
 	}
 	res := rpcReq.ProcessRequest()
 	// Write response
