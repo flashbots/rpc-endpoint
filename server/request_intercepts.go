@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -200,11 +202,13 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 
 	backendTxCount := uint64(0)
 	if r.jsonRes.Result != nil {
-		if err := json.Unmarshal(r.jsonRes.Result, &backendTxCount); err != nil {
-			r.logger.Info("[ProcessRequest] Proxy to node failed", "method", r.jsonReq.Method)
+		count := hexutil.Uint64(0)
+		if err := json.Unmarshal(r.jsonRes.Result, &count); err != nil {
+			r.logger.Info("[ProcessRequest] Unmarshal backend response failed", "method", r.jsonReq.Method)
 			r.writeRpcError("internal server error", types.JsonRpcInternalError)
 			return true
 		}
+		backendTxCount = uint64(count)
 		r.logger.Info("[eth_getTransactionCount] intercept", "backendTxCount", backendTxCount, "addr", addr)
 	}
 
