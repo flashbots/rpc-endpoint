@@ -282,6 +282,11 @@ func (s *RedisState) GetSenderMaxNonce(txFrom string) (senderMaxNonce uint64, fo
 	return senderMaxNonce, true, nil
 }
 
+func (s *RedisState) DelSenderMaxNonce(txFrom string) error {
+	key := RedisKeySenderMaxNonce(txFrom)
+	return s.RedisClient.Del(context.Background(), key).Err()
+}
+
 // Block transactions, with a specific return value (eg. "nonce too low")
 func (s *RedisState) SetBlockedTxHash(txHash string, returnValue string) error {
 	key := RedisKeyBlockedTxHash(txHash)

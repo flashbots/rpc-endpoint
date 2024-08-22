@@ -1,8 +1,11 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/flashbots/rpc-endpoint/types"
 )
@@ -179,7 +182,9 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 		return false
 	}
 
-	nonce, found, err := RState.GetSenderMaxNonce(addr)
+	// since it's possible that the user sent another tx via another provider, we need to check the nonce from
+	// both the backend and our cache, and return the greater of the two
+	cachedNonce, found, err := RState.GetSenderMaxNonce(addr)
 	if err != nil {
 		r.logger.Error("[eth_getTransactionCount] Redis:GetSenderMaxNonce error", "error", err)
 		return false
@@ -188,9 +193,38 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 		r.logger.Info("[eth_getTransactionCount] No nonce found")
 		return false
 	}
+	if !r.proxyRequestRead() {
+		r.logger.Info("[ProcessRequest] Proxy to node failed", "method", r.jsonReq.Method)
+		r.writeRpcError("internal server error", types.JsonRpcInternalError)
+		return true
+	}
+	r.logger.Info("[eth_getTransactionCount] intercept", "cachedNonce", cachedNonce, "addr", addr)
 
-	r.logger.Info("[eth_getTransactionCount] intercept", "nonce", nonce)
-	resp := fmt.Sprintf("0x%x", nonce+1)
+	backendTxCount := uint64(0)
+	if r.jsonRes.Result != nil {
+		count := hexutil.Uint64(0)
+		if err := json.Unmarshal(r.jsonRes.Result, &count); err != nil {
+			r.logger.Info("[ProcessRequest] Unmarshal backend response failed", "method", r.jsonReq.Method)
+			r.writeRpcError("internal server error", types.JsonRpcInternalError)
+			return true
+		}
+		backendTxCount = uint64(count)
+		r.logger.Info("[eth_getTransactionCount] intercept", "backendTxCount", backendTxCount, "addr", addr)
+	}
+
+	// return either the cached nonce plus one, or the backend tx count
+	txCount := cachedNonce + 1
+	if backendTxCount > txCount {
+		txCount = backendTxCount
+		// since the cached value is invalid lets remove it from redis
+		r.logger.Info("[eth_getTransactionCount] intercept invalidated nonce", "addr", addr)
+		if err := RState.DelSenderMaxNonce(addr); err != nil {
+			// log the error but continue
+			r.logger.Error("[eth_getTransactionCount] Redis:DelSenderMaxNonce error", "error", err, "addr", addr)
+		}
+	}
+
+	resp := fmt.Sprintf("0x%x", txCount)
 	r.writeRpcResult(resp)
 	return true
 }
