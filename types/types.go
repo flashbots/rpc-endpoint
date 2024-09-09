@@ -112,8 +112,10 @@ type SendPrivateTxRequestWithPreferences struct {
 }
 
 type TxPrivacyPreferences struct {
-	Hints    []string `json:"hints"`
-	Builders []string `json:"builders"`
+	Hints         []string `json:"hints"`
+	Builders      []string `json:"builders"`
+	UseMempool    bool     `json:"useMempool"`
+	CustomMempool string   `json:"customMempool"`
 }
 
 type TxValidityPreferences struct {
@@ -126,7 +128,8 @@ type RefundConfig struct {
 }
 
 type PrivateTxPreferences struct {
-	Privacy  TxPrivacyPreferences  `json:"privacy"`
-	Validity TxValidityPreferences `json:"validity"`
-	Fast     bool                  `json:"fast"`
+	Privacy     TxPrivacyPreferences  `json:"privacy"`
+	Validity    TxValidityPreferences `json:"validity"`
+	Fast        bool                  `json:"fast"`
+	AllowRevert bool                  `json:"allowRevert"`
 }

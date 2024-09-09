@@ -317,11 +317,12 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.logger.Info("[sendTxToRelay] Relay error response", "error", err, "rawTx", r.rawTxHex)
-			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
 		} else {
 			r.logger.Error("[sendTxToRelay] Relay call failed", "error", err, "rawTx", r.rawTxHex)
-			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
 		}
+		// todo: we need to change the way we call bundle-relay-api as it's not json-rpc compatible so we don't get proper
+		// error code/text
+		r.writeRpcError("internal error", types.JsonRpcInternalError)
 		return
 	}
 

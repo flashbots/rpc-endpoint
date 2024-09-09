@@ -14,6 +14,7 @@ import (
 var (
 	DefaultAuctionHint = []string{"hash", "special_logs"}
 
+	ErrIncorrectMempoolURL                 = errors.New("Incorrect mempool URL.")
 	ErrEmptyHintQuery                      = errors.New("Hint query must be non-empty if set.")
 	ErrEmptyTargetBuilderQuery             = errors.New("Target builder query must be non-empty if set.")
 	ErrIncorrectAuctionHints               = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata, default_logs.")
@@ -49,12 +50,12 @@ func normalizeQueryParams(url *url.URL) map[string][]string {
 //   - builder: target builder, can be set multiple times, default: empty (only send to flashbots builders)
 //   - refund: refund in the form of 0xaddress:percentage, default: empty (will be set by default when backrun is produced)
 //     example: 0x123:80 - will refund 80% of the backrun profit to 0x123
-func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLParameters, err error) {
-	if strings.HasPrefix(url.Path, "/fast") {
+func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URLParameters, err error) {
+	if strings.HasPrefix(reqUrl.Path, "/fast") {
 		params.fast = true
 	}
 	// Normalize all query parameters to lowercase keys
-	normalizedQuery := normalizeQueryParams(url)
+	normalizedQuery := normalizeQueryParams(reqUrl)
 
 	var hint []string
 	hintQuery, ok := normalizedQuery["hint"]
@@ -92,7 +93,7 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 	}
 	if params.fast {
 		params.pref.Fast = true
-		// set all builders no matter what's in the url
+		// set all builders no matter what's in the reqUrl
 		params.pref.Privacy.Builders = allBuilders
 	}
 
@@ -145,6 +146,27 @@ func ExtractParametersFromUrl(url *url.URL, allBuilders []string) (params URLPar
 		}
 
 		params.pref.Validity.Refund = refundConfig
+	}
+
+	useMempoolQuery := normalizedQuery["usemempool"]
+	if len(useMempoolQuery) != 0 && useMempoolQuery[0] == "true" {
+		params.pref.Privacy.UseMempool = true
+	}
+	allowRevertQuery := normalizedQuery["allowrevert"]
+	if len(allowRevertQuery) != 0 && allowRevertQuery[0] == "true" {
+		params.pref.AllowRevert = true
+	}
+	customMempoolQuery := normalizedQuery["custommempool"]
+	if len(customMempoolQuery) != 0 {
+		cm, err := url.QueryUnescape(customMempoolQuery[0])
+		if err != nil {
+			return params, ErrIncorrectMempoolURL
+		}
+		_, err = url.Parse(customMempoolQuery[0])
+		if err != nil {
+			return params, ErrIncorrectMempoolURL
+		}
+		params.pref.Privacy.CustomMempool = cm
 	}
 
 	return params, nil
