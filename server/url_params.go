@@ -152,21 +152,21 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 	if len(useMempoolQuery) != 0 && useMempoolQuery[0] == "true" {
 		params.pref.Privacy.UseMempool = true
 	}
-	allowRevertQuery := normalizedQuery["allowrevert"]
-	if len(allowRevertQuery) != 0 && allowRevertQuery[0] == "true" {
-		params.pref.AllowRevert = true
+	canRevertQuery := normalizedQuery["canrevert"]
+	if len(canRevertQuery) != 0 && canRevertQuery[0] == "true" {
+		params.pref.CanRevert = true
 	}
-	customMempoolQuery := normalizedQuery["custommempool"]
-	if len(customMempoolQuery) != 0 {
-		cm, err := url.QueryUnescape(customMempoolQuery[0])
+	mempoolRPC := normalizedQuery["mempoolrpc"]
+	if len(mempoolRPC) != 0 {
+		cm, err := url.QueryUnescape(mempoolRPC[0])
 		if err != nil {
 			return params, ErrIncorrectMempoolURL
 		}
-		_, err = url.Parse(customMempoolQuery[0])
+		_, err = url.Parse(mempoolRPC[0])
 		if err != nil {
 			return params, ErrIncorrectMempoolURL
 		}
-		params.pref.Privacy.CustomMempool = cm
+		params.pref.Privacy.MempoolRPC = cm
 	}
 
 	return params, nil
