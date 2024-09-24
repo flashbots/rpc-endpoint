@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -130,5 +131,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
+	// do it as the last step, in case it is used as cancellation
+	if r.tx.GasTipCap().Cmp(big.NewInt(0)) == 0 {
+		r.writeRpcError("transaction underpriced: gas tip cap 0, minimum needed 1", types.JsonRpcInvalidRequest)
+		return
+	}
 	r.sendTxToRelay()
 }
