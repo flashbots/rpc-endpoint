@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/flashbots/rpc-endpoint/adapters/webfile"
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
@@ -57,6 +58,7 @@ type RpcEndPointServer struct {
 	builderNameProvider BuilderNameProvider
 	chainID             []byte
 	rpcCache            *application.RpcCache
+	defaultEthClient    *ethclient.Client
 }
 
 func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
@@ -94,6 +96,10 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 	}
 
 	rpcCache := application.NewRpcCache(cfg.TTLCacheSeconds)
+	ethCl, err := ethclient.Dial(cfg.DefaultMempoolRPC)
+	if err != nil {
+		return nil, errors.Wrap(err, "ethclient.Dial error")
+	}
 	return &RpcEndPointServer{
 		db:                  cfg.DB,
 		drainAddress:        cfg.DrainAddress,
@@ -110,6 +116,7 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		chainID:             bts,
 		builderNameProvider: bis,
 		rpcCache:            rpcCache,
+		defaultEthClient:    ethCl,
 	}, nil
 }
 
@@ -243,7 +250,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache, s.defaultEthClient)
 	request.process()
 }
 

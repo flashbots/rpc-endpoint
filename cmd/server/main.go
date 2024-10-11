@@ -29,6 +29,7 @@ var (
 	defaultServiceName              = os.Getenv("SERVICE_NAME")
 	defaultFetchInfoIntervalSeconds = 600
 	defaultRpcTTLCacheSeconds       = 300
+	defaultMempoolRPC               = os.Getenv("DEFAULT_MEMPOOL_RPC")
 
 	// cli flags
 	versionPtr           = flag.Bool("version", false, "just print the program version")
@@ -119,6 +120,7 @@ func main() {
 		BuilderInfoSource:   *builderInfoSource,
 		FetchInfoInterval:   *fetchIntervalSeconds,
 		TTLCacheSeconds:     int64(*ttlCacheSeconds),
+		DefaultMempoolRPC:   defaultMempoolRPC,
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)

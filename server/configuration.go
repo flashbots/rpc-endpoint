@@ -22,4 +22,5 @@ type Configuration struct {
 	BuilderInfoSource   string
 	FetchInfoInterval   int
 	TTLCacheSeconds     int64
+	DefaultMempoolRPC   string
 }
