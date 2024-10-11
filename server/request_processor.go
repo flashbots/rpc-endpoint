@@ -4,6 +4,7 @@ Request represents an incoming client request
 package server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
@@ -28,6 +30,7 @@ import (
 type RpcRequest struct {
 	logger                     log.Logger
 	client                     RPCProxyClient
+	defaultEthClient           *ethclient.Client
 	jsonReq                    *types.JsonRpcRequest
 	jsonRes                    *types.JsonRpcResponse
 	rawTxHex                   string
@@ -58,6 +61,7 @@ func NewRpcRequest(
 	urlParams URLParameters,
 	chainID []byte,
 	rpcCache *application.RpcCache,
+	defaultEthClient *ethclient.Client,
 ) *RpcRequest {
 	return &RpcRequest{
 		logger:                     logger.With("method", jsonReq.Method),
@@ -73,6 +77,7 @@ func NewRpcRequest(
 		urlParams:                  urlParams,
 		chainID:                    chainID,
 		rpcCache:                   rpcCache,
+		defaultEthClient:           defaultEthClient,
 	}
 }
 
@@ -384,6 +389,26 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 		r.logger.Info("[cancelTx] Faked sending cancel-tx to relay, did nothing", "tx", initialTxHash)
 		r.writeRpcResult(initialTxHash)
 		return true
+	}
+
+	if r.urlParams.pref.Privacy.UseMempool {
+		r.logger.Info("[cancelTx] cancel-tx sending to mempool", "tx", initialTxHash)
+		ethCl := r.defaultEthClient
+		if r.urlParams.pref.Privacy.MempoolRPC != "" {
+			ethCl, err = ethclient.Dial(r.urlParams.pref.Privacy.MempoolRPC)
+			if err != nil {
+				r.logger.Error("[cancelTx] Dial failed", "error", err, "rpc", r.urlParams.pref.Privacy.MempoolRPC)
+				r.writeRpcError("invalid mempool rpc", types.JsonRpcInvalidParams)
+				return true
+			}
+		}
+
+		err = ethCl.SendTransaction(context.Background(), r.tx)
+		if err != nil {
+			r.logger.Error("[cancelTx] SendTransaction failed", "error", err)
+			r.writeRpcError("proxying cancellation to mempool failed", types.JsonRpcInternalError)
+			return true
+		}
 	}
 
 	cancelPrivTxArgs := flashbotsrpc.FlashbotsCancelPrivateTransactionRequest{TxHash: initialTxHash}

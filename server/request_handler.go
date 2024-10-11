@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
 	"golang.org/x/exp/rand"
@@ -33,6 +34,7 @@ type RpcRequestHandler struct {
 	builderNames        []string
 	chainID             []byte
 	rpcCache            *application.RpcCache
+	defaultEthClient    *ethclient.Client
 }
 
 func NewRpcRequestHandler(
@@ -47,6 +49,7 @@ func NewRpcRequestHandler(
 	builderNames []string,
 	chainID []byte,
 	rpcCache *application.RpcCache,
+	defaultEthClient *ethclient.Client,
 ) *RpcRequestHandler {
 	return &RpcRequestHandler{
 		logger:              logger,
@@ -62,6 +65,7 @@ func NewRpcRequestHandler(
 		builderNames:        builderNames,
 		chainID:             chainID,
 		rpcCache:            rpcCache,
+		defaultEthClient:    defaultEthClient,
 	}
 }
 
@@ -146,7 +150,7 @@ func (r *RpcRequestHandler) processRequest(client RPCProxyClient, jsonReq *types
 		r.logger.Info("[processRequest] eth_sendRawTransaction request URL", "url", reqURL)
 	}
 	// Handle single request
-	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache)
+	rpcReq := NewRpcRequest(r.logger, client, jsonReq, r.relaySigningKey, r.relayUrl, origin, referer, isWhitehatBundleCollection, whitehatBundleId, entry, urlParams, r.chainID, r.rpcCache, r.defaultEthClient)
 
 	if err := rpcReq.CheckFlashbotsSignature(r.req.Header.Get("X-Flashbots-Signature"), body); err != nil {
 		r.logger.Warn("[processRequest] CheckFlashbotsSignature", "error", err)
