@@ -162,11 +162,12 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		if err != nil {
 			return params, ErrIncorrectMempoolURL
 		}
-		_, err = url.Parse(mempoolRPC[0])
+		parsedUrl, err := url.Parse(cm)
 		if err != nil {
 			return params, ErrIncorrectMempoolURL
 		}
-		params.pref.Privacy.MempoolRPC = cm
+		parsedUrl.Scheme = "https"
+		params.pref.Privacy.MempoolRPC = parsedUrl.String()
 	}
 
 	return params, nil
