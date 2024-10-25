@@ -107,8 +107,9 @@ type BundleResponse struct {
 }
 
 type SendPrivateTxRequestWithPreferences struct {
-	Tx          string                `json:"tx"`
-	Preferences *PrivateTxPreferences `json:"preferences,omitempty"`
+	Tx             string                `json:"tx"`
+	Preferences    *PrivateTxPreferences `json:"preferences,omitempty"`
+	MaxBlockNumber uint64                `json:"maxBlockNumber"`
 }
 
 type TxPrivacyPreferences struct {
