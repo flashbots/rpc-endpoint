@@ -312,6 +312,18 @@ func (r *RpcRequest) sendTxToRelay() {
 		}
 	}
 
+	if r.urlParams.blockRange > 0 {
+		bn, err := r.defaultEthClient.BlockNumber(context.Background())
+		if err != nil {
+			r.logger.Error("[sendTxToRelay] BlockNumber failed", "error", err)
+			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
+			return
+		}
+		// this actually means that we use blockRange+1, to avoid problems with lagging blocks etc.
+		maxBlockNumber := bn + 1 + uint64(r.urlParams.blockRange)
+		sendPrivateTxArgs.MaxBlockNumber = maxBlockNumber
+	}
+
 	fbRpc := flashbotsrpc.New(r.relayUrl, func(rpc *flashbotsrpc.FlashbotsRPC) {
 		if r.urlParams.originId != "" {
 			rpc.Headers["X-Flashbots-Origin"] = r.urlParams.originId

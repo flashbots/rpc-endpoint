@@ -15,6 +15,7 @@ var (
 	DefaultAuctionHint = []string{"hash", "special_logs"}
 
 	ErrIncorrectMempoolURL                 = errors.New("Incorrect mempool URL.")
+	ErrIncorrectURLParam                   = errors.New("Incorrect URL parameter")
 	ErrEmptyHintQuery                      = errors.New("Hint query must be non-empty if set.")
 	ErrEmptyTargetBuilderQuery             = errors.New("Target builder query must be non-empty if set.")
 	ErrIncorrectAuctionHints               = errors.New("Incorrect auction hint, must be one of: contract_address, function_selector, logs, calldata, default_logs.")
@@ -30,6 +31,7 @@ type URLParameters struct {
 	prefWasSet bool
 	originId   string
 	fast       bool
+	blockRange int
 }
 
 // normalizeQueryParams takes a URL and returns a map of query parameters with all keys normalized to lowercase.
@@ -168,6 +170,14 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		}
 		parsedUrl.Scheme = "https"
 		params.pref.Privacy.MempoolRPC = parsedUrl.String()
+	}
+	blockRange := normalizedQuery["blockrange"]
+	if len(blockRange) != 0 {
+		brange, err := strconv.Atoi(blockRange[0])
+		if err != nil {
+			return params, ErrIncorrectURLParam
+		}
+		params.blockRange = brange
 	}
 
 	return params, nil
