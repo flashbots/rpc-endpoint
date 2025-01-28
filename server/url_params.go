@@ -45,6 +45,17 @@ func normalizeQueryParams(url *url.URL) map[string][]string {
 	return normalizedQuery
 }
 
+var allowedHints = map[string]struct{}{
+	"hash":              struct{}{},
+	"contract_address":  struct{}{},
+	"function_selector": struct{}{},
+	"logs":              struct{}{},
+	"calldata":          struct{}{},
+	"default_logs":      struct{}{},
+	"tx_hash":           struct{}{},
+	"tx_full":           struct{}{},
+}
+
 // ExtractParametersFromUrl extracts the auction preference from the url query
 // Allowed query params:
 //   - hint: mev share hints, can be set multiple times, default: hash, special_logs
@@ -67,8 +78,9 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		}
 		for _, hint := range hintQuery {
 			// valid hints are: "hash", "contract_address", "function_selector", "logs", "calldata"
-			if hint != "hash" && hint != "contract_address" && hint != "function_selector" && hint != "logs" && hint != "calldata" && hint != "default_logs" {
+			if _, ok := allowedHints[hint]; !ok {
 				return params, ErrIncorrectAuctionHints
+
 			}
 		}
 		hint = hintQuery
