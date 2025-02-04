@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
-          go-version: ^1.20
+          go-version: ^1.22
         id: go
 
       - name: Check out code into the Go module directory
@@ -30,14 +30,14 @@ jobs:
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
-          go-version: ^1.20
+          go-version: ^1.22
         id: go
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@v0.4.3
+        run: go install honnef.co/go/tools/cmd/staticcheck@2024.1.1
 
       - name: Lint
         run: make lint
