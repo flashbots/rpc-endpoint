@@ -77,6 +77,7 @@ func testServerSetup(db database.Store) {
 		RelaySigningKey:     relaySigningKey,
 		RelayUrl:            RpcBackendServerUrl,
 		Version:             "test",
+		DefaultMempoolRPC:   RpcBackendServerUrl,
 	})
 	if err != nil {
 		panic(err)
@@ -278,7 +279,7 @@ func TestRelayTx(t *testing.T) {
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0xe0f86ee2f36b4e254cd74aa1859a6d67c2e57e22e10d593bcdbcb815a1ab46d82aa9c8cbea8ac79d590b5a7ca5491a5621060a6a9d3be9016880c6a09980e32d00", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0x06e1ea66c5fc1017787369beffc9c9acd82570b4ec4ea075c708f2351a26fdff4abbf601037884d0785ff88985b590f7b865852a4100d5670605a56b9118804900", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
