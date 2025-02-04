@@ -50,6 +50,6 @@ require (
 	github.com/gomodule/redigo v1.8.5 // indirect
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
-	golang.org/x/crypto v0.22.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )
