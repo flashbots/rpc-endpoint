@@ -87,10 +87,10 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		return
 	}
 
-	// Remember sender of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
-	err = RState.SetSenderOfTxHash(txHashLower, txFromLower)
+	// Remember sender and nonce of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
+	err = RState.SetSenderAndNonceOfTxHash(txHashLower, txFromLower, r.tx.Nonce())
 	if err != nil {
-		r.logger.Error("[sendRawTransaction] Redis:SetSenderOfTxHash failed: %v", err)
+		r.logger.Error("[sendRawTransaction] Redis:SetSenderAndNonceOfTxHash failed: %v", err)
 	}
 	var txToAddr string
 	if r.tx.To() != nil { // to address will be nil for contract creation tx

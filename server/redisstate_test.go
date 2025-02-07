@@ -146,13 +146,14 @@ func TestSenderOfTxHash(t *testing.T) {
 
 	txFrom := "0x0Sender"
 	txHash := "0xDeadBeef"
+	txNonce := uint64(1337)
 
 	val, found, err := redisState.GetSenderOfTxHash(txHash)
 	require.Nil(t, err, err)
 	require.False(t, found)
 	require.Equal(t, "", val)
 
-	err = redisState.SetSenderOfTxHash(txHash, txFrom)
+	err = redisState.SetSenderAndNonceOfTxHash(txHash, txFrom, txNonce)
 	require.Nil(t, err, err)
 
 	val, found, err = redisState.GetSenderOfTxHash(txHash)
@@ -172,7 +173,7 @@ func TestSenderMaxNonce(t *testing.T) {
 	require.False(t, found)
 	require.Equal(t, uint64(0), val)
 
-	err = redisState.SetSenderMaxNonce(txFrom, 17)
+	err = redisState.SetSenderMaxNonce(txFrom, 17, 0)
 	require.Nil(t, err, err)
 
 	val, found, err = redisState.GetSenderMaxNonce(txFrom)
@@ -180,7 +181,7 @@ func TestSenderMaxNonce(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, uint64(17), val)
 
-	err = redisState.SetSenderMaxNonce(txFrom, 16)
+	err = redisState.SetSenderMaxNonce(txFrom, 16, 10)
 	require.Nil(t, err, err)
 
 	val, found, err = redisState.GetSenderMaxNonce(txFrom)
@@ -188,7 +189,7 @@ func TestSenderMaxNonce(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, uint64(17), val)
 
-	err = redisState.SetSenderMaxNonce(txFrom, 18)
+	err = redisState.SetSenderMaxNonce(txFrom, 18, 0)
 	require.Nil(t, err, err)
 
 	val, found, err = redisState.GetSenderMaxNonce(txFrom)

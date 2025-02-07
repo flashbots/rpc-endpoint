@@ -258,7 +258,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		}
 	}
 
-	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce())
+	go RState.SetSenderMaxNonce(r.txFrom, r.tx.Nonce(), r.urlParams.blockRange)
 
 	// only allow large non-blob transactions to certain addresses - default max tx size is 128KB
 	// https://github.com/ethereum/go-ethereum/blob/master/core/tx_pool.go#L53
