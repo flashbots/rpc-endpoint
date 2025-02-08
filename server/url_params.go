@@ -174,7 +174,7 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 	blockRange := normalizedQuery["blockrange"]
 	if len(blockRange) != 0 {
 		brange, err := strconv.Atoi(blockRange[0])
-		if err != nil {
+		if err != nil || brange < 0 {
 			return params, ErrIncorrectURLParam
 		}
 		params.blockRange = brange
