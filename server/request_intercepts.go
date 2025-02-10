@@ -37,6 +37,28 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		return false
 	}
 
+	resetMaxNonce := func(txFrom string, txHash string) {
+		// if the tx failed then we want to reset the redis max nonce
+		maxNonce, found, err := RState.GetSenderMaxNonce(txFrom)
+		if err != nil {
+			r.logger.Error("[post_getTransactionReceipt] GetSenderMaxNonce failed", "error", err)
+			return
+		}
+
+		// if the user doesn't have a cached nonce then we can exit early
+		if !found {
+			return
+		}
+
+		// we can elide error checking here since a txNonce of 0 will never match
+		txNonce, _, _ := RState.GetNonceOfTxHash(txHash)
+		if maxNonce == txNonce {
+			if err := RState.DelSenderMaxNonce(txFrom); err != nil {
+				r.logger.Error("[post_getTransactionReceipt] DelSenderMaxNonce failed", "error", err)
+			}
+		}
+	}
+
 	ensureAccountFixIsInPlace := func() {
 		// Get the sender of this transaction
 		txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
@@ -68,6 +90,9 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		}
 
 		r.logger.Info("[post_getTransactionReceipt] Nonce-fix set for tx", "tx", txFromLower)
+
+		// Also reset the users max nonce if necessary
+		resetMaxNonce(txFromLower, txHashLower)
 	}
 
 	r.logger.Info("[post_getTransactionReceipt] Priv-tx-api status", "status", statusApiResponse.Status)
