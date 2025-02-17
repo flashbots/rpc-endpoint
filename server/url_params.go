@@ -53,7 +53,7 @@ var allowedHints = map[string]struct{}{
 	"calldata":          struct{}{},
 	"default_logs":      struct{}{},
 	"tx_hash":           struct{}{},
-	"tx_full":           struct{}{},
+	"full":              struct{}{},
 }
 
 // ExtractParametersFromUrl extracts the auction preference from the url query
