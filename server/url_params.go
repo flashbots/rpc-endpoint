@@ -23,7 +23,7 @@ var (
 	ErrIncorrectRefundQuery                = errors.New("Incorrect refund query, must be 0xaddress:percentage.")
 	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
 	ErrIncorrectRefundPercentageQuery      = errors.New("Incorrect refund percentage.")
-	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be bellow 100%.")
+	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be below 100%.")
 )
 
 type URLParameters struct {
