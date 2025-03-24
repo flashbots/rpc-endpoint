@@ -3,6 +3,8 @@ package server
 import "testing"
 
 func Test_isOnOFACList(t *testing.T) {
+	ofacBlacklist["0x53b6936513e738f44fb50d2b9476730c0ab3bfc1"] = true
+
 	tests := map[string]struct {
 		address string
 		want    bool
