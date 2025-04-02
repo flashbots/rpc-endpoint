@@ -154,7 +154,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	return true
 }
 
-// Returns true if request has already received a response, false if req should contiue to normal proxy
+// Returns true if request has already received a response, false if req should continue to normal proxy
 func (r *RpcRequest) intercept_eth_call_to_FlashRPC_Contract() (requestFinished bool) {
 	if len(r.jsonReq.Params) < 1 {
 		return false
