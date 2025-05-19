@@ -312,6 +312,10 @@ func (r *RpcRequest) sendTxToRelay() {
 		}
 	}
 
+	if r.urlParams.auctionTimeout != 0 {
+		sendPrivateTxArgs.Preferences.Privacy.AuctionTimeout = r.urlParams.auctionTimeout
+	}
+
 	if r.urlParams.blockRange > 0 {
 		bn, err := r.defaultEthClient.BlockNumber(context.Background())
 		if err != nil {
