@@ -35,7 +35,7 @@ var RedisExpiryNonceOfTxHash = 24 * time.Hour // 1 day
 
 // Remember nonce of pending user tx
 var RedisPrefixSenderMaxNonce = RedisPrefix + "txsender-pending-max-nonce:"
-var RedisExpirySenderMaxNonce = 2 * time.Hour
+var RedisExpirySenderMaxNonce = 280 * time.Second //weird time to be a little less than 5 minute default blockrange
 
 // Enable lookup of bundle txs by bundleId
 var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
