@@ -27,11 +27,12 @@ var (
 )
 
 type URLParameters struct {
-	pref       types.PrivateTxPreferences
-	prefWasSet bool
-	originId   string
-	fast       bool
-	blockRange int
+	pref           types.PrivateTxPreferences
+	prefWasSet     bool
+	originId       string
+	fast           bool
+	blockRange     int
+	auctionTimeout uint64
 }
 
 // normalizeQueryParams takes a URL and returns a map of query parameters with all keys normalized to lowercase.
@@ -62,6 +63,7 @@ var allowedHints = map[string]struct{}{
 //   - originId: origin id, default: ""
 //   - builder: target builder, can be set multiple times, default: empty (only send to flashbots builders)
 //   - refund: refund in the form of 0xaddress:percentage, default: empty (will be set by default when backrun is produced)
+//   - auctionTimeout: auction timeout in milliseconds
 //     example: 0x123:80 - will refund 80% of the backrun profit to 0x123
 func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URLParameters, err error) {
 	if strings.HasPrefix(reqUrl.Path, "/fast") {
@@ -190,6 +192,14 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			return params, ErrIncorrectURLParam
 		}
 		params.blockRange = brange
+	}
+	auctionTimeout := normalizedQuery["auctiontimeout"]
+	if len(auctionTimeout) != 0 {
+		timeout, err := strconv.Atoi(auctionTimeout[0])
+		if err != nil || timeout < 0 {
+			return params, ErrIncorrectURLParam
+		}
+		params.auctionTimeout = uint64(timeout)
 	}
 
 	return params, nil

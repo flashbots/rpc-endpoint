@@ -226,6 +226,20 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
+		"fast, keep hints, auctionTimeout": {
+			url: "https://rpc.flashbots.net/fast?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash&auctionTimeout=1000",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}},
+					Fast:    true,
+				},
+				prefWasSet:     true,
+				fast:           true,
+				originId:       "",
+				auctionTimeout: 1000,
+			},
+			err: nil,
+		},
 	}
 
 	for name, tt := range tests {

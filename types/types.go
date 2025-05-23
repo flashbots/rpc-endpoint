@@ -113,10 +113,11 @@ type SendPrivateTxRequestWithPreferences struct {
 }
 
 type TxPrivacyPreferences struct {
-	Hints      []string `json:"hints"`
-	Builders   []string `json:"builders"`
-	UseMempool bool     `json:"useMempool"`
-	MempoolRPC string   `json:"mempoolRpc"`
+	Hints          []string `json:"hints"`
+	Builders       []string `json:"builders"`
+	UseMempool     bool     `json:"useMempool"`
+	MempoolRPC     string   `json:"mempoolRpc"`
+	AuctionTimeout uint64   `json:"auctionTimeout,omitempty"`
 }
 
 type TxValidityPreferences struct {
