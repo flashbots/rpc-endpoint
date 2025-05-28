@@ -24,14 +24,6 @@ Privacy notice: rpc-endpoint does not track, store or log any kind of user infor
 
 If a transaction is sent to the Flashbots relay instead of the public mempool, you cannot see the status on Etherscan or other explorers. Flashbots provides a Protect Transaction API to get the status of these private transactions: **https://protect.flashbots.net/**
 
-## Transaction Frontrunning Protection Evaluation Rules
-
-Not all transactions need frontrunning protection, and in fact some transactions cannot be sent to Flashbots at all. To reflect this we evaluate transactions in two ways:
-- Does the transaction use more than 42,000 gas? If it doesn't then the Flashbots Relay will reject it, and we're not aware of use cases that use such low gas that need frontrunning protection. Thus, we send low gas transactions to the mempool.
-- Does the transaction call one of a few whitelisted functions, such as an ERC20 approval, that don't need frontrunning protection? If so then we send it to the mempool.
-
-We're open to new ways of evaluating what needs frontrunning protection and welcome PRs to this end.
-
 ## Usage
 
 To send your transactions through the Flashbots Protect RPC please refer to the [quick-start guide](https://docs.flashbots.net/flashbots-protect/rpc/quick-start/).
