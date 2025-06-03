@@ -179,9 +179,11 @@ func (s *RpcEndPointServer) startMainServer() {
 	mux.HandleFunc("/", s.HandleHttpRequest)
 	mux.HandleFunc("/health", s.handleHealthRequest)
 	mux.HandleFunc("/bundle", s.HandleBundleRequest)
+	wrappedRouter := MetricsMiddleware(mux)
+
 	s.server = &http.Server{
 		Addr:         s.listenAddress,
-		Handler:      mux,
+		Handler:      wrappedRouter,
 		WriteTimeout: 30 * time.Second,
 		ReadTimeout:  30 * time.Second,
 	}

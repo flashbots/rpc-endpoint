@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/server"
 )
 
@@ -30,6 +31,7 @@ var (
 	defaultFetchInfoIntervalSeconds = 600
 	defaultRpcTTLCacheSeconds       = 300
 	defaultMempoolRPC               = os.Getenv("DEFAULT_MEMPOOL_RPC")
+	defaultMetricsAddr              = os.Getenv("METRICS_ADDR")
 
 	// cli flags
 	versionPtr           = flag.Bool("version", false, "just print the program version")
@@ -126,6 +128,15 @@ func main() {
 		logger.Crit("Server init error", "error", err)
 	}
 	logger.Info("Starting rpc-endpoint...", "relayUrl", *relayUrl, "proxyUrl", *proxyUrl)
+
+	if defaultMetricsAddr != "" {
+		go func() {
+			if err := metrics.DefaultServer(defaultMetricsAddr).ListenAndServe(); err != nil {
+				log.Crit("metrics http server crashed", "err", err)
+			}
+		}()
+	}
+
 	s.Start()
 }
 
