@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -15,6 +16,8 @@ const (
 )
 
 func (r *RpcRequest) handle_sendRawTransaction() {
+	metrics.IncPrivateTx()
+
 	var err error
 
 	// JSON-RPC sanity checks
