@@ -93,6 +93,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 	// Remember sender and nonce of the tx, for lookup in getTransactionReceipt to possibly set nonce-fix
 	err = RState.SetSenderAndNonceOfTxHash(txHashLower, txFromLower, r.tx.Nonce())
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[sendRawTransaction] Redis:SetSenderAndNonceOfTxHash failed: %v", err)
 	}
 	var txToAddr string
@@ -114,6 +115,7 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.logger.Info("[WhitehatBundleCollection] Adding tx to bundle", "whiteHatBundleId", r.whitehatBundleId, "tx", r.rawTxHex)
 		err = RState.AddTxToWhitehatBundle(r.whitehatBundleId, r.rawTxHex)
 		if err != nil {
+			metrics.IncRedisErr()
 			r.logger.Error("[WhitehatBundleCollection] AddTxToWhitehatBundle failed", "error", err)
 			r.writeRpcError("[WhitehatBundleCollection] AddTxToWhitehatBundle failed:", types.JsonRpcInternalError)
 			return
