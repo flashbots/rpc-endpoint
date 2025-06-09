@@ -11,6 +11,9 @@ var (
 	databaseErr = metrics.NewCounter("postgres_error_total")
 	redisErr    = metrics.NewCounter("redis_error_total")
 	ethNodeErr  = metrics.NewCounter("eth_node_cluster_error_total")
+
+	rpcNodeProxyClientErr = metrics.NewCounter("rpc_node_proxy_client_error_total")
+	rpcNodeProxyServerErr = metrics.NewCounter("rpc_node_proxy_server_error_total")
 )
 
 func IncDatabaseErr() {
@@ -23,6 +26,16 @@ func IncRedisErr() {
 
 func IncEthNodeClusterErr() {
 	ethNodeErr.Inc()
+}
+
+// IncRPCNodeProxyClientErr increments client total errors counter when error caused on the client side/request building
+func IncRPCNodeProxyClientErr() {
+	rpcNodeProxyClientErr.Inc()
+}
+
+// IncRPCNodeProxyServerErr increments server total errors counter when error caused on the server/transport layer
+func IncRPCNodeProxyServerErr() {
+	rpcNodeProxyServerErr.Inc()
 }
 
 func DefaultServer(addr string) *http.Server {

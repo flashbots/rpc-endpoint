@@ -159,6 +159,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	timeProxyStart := Now() // for measuring execution time
 	body, err := json.Marshal(r.jsonReq)
 	if err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed to marshal request before making proxy request", "error", err)
 		return false
 	}
@@ -167,11 +168,8 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	proxyResp, err := r.client.ProxyRequest(body)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to make proxy request", "error", err, "response", proxyResp)
-		if proxyResp == nil {
-			return false
-		} else {
-			return false
-		}
+		metrics.IncRPCNodeProxyServerErr()
+		return false
 	}
 
 	// Afterwards, check time and result
@@ -182,6 +180,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	defer proxyResp.Body.Close()
 	proxyRespBody, err := io.ReadAll(proxyResp.Body)
 	if err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed to read proxy request body", "error", err)
 		return false
 	}
@@ -189,6 +188,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(types.JsonRpcResponse)
 	if err = json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed decoding proxy json-rpc response", "error", err, "response", proxyRespBody)
 		return false
 	}
