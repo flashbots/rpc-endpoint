@@ -1,6 +1,10 @@
 package metrics
 
-import "github.com/VictoriaMetrics/metrics"
+import (
+	"fmt"
+
+	"github.com/VictoriaMetrics/metrics"
+)
 
 var (
 	metamaskInterceptorWrongNonce      = metrics.NewCounter("metamask_interceptor_wrong_nonce_total")
@@ -13,4 +17,8 @@ func IncMetamaskInterceptorWrongNonce() {
 
 func IncUniswapInterceptorNonceDiffTooHigh() {
 	uniswapInterceptorNonceDiffTooHigh.Inc()
+}
+
+func ReportCustomerConfigWasUpdated(customer string) {
+	metrics.GetOrCreateCounter(fmt.Sprintf(`customer_configuration_was_updated_total{customer="%s"}`, customer)).Inc()
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -21,20 +22,21 @@ var seed uint64 = uint64(rand.Int63())
 
 // RPC request handler for a single/ batch JSON-RPC request
 type RpcRequestHandler struct {
-	respw               *http.ResponseWriter
-	req                 *http.Request
-	logger              log.Logger
-	timeStarted         time.Time
-	defaultProxyUrl     string
-	proxyTimeoutSeconds int
-	relaySigningKey     *ecdsa.PrivateKey
-	relayUrl            string
-	uid                 uuid.UUID
-	requestRecord       *requestRecord
-	builderNames        []string
-	chainID             []byte
-	rpcCache            *application.RpcCache
-	defaultEthClient    *ethclient.Client
+	respw                *http.ResponseWriter
+	req                  *http.Request
+	logger               log.Logger
+	timeStarted          time.Time
+	defaultProxyUrl      string
+	proxyTimeoutSeconds  int
+	relaySigningKey      *ecdsa.PrivateKey
+	relayUrl             string
+	uid                  uuid.UUID
+	requestRecord        *requestRecord
+	builderNames         []string
+	chainID              []byte
+	rpcCache             *application.RpcCache
+	defaultEthClient     *ethclient.Client
+	configurationWatcher *ConfigurationWatcher
 }
 
 func NewRpcRequestHandler(
@@ -50,22 +52,24 @@ func NewRpcRequestHandler(
 	chainID []byte,
 	rpcCache *application.RpcCache,
 	defaultEthClient *ethclient.Client,
+	configurationWatcher *ConfigurationWatcher,
 ) *RpcRequestHandler {
 	return &RpcRequestHandler{
-		logger:              logger,
-		respw:               respw,
-		req:                 req,
-		timeStarted:         Now(),
-		defaultProxyUrl:     proxyUrl,
-		proxyTimeoutSeconds: proxyTimeoutSeconds,
-		relaySigningKey:     relaySigningKey,
-		relayUrl:            relayUrl,
-		uid:                 uuid.New(),
-		requestRecord:       NewRequestRecord(db),
-		builderNames:        builderNames,
-		chainID:             chainID,
-		rpcCache:            rpcCache,
-		defaultEthClient:    defaultEthClient,
+		logger:               logger,
+		respw:                respw,
+		req:                  req,
+		timeStarted:          Now(),
+		defaultProxyUrl:      proxyUrl,
+		proxyTimeoutSeconds:  proxyTimeoutSeconds,
+		relaySigningKey:      relaySigningKey,
+		relayUrl:             relayUrl,
+		uid:                  uuid.New(),
+		requestRecord:        NewRequestRecord(db),
+		builderNames:         builderNames,
+		chainID:              chainID,
+		rpcCache:             rpcCache,
+		defaultEthClient:     defaultEthClient,
+		configurationWatcher: configurationWatcher,
 	}
 }
 
@@ -136,6 +140,20 @@ func (r *RpcRequestHandler) process() {
 		return
 	}
 	r.logger = r.logger.New("rpc_method", jsonReq.Method)
+
+	if r.configurationWatcher != nil {
+		updated, err := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.URL.Query())
+		if err == nil {
+			if updated {
+				customerName, err := r.configurationWatcher.GetCustomerByOrigin(urlParams.originId)
+				if err != nil {
+					r.logger.Error("[process] Invalid customer configuration config", "error", err)
+				} else {
+					metrics.ReportCustomerConfigWasUpdated(customerName)
+				}
+			}
+		}
+	}
 
 	// Process single request
 	r.processRequest(client, jsonReq, origin, referer, isWhitehatBundleCollection, whitehatBundleId, urlParams, r.req.URL.String(), body)

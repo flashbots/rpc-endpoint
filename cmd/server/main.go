@@ -106,23 +106,28 @@ func main() {
 	} else {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
+
+	var configurationWatcher *server.ConfigurationWatcher
+	// todo: setup configuration watcher
+
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(server.Configuration{
-		DB:                  db,
-		DrainAddress:        *drainAddress,
-		DrainSeconds:        *drainSeconds,
-		ListenAddress:       *listenAddress,
-		Logger:              logger,
-		ProxyTimeoutSeconds: *proxyTimeoutSeconds,
-		ProxyUrl:            *proxyUrl,
-		RedisUrl:            *redisUrl,
-		RelaySigningKey:     key,
-		RelayUrl:            *relayUrl,
-		Version:             version,
-		BuilderInfoSource:   *builderInfoSource,
-		FetchInfoInterval:   *fetchIntervalSeconds,
-		TTLCacheSeconds:     int64(*ttlCacheSeconds),
-		DefaultMempoolRPC:   defaultMempoolRPC,
+		DB:                   db,
+		DrainAddress:         *drainAddress,
+		DrainSeconds:         *drainSeconds,
+		ListenAddress:        *listenAddress,
+		Logger:               logger,
+		ProxyTimeoutSeconds:  *proxyTimeoutSeconds,
+		ProxyUrl:             *proxyUrl,
+		RedisUrl:             *redisUrl,
+		RelaySigningKey:      key,
+		RelayUrl:             *relayUrl,
+		Version:              version,
+		BuilderInfoSource:    *builderInfoSource,
+		FetchInfoInterval:    *fetchIntervalSeconds,
+		TTLCacheSeconds:      int64(*ttlCacheSeconds),
+		DefaultMempoolRPC:    defaultMempoolRPC,
+		ConfigurationWatcher: configurationWatcher,
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
