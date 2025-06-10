@@ -141,10 +141,12 @@ func (r *RpcRequestHandler) process() {
 	}
 	r.logger = r.logger.New("rpc_method", jsonReq.Method)
 
-	if r.configurationWatcher != nil {
-		r.logger.Info("url", "url", r.req.RequestURI, "url_raw", r.req.URL.RawQuery)
-		updated := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.URL.RawQuery)
+	if r.configurationWatcher != nil && jsonReq.Method == "eth_sendRawTransaction" {
+		origin := urlParams.originId
+		r.logger.Info("configuration_watcher_check", "url", r.req.RequestURI, "origin", origin)
+		updated := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.RequestURI)
 		if updated {
+			r.logger.Info("Configuration change detected", "origin", origin, "url", r.req.RequestURI)
 			metrics.ReportCustomerConfigWasUpdated(origin)
 		}
 	}

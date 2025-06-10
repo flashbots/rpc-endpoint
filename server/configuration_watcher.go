@@ -17,17 +17,17 @@ type CustomersConfig struct {
 // ConfigurationWatcher
 // all params are normilized
 type ConfigurationWatcher struct {
-	// customersConfig represents config for each custom with allowed list of configuration parameters
-	customersConfig CustomersConfig
+	// CustomersConfig represents config for each custom with allowed list of configuration parameters
+	CustomersConfig CustomersConfig
 }
 
 func NewConfigurationWatcher(customersConfig CustomersConfig) *ConfigurationWatcher {
-	return &ConfigurationWatcher{customersConfig: customersConfig}
+	return &ConfigurationWatcher{CustomersConfig: customersConfig}
 }
 
 func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) {
 	if fileName == "" {
-		return &ConfigurationWatcher{customersConfig: CustomersConfig{URLs: make(map[string][]string)}}, nil
+		return &ConfigurationWatcher{CustomersConfig: CustomersConfig{URLs: make(map[string][]string)}}, nil
 	}
 	data, err := os.ReadFile(fileName)
 	if err != nil {
@@ -39,11 +39,11 @@ func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &ConfigurationWatcher{customersConfig: config}, nil
+	return &ConfigurationWatcher{CustomersConfig: config}, nil
 }
 
 func (watcher *ConfigurationWatcher) IsConfigurationUpdated(customer string, url string) bool {
-	allowedUrls, ok := watcher.customersConfig.URLs[customer]
+	allowedUrls, ok := watcher.CustomersConfig.URLs[customer]
 	if !ok {
 		return false
 	}
