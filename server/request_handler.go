@@ -142,16 +142,10 @@ func (r *RpcRequestHandler) process() {
 	r.logger = r.logger.New("rpc_method", jsonReq.Method)
 
 	if r.configurationWatcher != nil {
-		updated, err := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.URL.Query())
-		if err == nil {
-			if updated {
-				customerName, err := r.configurationWatcher.GetCustomerByOrigin(urlParams.originId)
-				if err != nil {
-					r.logger.Error("[process] Invalid customer configuration config", "error", err)
-				} else {
-					metrics.ReportCustomerConfigWasUpdated(customerName)
-				}
-			}
+		r.logger.Info("url", "url", r.req.RequestURI, "url_raw", r.req.URL.RawQuery)
+		updated := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.URL.RawQuery)
+		if updated {
+			metrics.ReportCustomerConfigWasUpdated(origin)
 		}
 	}
 

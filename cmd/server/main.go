@@ -32,6 +32,7 @@ var (
 	defaultRpcTTLCacheSeconds       = 300
 	defaultMempoolRPC               = os.Getenv("DEFAULT_MEMPOOL_RPC")
 	defaultMetricsAddr              = os.Getenv("METRICS_ADDR")
+	defaultCustomerConfigFile       = os.Getenv("CUSTOMER_CONFIG")
 
 	// cli flags
 	versionPtr           = flag.Bool("version", false, "just print the program version")
@@ -107,7 +108,11 @@ func main() {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
 
-	var configurationWatcher *server.ConfigurationWatcher
+	configurationWatcher, err := server.ReadCustomerConfigFromFile(defaultCustomerConfigFile)
+	if err != nil {
+		logger.Crit("Customer config file is set, but file is invalid", "error", err)
+	}
+
 	// todo: setup configuration watcher
 
 	// Start the endpoint
