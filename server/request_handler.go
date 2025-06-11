@@ -134,7 +134,7 @@ func (r *RpcRequestHandler) process() {
 	// mev-share parameters
 	urlParams, err := ExtractParametersFromUrl(r.req.URL, r.builderNames)
 	if err != nil {
-		r.logger.Warn("[process] Invalid auction preference", "error", err)
+		r.logger.Warn("[process] Invalid auction preference", "error", err, "url", r.req.URL)
 		res := AuctionPreferenceErrorToJSONRPCResponse(jsonReq, err)
 		r._writeRpcResponse(res)
 		return
@@ -144,7 +144,7 @@ func (r *RpcRequestHandler) process() {
 	if r.configurationWatcher != nil && jsonReq.Method == "eth_sendRawTransaction" {
 		origin := urlParams.originId
 		r.logger.Info("configuration_watcher_check", "url", r.req.RequestURI, "origin", origin)
-		updated := r.configurationWatcher.IsConfigurationUpdated(origin, r.req.RequestURI)
+		updated := r.configurationWatcher.IsConfigurationUpdated(origin, urlParams)
 		if updated {
 			r.logger.Info("Configuration change detected", "origin", origin, "url", r.req.RequestURI)
 			metrics.ReportCustomerConfigWasUpdated(origin)

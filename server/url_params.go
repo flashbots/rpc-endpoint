@@ -27,12 +27,13 @@ var (
 )
 
 type URLParameters struct {
-	pref           types.PrivateTxPreferences
-	prefWasSet     bool
-	originId       string
-	fast           bool
-	blockRange     int
-	auctionTimeout uint64
+	pref                     types.PrivateTxPreferences
+	prefWasSet               bool
+	originId                 string
+	fast                     bool
+	blockRange               int
+	auctionTimeout           uint64
+	rawNormalizedQueryParams map[string][]string
 }
 
 // normalizeQueryParams takes a URL and returns a map of query parameters with all keys normalized to lowercase.
@@ -47,14 +48,14 @@ func normalizeQueryParams(url *url.URL) map[string][]string {
 }
 
 var allowedHints = map[string]struct{}{
-	"hash":              struct{}{},
-	"contract_address":  struct{}{},
-	"function_selector": struct{}{},
-	"logs":              struct{}{},
-	"calldata":          struct{}{},
-	"default_logs":      struct{}{},
-	"tx_hash":           struct{}{},
-	"full":              struct{}{},
+	"hash":              {},
+	"contract_address":  {},
+	"function_selector": {},
+	"logs":              {},
+	"calldata":          {},
+	"default_logs":      {},
+	"tx_hash":           {},
+	"full":              {},
 }
 
 // ExtractParametersFromUrl extracts the auction preference from the url query
@@ -72,6 +73,8 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 	// Normalize all query parameters to lowercase keys
 	normalizedQuery := normalizeQueryParams(reqUrl)
 
+	params.rawNormalizedQueryParams = normalizedQuery
+
 	var hint []string
 	hintQuery, ok := normalizedQuery["hint"]
 	if ok {
@@ -82,7 +85,6 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			// valid hints are: "hash", "contract_address", "function_selector", "logs", "calldata"
 			if _, ok := allowedHints[hint]; !ok {
 				return params, ErrIncorrectAuctionHints
-
 			}
 		}
 		hint = hintQuery

@@ -2,8 +2,8 @@ package server
 
 import (
 	"errors"
+	"net/url"
 	"os"
-	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,16 +18,32 @@ type CustomersConfig struct {
 // all params are normilized
 type ConfigurationWatcher struct {
 	// CustomersConfig represents config for each custom with allowed list of configuration parameters
-	CustomersConfig CustomersConfig
+	ParsedCustomersConfig map[string][]URLParameters
 }
 
-func NewConfigurationWatcher(customersConfig CustomersConfig) *ConfigurationWatcher {
-	return &ConfigurationWatcher{CustomersConfig: customersConfig}
+func NewConfigurationWatcher(customersConfig CustomersConfig) (*ConfigurationWatcher, error) {
+	parsedCustomersConfig := make(map[string][]URLParameters)
+	for k, v := range customersConfig.URLs {
+		var allowedConfigs []URLParameters
+		for _, rawUrl := range v {
+			parsedUrl, err := url.Parse(rawUrl)
+			if err != nil {
+				return nil, err
+			}
+			URLParam, err := ExtractParametersFromUrl(parsedUrl, nil)
+			if err != nil {
+				return nil, err
+			}
+			allowedConfigs = append(allowedConfigs, URLParam)
+		}
+		parsedCustomersConfig[k] = allowedConfigs
+	}
+	return &ConfigurationWatcher{ParsedCustomersConfig: parsedCustomersConfig}, nil
 }
 
 func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) {
 	if fileName == "" {
-		return &ConfigurationWatcher{CustomersConfig: CustomersConfig{URLs: make(map[string][]string)}}, nil
+		return &ConfigurationWatcher{ParsedCustomersConfig: make(map[string][]URLParameters)}, nil
 	}
 	data, err := os.ReadFile(fileName)
 	if err != nil {
@@ -39,13 +55,43 @@ func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &ConfigurationWatcher{CustomersConfig: config}, nil
+	return NewConfigurationWatcher(config)
 }
 
-func (watcher *ConfigurationWatcher) IsConfigurationUpdated(customer string, url string) bool {
-	allowedUrls, ok := watcher.CustomersConfig.URLs[customer]
+func (watcher *ConfigurationWatcher) IsConfigurationUpdated(customer string, urlParams URLParameters) bool {
+	allowedUrls, ok := watcher.ParsedCustomersConfig[customer]
 	if !ok {
 		return false
 	}
-	return !slices.Contains(allowedUrls, url)
+	for _, au := range allowedUrls {
+		if EquivalentURLParams(au, urlParams) {
+			return false
+		}
+	}
+	return true
+}
+
+func EquivalentURLParams(left URLParameters, right URLParameters) bool {
+	if left.fast != right.fast {
+		return false
+	}
+	if len(left.rawNormalizedQueryParams) != len(right.rawNormalizedQueryParams) {
+		return false
+	}
+
+	for k, v := range left.rawNormalizedQueryParams {
+		if k == "refund" {
+			continue
+		}
+		rightV := right.rawNormalizedQueryParams[k]
+		if len(rightV) != len(v) {
+			return false
+		}
+		for i := range v {
+			if v[i] != rightV[i] {
+				return false
+			}
+		}
+	}
+	return true
 }

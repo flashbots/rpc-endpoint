@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"encoding/json"
 	"flag"
 	"os"
 	"strconv"
@@ -114,8 +113,6 @@ func main() {
 	if err != nil {
 		logger.Crit("Customer config file is set, but file is invalid", "error", err)
 	}
-	bts, _ := json.Marshal(configurationWatcher.CustomersConfig)
-	logger.Info("Configuration fetched", "config_body", string(bts))
 
 	// todo: setup configuration watcher
 
