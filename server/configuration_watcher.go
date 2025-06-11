@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"maps"
 	"net/url"
 	"os"
 
@@ -72,18 +73,23 @@ func (watcher *ConfigurationWatcher) IsConfigurationUpdated(customer string, url
 }
 
 func EquivalentURLParams(left URLParameters, right URLParameters) bool {
+	leftParams := maps.Clone(left.rawNormalizedQueryParams)
+	delete(leftParams, "refund")
+	rightParams := maps.Clone(right.rawNormalizedQueryParams)
+	delete(rightParams, "refund")
+
 	if left.fast != right.fast {
 		return false
 	}
-	if len(left.rawNormalizedQueryParams) != len(right.rawNormalizedQueryParams) {
+	if len(leftParams) != len(rightParams) {
 		return false
 	}
 
-	for k, v := range left.rawNormalizedQueryParams {
+	for k, v := range leftParams {
 		if k == "refund" {
 			continue
 		}
-		rightV := right.rawNormalizedQueryParams[k]
+		rightV := rightParams[k]
 		if len(rightV) != len(v) {
 			return false
 		}
