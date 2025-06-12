@@ -14,6 +14,9 @@ var (
 
 	rpcNodeProxyClientErr = metrics.NewCounter("rpc_node_proxy_client_error_total")
 	rpcNodeProxyServerErr = metrics.NewCounter("rpc_node_proxy_server_error_total")
+
+	relayServerErr = metrics.NewCounter("relay_server_error_total")
+	relayClientErr = metrics.NewCounter("relay_client_error_total")
 )
 
 func IncDatabaseErr() {
@@ -36,6 +39,14 @@ func IncRPCNodeProxyClientErr() {
 // IncRPCNodeProxyServerErr increments server total errors counter when error caused on the server/transport layer
 func IncRPCNodeProxyServerErr() {
 	rpcNodeProxyServerErr.Inc()
+}
+
+func IncRelayServerErr() {
+	relayServerErr.Inc()
+}
+
+func IncRelayClientErr() {
+	relayClientErr.Inc()
 }
 
 func DefaultServer(addr string) *http.Server {

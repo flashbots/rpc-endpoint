@@ -342,9 +342,12 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.logger.Info("[sendTxToRelay] Relay error response", "error", err, "rawTx", r.rawTxHex)
+			metrics.IncRelayClientErr()
 		} else {
 			r.logger.Error("[sendTxToRelay] Relay call failed", "error", err, "rawTx", r.rawTxHex)
+			metrics.IncRelayServerErr()
 		}
+
 		// todo: we need to change the way we call bundle-relay-api as it's not json-rpc compatible so we don't get proper
 		// error code/text
 		r.writeRpcError("internal error", types.JsonRpcInternalError)
@@ -445,9 +448,11 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'
 			r.logger.Info("[cancelTx] Relay error response", "err", err, "rawTx", r.rawTxHex)
 			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
+			metrics.IncRelayClientErr()
 		} else {
 			r.logger.Error("[cancelTx] Relay call failed", "error", err, "rawTx", r.rawTxHex)
 			r.writeRpcError("internal server error", types.JsonRpcInternalError)
+			metrics.IncRelayServerErr()
 		}
 		return true
 	}
