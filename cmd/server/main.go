@@ -114,6 +114,8 @@ func main() {
 		logger.Crit("Customer config file is set, but file is invalid", "error", err)
 	}
 
+	metrics.InitCustomersConfigMetric(configurationWatcher.Customers()...)
+
 	// todo: setup configuration watcher
 
 	// Start the endpoint

@@ -72,6 +72,15 @@ func (watcher *ConfigurationWatcher) IsConfigurationUpdated(customer string, url
 	return true
 }
 
+func (watcher *ConfigurationWatcher) Customers() []string {
+	customers := make([]string, 0, len(watcher.ParsedCustomersConfig))
+	for k := range watcher.ParsedCustomersConfig {
+		customers = append(customers, k)
+	}
+
+	return customers
+}
+
 func EquivalentURLParams(left URLParameters, right URLParameters) bool {
 	leftParams := maps.Clone(left.rawNormalizedQueryParams)
 	delete(leftParams, "refund")
