@@ -8,19 +8,20 @@ import (
 )
 
 type Configuration struct {
-	DB                  database.Store
-	DrainAddress        string
-	DrainSeconds        int
-	ListenAddress       string
-	Logger              log.Logger
-	ProxyTimeoutSeconds int
-	ProxyUrl            string
-	RedisUrl            string
-	RelaySigningKey     *ecdsa.PrivateKey
-	RelayUrl            string
-	Version             string
-	BuilderInfoSource   string
-	FetchInfoInterval   int
-	TTLCacheSeconds     int64
-	DefaultMempoolRPC   string
+	DB                   database.Store
+	DrainAddress         string
+	DrainSeconds         int
+	ListenAddress        string
+	Logger               log.Logger
+	ProxyTimeoutSeconds  int
+	ProxyUrl             string
+	RedisUrl             string
+	RelaySigningKey      *ecdsa.PrivateKey
+	RelayUrl             string
+	Version              string
+	BuilderInfoSource    string
+	FetchInfoInterval    int
+	TTLCacheSeconds      int64
+	DefaultMempoolRPC    string
+	ConfigurationWatcher *ConfigurationWatcher
 }

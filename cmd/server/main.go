@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/server"
 )
 
@@ -30,6 +31,8 @@ var (
 	defaultFetchInfoIntervalSeconds = 600
 	defaultRpcTTLCacheSeconds       = 300
 	defaultMempoolRPC               = os.Getenv("DEFAULT_MEMPOOL_RPC")
+	defaultMetricsAddr              = os.Getenv("METRICS_ADDR")
+	defaultCustomerConfigFile       = os.Getenv("CUSTOMER_CONFIG")
 
 	// cli flags
 	versionPtr           = flag.Bool("version", false, "just print the program version")
@@ -104,28 +107,49 @@ func main() {
 	} else {
 		db = database.NewPostgresStore(*psqlDsn)
 	}
+
+	logger.Info("Reading customer config from file", "file", defaultCustomerConfigFile)
+	configurationWatcher, err := server.ReadCustomerConfigFromFile(defaultCustomerConfigFile)
+	if err != nil {
+		logger.Crit("Customer config file is set, but file is invalid", "error", err)
+	}
+
+	metrics.InitCustomersConfigMetric(configurationWatcher.Customers()...)
+
+	// todo: setup configuration watcher
+
 	// Start the endpoint
 	s, err := server.NewRpcEndPointServer(server.Configuration{
-		DB:                  db,
-		DrainAddress:        *drainAddress,
-		DrainSeconds:        *drainSeconds,
-		ListenAddress:       *listenAddress,
-		Logger:              logger,
-		ProxyTimeoutSeconds: *proxyTimeoutSeconds,
-		ProxyUrl:            *proxyUrl,
-		RedisUrl:            *redisUrl,
-		RelaySigningKey:     key,
-		RelayUrl:            *relayUrl,
-		Version:             version,
-		BuilderInfoSource:   *builderInfoSource,
-		FetchInfoInterval:   *fetchIntervalSeconds,
-		TTLCacheSeconds:     int64(*ttlCacheSeconds),
-		DefaultMempoolRPC:   defaultMempoolRPC,
+		DB:                   db,
+		DrainAddress:         *drainAddress,
+		DrainSeconds:         *drainSeconds,
+		ListenAddress:        *listenAddress,
+		Logger:               logger,
+		ProxyTimeoutSeconds:  *proxyTimeoutSeconds,
+		ProxyUrl:             *proxyUrl,
+		RedisUrl:             *redisUrl,
+		RelaySigningKey:      key,
+		RelayUrl:             *relayUrl,
+		Version:              version,
+		BuilderInfoSource:    *builderInfoSource,
+		FetchInfoInterval:    *fetchIntervalSeconds,
+		TTLCacheSeconds:      int64(*ttlCacheSeconds),
+		DefaultMempoolRPC:    defaultMempoolRPC,
+		ConfigurationWatcher: configurationWatcher,
 	})
 	if err != nil {
 		logger.Crit("Server init error", "error", err)
 	}
 	logger.Info("Starting rpc-endpoint...", "relayUrl", *relayUrl, "proxyUrl", *proxyUrl)
+
+	if defaultMetricsAddr != "" {
+		go func() {
+			if err := metrics.DefaultServer(defaultMetricsAddr).ListenAndServe(); err != nil {
+				log.Crit("metrics http server crashed", "err", err)
+			}
+		}()
+	}
+
 	s.Start()
 }
 

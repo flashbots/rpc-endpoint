@@ -42,23 +42,24 @@ type RpcEndPointServer struct {
 	server *http.Server
 	drain  *http.Server
 
-	drainAddress        string
-	drainSeconds        int
-	db                  database.Store
-	isHealthy           bool
-	isHealthyMx         sync.RWMutex
-	listenAddress       string
-	logger              log.Logger
-	proxyTimeoutSeconds int
-	proxyUrl            string
-	relaySigningKey     *ecdsa.PrivateKey
-	relayUrl            string
-	startTime           time.Time
-	version             string
-	builderNameProvider BuilderNameProvider
-	chainID             []byte
-	rpcCache            *application.RpcCache
-	defaultEthClient    *ethclient.Client
+	drainAddress         string
+	drainSeconds         int
+	db                   database.Store
+	isHealthy            bool
+	isHealthyMx          sync.RWMutex
+	listenAddress        string
+	logger               log.Logger
+	proxyTimeoutSeconds  int
+	proxyUrl             string
+	relaySigningKey      *ecdsa.PrivateKey
+	relayUrl             string
+	startTime            time.Time
+	version              string
+	builderNameProvider  BuilderNameProvider
+	chainID              []byte
+	rpcCache             *application.RpcCache
+	defaultEthClient     *ethclient.Client
+	configurationWatcher *ConfigurationWatcher
 }
 
 func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
@@ -101,22 +102,23 @@ func NewRpcEndPointServer(cfg Configuration) (*RpcEndPointServer, error) {
 		return nil, errors.Wrap(err, "ethclient.Dial error")
 	}
 	return &RpcEndPointServer{
-		db:                  cfg.DB,
-		drainAddress:        cfg.DrainAddress,
-		drainSeconds:        cfg.DrainSeconds,
-		isHealthy:           true,
-		listenAddress:       cfg.ListenAddress,
-		logger:              cfg.Logger,
-		proxyTimeoutSeconds: cfg.ProxyTimeoutSeconds,
-		proxyUrl:            cfg.ProxyUrl,
-		relaySigningKey:     cfg.RelaySigningKey,
-		relayUrl:            cfg.RelayUrl,
-		startTime:           Now(),
-		version:             cfg.Version,
-		chainID:             bts,
-		builderNameProvider: bis,
-		rpcCache:            rpcCache,
-		defaultEthClient:    ethCl,
+		db:                   cfg.DB,
+		drainAddress:         cfg.DrainAddress,
+		drainSeconds:         cfg.DrainSeconds,
+		isHealthy:            true,
+		listenAddress:        cfg.ListenAddress,
+		logger:               cfg.Logger,
+		proxyTimeoutSeconds:  cfg.ProxyTimeoutSeconds,
+		proxyUrl:             cfg.ProxyUrl,
+		relaySigningKey:      cfg.RelaySigningKey,
+		relayUrl:             cfg.RelayUrl,
+		startTime:            Now(),
+		version:              cfg.Version,
+		chainID:              bts,
+		builderNameProvider:  bis,
+		rpcCache:             rpcCache,
+		defaultEthClient:     ethCl,
+		configurationWatcher: cfg.ConfigurationWatcher,
 	}, nil
 }
 
@@ -179,9 +181,11 @@ func (s *RpcEndPointServer) startMainServer() {
 	mux.HandleFunc("/", s.HandleHttpRequest)
 	mux.HandleFunc("/health", s.handleHealthRequest)
 	mux.HandleFunc("/bundle", s.HandleBundleRequest)
+	wrappedRouter := MetricsMiddleware(mux)
+
 	s.server = &http.Server{
 		Addr:         s.listenAddress,
-		Handler:      mux,
+		Handler:      wrappedRouter,
 		WriteTimeout: 30 * time.Second,
 		ReadTimeout:  30 * time.Second,
 	}
@@ -250,7 +254,7 @@ func (s *RpcEndPointServer) HandleHttpRequest(respw http.ResponseWriter, req *ht
 		return
 	}
 
-	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache, s.defaultEthClient)
+	request := NewRpcRequestHandler(s.logger, &respw, req, s.proxyUrl, s.proxyTimeoutSeconds, s.relaySigningKey, s.relayUrl, s.db, s.builderNameProvider.BuilderNames(), s.chainID, s.rpcCache, s.defaultEthClient, s.configurationWatcher)
 	request.process()
 }
 

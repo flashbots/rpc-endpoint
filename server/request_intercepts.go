@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/types"
 )
 
@@ -33,6 +34,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 	// get tx status from private-tx-api
 	statusApiResponse, err := GetTxStatus(txHashLower)
 	if err != nil {
+		metrics.IncStatusEndpointErr()
 		r.logger.Error("[post_getTransactionReceipt] PrivateTxApi failed", "error", err)
 		return false
 	}
@@ -41,6 +43,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// if the tx failed then we want to reset the redis max nonce
 		maxNonce, found, err := RState.GetSenderMaxNonce(txFrom)
 		if err != nil {
+			metrics.IncRedisErr()
 			r.logger.Error("[post_getTransactionReceipt] GetSenderMaxNonce failed", "error", err)
 			return
 		}
@@ -54,6 +57,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		txNonce, _, _ := RState.GetNonceOfTxHash(txHash)
 		if maxNonce == txNonce {
 			if err := RState.DelSenderMaxNonce(txFrom); err != nil {
+				metrics.IncRedisErr()
 				r.logger.Error("[post_getTransactionReceipt] DelSenderMaxNonce failed", "error", err)
 			}
 		}
@@ -63,6 +67,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Get the sender of this transaction
 		txFromLower, txFromFound, err := RState.GetSenderOfTxHash(txHashLower)
 		if err != nil {
+			metrics.IncRedisErr()
 			r.logger.Error("[post_getTransactionReceipt] Redis:GetSenderOfTxHash failed", "error", err)
 			return
 		}
@@ -74,6 +79,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Check if nonceFix is already in place for this user
 		_, nonceFixAlreadyExists, err := RState.GetNonceFixForAccount(txFromLower)
 		if err != nil {
+			metrics.IncRedisErr()
 			r.logger.Error("[post_getTransactionReceipt] Redis:GetNonceFixForAccount failed", "error", err)
 			return
 		}
@@ -85,6 +91,7 @@ func (r *RpcRequest) check_post_getTransactionReceipt(jsonResp *types.JsonRpcRes
 		// Setup a new nonce-fix for this user
 		err = RState.SetNonceFixForAccount(txFromLower, 0)
 		if err != nil {
+			metrics.IncRedisErr()
 			r.logger.Error("[post_getTransactionReceipt] Redis error", "error", err)
 			return
 		}
@@ -124,6 +131,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	// Check if nonceFix is in place for this user
 	numTimesSent, nonceFixInPlace, err := RState.GetNonceFixForAccount(addr)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[eth_getTransactionCount] Redis:GetAccountWithNonceFix error:", "error", err)
 		return false
 	}
@@ -140,6 +148,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 
 	err = RState.SetNonceFixForAccount(addr, numTimesSent)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[eth_getTransactionCount] Redis:SetAccountWithNonceFix error", "error", err)
 		return false
 	}
@@ -151,6 +160,7 @@ func (r *RpcRequest) intercept_mm_eth_getTransactionCount() (requestFinished boo
 	resp := fmt.Sprintf("0x%x", wrongNonce)
 	r.writeRpcResult(resp)
 	r.logger.Info("[eth_getTransactionCount] Intercepted eth_getTransactionCount for", "address", addr)
+	metrics.IncMetamaskInterceptorWrongNonce()
 	return true
 }
 
@@ -211,6 +221,7 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 	// both the backend and our cache, and return the greater of the two
 	cachedNonce, found, err := RState.GetSenderMaxNonce(addr)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[eth_getTransactionCount] Redis:GetSenderMaxNonce error", "error", err)
 		return false
 	}
@@ -239,11 +250,17 @@ func (r *RpcRequest) intercept_signed_eth_getTransactionCount() (requestFinished
 
 	// return either the cached nonce plus one, or the backend tx count
 	txCount := cachedNonce + 1
+	// means there are troubles with uniswap integration
+	if txCount > backendTxCount+1 {
+		metrics.IncUniswapInterceptorNonceDiffTooHigh()
+	}
+
 	if backendTxCount > txCount {
 		txCount = backendTxCount
 		// since the cached value is invalid lets remove it from redis
 		r.logger.Info("[eth_getTransactionCount] intercept invalidated nonce", "addr", addr)
 		if err := RState.DelSenderMaxNonce(addr); err != nil {
+			metrics.IncRedisErr()
 			// log the error but continue
 			r.logger.Error("[eth_getTransactionCount] Redis:DelSenderMaxNonce error", "error", err, "addr", addr)
 		}

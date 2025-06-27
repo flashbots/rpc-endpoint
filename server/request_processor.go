@@ -18,6 +18,7 @@ import (
 	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/application"
 	"github.com/flashbots/rpc-endpoint/database"
+	"github.com/flashbots/rpc-endpoint/metrics"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -158,6 +159,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	timeProxyStart := Now() // for measuring execution time
 	body, err := json.Marshal(r.jsonReq)
 	if err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed to marshal request before making proxy request", "error", err)
 		return false
 	}
@@ -166,11 +168,8 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	proxyResp, err := r.client.ProxyRequest(body)
 	if err != nil {
 		r.logger.Error("[proxyRequestRead] Failed to make proxy request", "error", err, "response", proxyResp)
-		if proxyResp == nil {
-			return false
-		} else {
-			return false
-		}
+		metrics.IncRPCNodeProxyServerErr()
+		return false
 	}
 
 	// Afterwards, check time and result
@@ -181,6 +180,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	defer proxyResp.Body.Close()
 	proxyRespBody, err := io.ReadAll(proxyResp.Body)
 	if err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed to read proxy request body", "error", err)
 		return false
 	}
@@ -188,6 +188,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 	// Unmarshall JSON-RPC response and check for error inside
 	jsonRpcResp := new(types.JsonRpcResponse)
 	if err = json.Unmarshal(proxyRespBody, jsonRpcResp); err != nil {
+		metrics.IncRPCNodeProxyClientErr()
 		r.logger.Error("[proxyRequestRead] Failed decoding proxy json-rpc response", "error", err, "response", proxyRespBody)
 		return false
 	}
@@ -199,6 +200,7 @@ func (r *RpcRequest) proxyRequestRead() (readJsonRpsResponseSuccess bool) {
 func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 	timeSent, txWasSentToRelay, err := RState.GetTxSentToRelay(txHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[blockResendingTxToRelay] Redis:GetTxSentToRelay error", "error", err)
 		return false // don't block on redis error
 	}
@@ -244,6 +246,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	// mark tx as sent to relay
 	err := RState.SetTxSentToRelay(txHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[sendTxToRelay] Redis:SetTxSentToRelay failed", "error", err)
 	}
 
@@ -278,6 +281,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	// remember this tx based on from+nonce (for cancel-tx)
 	err = RState.SetTxHashForSenderAndNonce(r.txFrom, r.tx.Nonce(), txHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[sendTxToRelay] Redis:SetTxHashForSenderAndNonce failed", "error", err)
 	}
 
@@ -338,9 +342,12 @@ func (r *RpcRequest) sendTxToRelay() {
 	if err != nil {
 		if errors.Is(err, flashbotsrpc.ErrRelayErrorResponse) {
 			r.logger.Info("[sendTxToRelay] Relay error response", "error", err, "rawTx", r.rawTxHex)
+			metrics.IncRelayClientErr()
 		} else {
 			r.logger.Error("[sendTxToRelay] Relay call failed", "error", err, "rawTx", r.rawTxHex)
+			metrics.IncRelayServerErr()
 		}
+
 		// todo: we need to change the way we call bundle-relay-api as it's not json-rpc compatible so we don't get proper
 		// error code/text
 		r.writeRpcError("internal error", types.JsonRpcInternalError)
@@ -360,6 +367,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	// Get initial txHash by sender+nonce
 	initialTxHash, txHashFound, err := RState.GetTxHashForSenderAndNonce(txFromLower, r.tx.Nonce())
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[cancelTx] Redis:GetTxHashForSenderAndNonce failed", "error", err)
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
@@ -372,6 +380,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	// Check if initial tx was sent to relay
 	_, txWasSentToRelay, err := RState.GetTxSentToRelay(initialTxHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[cancelTx] Redis:GetTxSentToRelay failed", "error", err)
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
@@ -384,6 +393,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 	// Should send cancel-tx to relay. Check if cancel-tx was already sent before
 	_, cancelTxAlreadySentToRelay, err := RState.GetTxSentToRelay(cancelTxHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[cancelTx] Redis:GetTxSentToRelay error", "error", err)
 		r.writeRpcError("internal server error", types.JsonRpcInternalError)
 		return true
@@ -396,6 +406,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 
 	err = RState.SetTxSentToRelay(cancelTxHash)
 	if err != nil {
+		metrics.IncRedisErr()
 		r.logger.Error("[cancelTx] Redis:SetTxSentToRelay failed", "error", err)
 	}
 
@@ -421,6 +432,7 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 
 		err = ethCl.SendTransaction(context.Background(), r.tx)
 		if err != nil {
+			metrics.IncEthNodeClusterErr()
 			r.logger.Error("[cancelTx] SendTransaction failed", "error", err)
 			r.writeRpcError("proxying cancellation to mempool failed", types.JsonRpcInternalError)
 			return true
@@ -436,9 +448,11 @@ func (r *RpcRequest) handleCancelTx() (requestCompleted bool) {
 			// errors could be: 'tx not found', 'tx was already cancelled', 'tx has already expired'
 			r.logger.Info("[cancelTx] Relay error response", "err", err, "rawTx", r.rawTxHex)
 			r.writeRpcError(err.Error(), types.JsonRpcInternalError)
+			metrics.IncRelayClientErr()
 		} else {
 			r.logger.Error("[cancelTx] Relay call failed", "error", err, "rawTx", r.rawTxHex)
 			r.writeRpcError("internal server error", types.JsonRpcInternalError)
+			metrics.IncRelayServerErr()
 		}
 		return true
 	}
