@@ -116,6 +116,7 @@ type TxPrivacyPreferences struct {
 	Hints          []string `json:"hints"`
 	Builders       []string `json:"builders"`
 	UseMempool     bool     `json:"useMempool"`
+	AllowBob       bool     `json:"allowBob,omitempty"`
 	MempoolRPC     string   `json:"mempoolRpc"`
 	AuctionTimeout uint64   `json:"auctionTimeout,omitempty"`
 }
