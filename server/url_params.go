@@ -22,6 +22,7 @@ var (
 	ErrIncorrectOriginId                   = errors.New("Incorrect origin id, must be less then 255 char.")
 	ErrIncorrectRefundQuery                = errors.New("Incorrect refund query, must be 0xaddress:percentage.")
 	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
+	ErrUnsupportedRefundKeyword            = errors.New("Unsupported refund keyword (only 'origin' is supported).")
 	ErrIncorrectRefundPercentageQuery      = errors.New("Incorrect refund percentage.")
 	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be bellow 100%.")
 )
@@ -122,8 +123,9 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		}
 
 		var (
-			addresses = make([]common.Address, len(refundAddressQuery))
-			percents  = make([]int, len(refundAddressQuery))
+			addresses  = make([]common.Address, len(refundAddressQuery))
+			percents   = make([]int, len(refundAddressQuery))
+			isKeywords = make([]bool, len(refundAddressQuery))
 		)
 
 		for i, refundAddress := range refundAddressQuery {
@@ -131,10 +133,20 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			if len(split) != 2 {
 				return params, ErrIncorrectRefundQuery
 			}
-			if !common.IsHexAddress(split[0]) {
-				return params, ErrIncorrectRefundAddressQuery
+
+			addressPart := strings.ToLower(split[0])
+			if addressPart == "origin" {
+				isKeywords[i] = true
+				addresses[i] = common.Address{}
+			} else if !common.IsHexAddress(split[0]) {
+				if strings.HasPrefix(addressPart, "0x") {
+					return params, ErrIncorrectRefundAddressQuery
+				}
+				return params, ErrUnsupportedRefundKeyword
+			} else {
+				addresses[i] = common.HexToAddress(split[0])
 			}
-			address := common.HexToAddress(split[0])
+
 			percent, err := strconv.Atoi(split[1])
 			if err != nil {
 				return params, ErrIncorrectRefundPercentageQuery
@@ -142,7 +154,6 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			if percent <= 0 || percent >= 100 {
 				return params, ErrIncorrectRefundPercentageQuery
 			}
-			addresses[i] = address
 			percents[i] = percent
 		}
 
@@ -158,8 +169,9 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		refundConfig := make([]types.RefundConfig, len(percents))
 		for i, percent := range percents {
 			refundConfig[i] = types.RefundConfig{
-				Address: addresses[i],
-				Percent: percent,
+				Address:   addresses[i],
+				Percent:   percent,
+				IsKeyword: isKeywords[i],
 			}
 		}
 
