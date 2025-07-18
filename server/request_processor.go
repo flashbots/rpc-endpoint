@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/flashbots/rpc-endpoint/adapters/flashbots"
 	"github.com/flashbots/rpc-endpoint/application"
@@ -297,8 +298,37 @@ func (r *RpcRequest) sendTxToRelay() {
 	}
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
+
+	// Check if we need to replace any "origin" keywords
+	needsKeywordReplacement := false
+	for _, refund := range r.urlParams.pref.Validity.Refund {
+		if refund.IsKeyword {
+			needsKeywordReplacement = true
+			break
+		}
+	}
+
+	if needsKeywordReplacement {
+		// Create a copy of preferences to preserve original URL params
+		prefCopy := r.urlParams.pref
+		prefCopy.Validity.Refund = make([]types.RefundConfig, len(r.urlParams.pref.Validity.Refund))
+
+		for i, refund := range r.urlParams.pref.Validity.Refund {
+			if refund.IsKeyword {
+				prefCopy.Validity.Refund[i] = types.RefundConfig{
+					Address: common.HexToAddress(r.txFrom),
+					Percent: refund.Percent,
+				}
+			} else {
+				prefCopy.Validity.Refund[i] = refund
+			}
+		}
+		sendPrivateTxArgs.Preferences = &prefCopy
+	} else {
+		sendPrivateTxArgs.Preferences = &r.urlParams.pref
+	}
+
 	sendPrivateTxArgs.Tx = r.rawTxHex
-	sendPrivateTxArgs.Preferences = &r.urlParams.pref
 	if r.urlParams.fast {
 		if len(sendPrivateTxArgs.Preferences.Validity.Refund) == 0 {
 			addr, err := GetSenderAddressFromTx(r.tx)
