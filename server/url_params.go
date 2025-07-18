@@ -123,9 +123,8 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		}
 
 		var (
-			addresses  = make([]common.Address, len(refundAddressQuery))
-			percents   = make([]int, len(refundAddressQuery))
-			isKeywords = make([]bool, len(refundAddressQuery))
+			addresses = make([]common.Address, len(refundAddressQuery))
+			percents  = make([]int, len(refundAddressQuery))
 		)
 
 		for i, refundAddress := range refundAddressQuery {
@@ -136,7 +135,6 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 
 			addressPart := strings.ToLower(split[0])
 			if addressPart == "origin" {
-				isKeywords[i] = true
 				addresses[i] = common.Address{}
 			} else if !common.IsHexAddress(split[0]) {
 				if strings.HasPrefix(addressPart, "0x") {
@@ -169,9 +167,8 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		refundConfig := make([]types.RefundConfig, len(percents))
 		for i, percent := range percents {
 			refundConfig[i] = types.RefundConfig{
-				Address:   addresses[i],
-				Percent:   percent,
-				IsKeyword: isKeywords[i],
+				Address: addresses[i],
+				Percent: percent,
 			}
 		}
 

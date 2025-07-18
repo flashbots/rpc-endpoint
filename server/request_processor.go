@@ -299,10 +299,10 @@ func (r *RpcRequest) sendTxToRelay() {
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 
-	// Check if we need to replace any "origin" keywords
+	// Check if we need to replace the null address (origin placeholder)
 	needsKeywordReplacement := false
 	for _, refund := range r.urlParams.pref.Validity.Refund {
-		if refund.IsKeyword {
+		if refund.Address == (common.Address{}) {
 			needsKeywordReplacement = true
 			break
 		}
@@ -314,7 +314,7 @@ func (r *RpcRequest) sendTxToRelay() {
 		prefCopy.Validity.Refund = make([]types.RefundConfig, len(r.urlParams.pref.Validity.Refund))
 
 		for i, refund := range r.urlParams.pref.Validity.Refund {
-			if refund.IsKeyword {
+			if refund.Address == (common.Address{}) {
 				prefCopy.Validity.Refund[i] = types.RefundConfig{
 					Address: common.HexToAddress(r.txFrom),
 					Percent: refund.Percent,

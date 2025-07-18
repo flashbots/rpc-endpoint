@@ -248,7 +248,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 						Hints: []string{"hash", "special_logs"},
 					},
 					Validity: types.TxValidityPreferences{
-						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50, IsKeyword: true}},
+						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50}},
 					},
 				},
 				prefWasSet: false,
@@ -264,7 +264,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 						Hints: []string{"hash", "special_logs"},
 					},
 					Validity: types.TxValidityPreferences{
-						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50, IsKeyword: true}},
+						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50}},
 					},
 				},
 				prefWasSet: false,
@@ -281,8 +281,8 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 					},
 					Validity: types.TxValidityPreferences{
 						Refund: []types.RefundConfig{
-							{Address: common.Address{}, Percent: 30, IsKeyword: true},
-							{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 50, IsKeyword: false},
+							{Address: common.Address{}, Percent: 30},
+							{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 50},
 						},
 					},
 				},
