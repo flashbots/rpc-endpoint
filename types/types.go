@@ -126,8 +126,9 @@ type TxValidityPreferences struct {
 }
 
 type RefundConfig struct {
-	Address common.Address `json:"address"`
-	Percent int            `json:"percent"`
+	Address   common.Address `json:"address"`
+	Percent   int            `json:"percent"`
+	IsKeyword bool           `json:"-"` // Don't serialize to JSON
 }
 
 type PrivateTxPreferences struct {
