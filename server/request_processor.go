@@ -229,6 +229,22 @@ func (r *RpcRequest) blockResendingTxToRelay(txHash string) bool {
 	}
 }
 
+// replaceZeroRefund replaces null addresses (origin placeholders) with the sender address
+func replaceZeroRefund(refunds []types.RefundConfig, sender common.Address) []types.RefundConfig {
+	result := make([]types.RefundConfig, len(refunds))
+	for i, refund := range refunds {
+		if refund.Address == (common.Address{}) {
+			result[i] = types.RefundConfig{
+				Address: sender,
+				Percent: refund.Percent,
+			}
+		} else {
+			result[i] = refund
+		}
+	}
+	return result
+}
+
 // Send tx to relay and finish request (write response)
 func (r *RpcRequest) sendTxToRelay() {
 	txHash := strings.ToLower(r.tx.Hash().Hex())
@@ -298,37 +314,14 @@ func (r *RpcRequest) sendTxToRelay() {
 	}
 
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
-
-	// Check if we need to replace the null address (origin placeholder)
-	needsKeywordReplacement := false
-	for _, refund := range r.urlParams.pref.Validity.Refund {
-		if refund.Address == (common.Address{}) {
-			needsKeywordReplacement = true
-			break
-		}
-	}
-
-	if needsKeywordReplacement {
-		// Create a copy of preferences to preserve original URL params
-		prefCopy := r.urlParams.pref
-		prefCopy.Validity.Refund = make([]types.RefundConfig, len(r.urlParams.pref.Validity.Refund))
-
-		for i, refund := range r.urlParams.pref.Validity.Refund {
-			if refund.Address == (common.Address{}) {
-				prefCopy.Validity.Refund[i] = types.RefundConfig{
-					Address: common.HexToAddress(r.txFrom),
-					Percent: refund.Percent,
-				}
-			} else {
-				prefCopy.Validity.Refund[i] = refund
-			}
-		}
-		sendPrivateTxArgs.Preferences = &prefCopy
-	} else {
-		sendPrivateTxArgs.Preferences = &r.urlParams.pref
-	}
-
 	sendPrivateTxArgs.Tx = r.rawTxHex
+	sendPrivateTxArgs.Preferences = &r.urlParams.pref
+	
+	// Replace null addresses (origin placeholders) with sender if needed
+	if len(r.urlParams.pref.Validity.Refund) > 0 {
+		sender := common.HexToAddress(r.txFrom)
+		r.urlParams.pref.Validity.Refund = replaceZeroRefund(r.urlParams.pref.Validity.Refund, sender)
+	}
 	if r.urlParams.fast {
 		if len(sendPrivateTxArgs.Preferences.Validity.Refund) == 0 {
 			addr, err := GetSenderAddressFromTx(r.tx)
