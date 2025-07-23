@@ -240,6 +240,66 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			},
 			err: nil,
 		},
+		"origin keyword refund": {
+			url: "https://rpc.flashbots.net?refund=origin:50",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{
+						Hints: []string{"hash", "special_logs"},
+					},
+					Validity: types.TxValidityPreferences{
+						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50}},
+					},
+				},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"origin keyword case insensitive": {
+			url: "https://rpc.flashbots.net?refund=Origin:50",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{
+						Hints: []string{"hash", "special_logs"},
+					},
+					Validity: types.TxValidityPreferences{
+						Refund: []types.RefundConfig{{Address: common.Address{}, Percent: 50}},
+					},
+				},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"origin keyword mixed with address": {
+			url: "https://rpc.flashbots.net?refund=origin:30&refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:50",
+			want: URLParameters{
+				pref: types.PrivateTxPreferences{
+					Privacy: types.TxPrivacyPreferences{
+						Hints: []string{"hash", "special_logs"},
+					},
+					Validity: types.TxValidityPreferences{
+						Refund: []types.RefundConfig{
+							{Address: common.Address{}, Percent: 30},
+							{Address: common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Percent: 50},
+						},
+					},
+				},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: nil,
+		},
+		"invalid keyword refund": {
+			url: "https://rpc.flashbots.net?refund=sender:50",
+			want: URLParameters{
+				pref:       types.PrivateTxPreferences{},
+				prefWasSet: false,
+				originId:   "",
+			},
+			err: ErrUnsupportedRefundKeyword,
+		},
 	}
 
 	for name, tt := range tests {
