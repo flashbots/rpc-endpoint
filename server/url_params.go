@@ -11,6 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	OriginKeyword = "origin"
+)
+
 var (
 	DefaultAuctionHint = []string{"hash", "special_logs"}
 
@@ -134,15 +138,19 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			}
 
 			addressPart := strings.ToLower(split[0])
-			if addressPart == "origin" {
+			
+			// Handle origin keyword
+			if addressPart == OriginKeyword {
 				addresses[i] = common.Address{}
-			} else if !common.IsHexAddress(split[0]) {
-				if strings.HasPrefix(addressPart, "0x") {
-					return params, ErrIncorrectRefundAddressQuery
-				}
-				return params, ErrUnsupportedRefundKeyword
-			} else {
+			} else if common.IsHexAddress(split[0]) {
+				// Handle valid hex address
 				addresses[i] = common.HexToAddress(split[0])
+			} else if strings.HasPrefix(addressPart, "0x") {
+				// Malformed address (starts with 0x but not valid)
+				return params, ErrIncorrectRefundAddressQuery
+			} else {
+				// Unsupported keyword
+				return params, ErrUnsupportedRefundKeyword
 			}
 
 			percent, err := strconv.Atoi(split[1])
