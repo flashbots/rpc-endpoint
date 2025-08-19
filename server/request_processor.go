@@ -48,6 +48,7 @@ type RpcRequest struct {
 	chainID                    []byte
 	rpcCache                   *application.RpcCache
 	flashbotsSigningAddress    string
+	maxBlockNumberOverride     uint64
 }
 
 func NewRpcRequest(
@@ -110,6 +111,9 @@ func (r *RpcRequest) ProcessRequest() *types.JsonRpcResponse {
 	case r.jsonReq.Method == "eth_sendRawTransaction":
 		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
 		r.handle_sendRawTransaction()
+	case r.jsonReq.Method == "eth_sendPrivateTransaction":
+		r.ethSendRawTxEntry.WhiteHatBundleId = r.whitehatBundleId
+		r.handle_sendPrivateTransaction()
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_signed_eth_getTransactionCount():
 	case r.jsonReq.Method == "eth_getTransactionCount" && r.intercept_mm_eth_getTransactionCount(): // intercept if MM needs to show an error to user
 	case r.jsonReq.Method == "eth_call" && r.intercept_eth_call_to_FlashRPC_Contract(): // intercept if Flashbots isRPC contract
@@ -320,7 +324,9 @@ func (r *RpcRequest) sendTxToRelay() {
 		sendPrivateTxArgs.Preferences.Privacy.AuctionTimeout = r.urlParams.auctionTimeout
 	}
 
-	if r.urlParams.blockRange > 0 {
+	if r.maxBlockNumberOverride > 0 {
+		sendPrivateTxArgs.MaxBlockNumber = r.maxBlockNumberOverride
+	} else if r.urlParams.blockRange > 0 {
 		bn, err := r.defaultEthClient.BlockNumber(context.Background())
 		if err != nil {
 			r.logger.Error("[sendTxToRelay] BlockNumber failed", "error", err)

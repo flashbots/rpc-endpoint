@@ -617,6 +617,22 @@ func TestWhitehatBundleCollectionGetBalance(t *testing.T) {
 	require.Equal(t, "0x56bc75e2d63100000", val)
 }
 
+func TestSendPrivateTransaction(t *testing.T) {
+	testServerSetupWithMockStore()
+
+	req := types.NewJsonRpcRequest(1, "eth_sendPrivateTransaction", []interface{}{
+		testutils.TestTx_BundleFailedTooManyTimes_RawTx,
+	})
+	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, req)
+	require.Nil(t, r1.Error)
+
+	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+
+	var res string
+	json.Unmarshal(r1.Result, &res)
+	require.Equal(t, testutils.TestTx_BundleFailedTooManyTimes_Hash, res)
+}
+
 func Test_StoreRequests(t *testing.T) {
 	// Store setup
 	memStore := database.NewMemStore()
