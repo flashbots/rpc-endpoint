@@ -183,7 +183,7 @@ func (r *RpcRequestHandler) finishRequest() {
 	go func() {
 		// Save both request entry and raw tx entries if present
 		if err := r.requestRecord.SaveRecord(); err != nil {
-			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err, "requestId", r.uid)
+			log.Error("saveRecord failed", "requestId", r.requestRecord.requestEntry.Id, "error", err)
 		}
 	}()
 	r.logger.Info("Request finished", "duration", reqDuration.Seconds())
