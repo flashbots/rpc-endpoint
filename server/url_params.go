@@ -69,6 +69,7 @@ var allowedHints = map[string]struct{}{
 func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URLParameters, err error) {
 	if strings.HasPrefix(reqUrl.Path, "/fast") {
 		params.fast = true
+		params.pref.Privacy.AllowTEE = true
 	}
 	// Normalize all query parameters to lowercase keys
 	normalizedQuery := normalizeQueryParams(reqUrl)
@@ -209,7 +210,7 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		if err != nil {
 			return params, ErrIncorrectURLParam
 		}
-		params.pref.Privacy.AllowBob = allowBobValue
+		params.pref.Privacy.AllowTEE = allowBobValue
 	}
 
 	return params, nil

@@ -86,10 +86,12 @@ type TransactionReceipt struct {
 
 type PrivateTxStatus string
 
-var TxStatusUnknown PrivateTxStatus = "UNKNOWN"
-var TxStatusPending PrivateTxStatus = "PENDING"
-var TxStatusIncluded PrivateTxStatus = "INCLUDED"
-var TxStatusFailed PrivateTxStatus = "FAILED"
+var (
+	TxStatusUnknown  PrivateTxStatus = "UNKNOWN"
+	TxStatusPending  PrivateTxStatus = "PENDING"
+	TxStatusIncluded PrivateTxStatus = "INCLUDED"
+	TxStatusFailed   PrivateTxStatus = "FAILED"
+)
 
 type PrivateTxApiResponse struct {
 	Status         PrivateTxStatus `json:"status"`
@@ -116,7 +118,7 @@ type TxPrivacyPreferences struct {
 	Hints          []string `json:"hints"`
 	Builders       []string `json:"builders"`
 	UseMempool     bool     `json:"useMempool"`
-	AllowBob       bool     `json:"allowBob,omitempty"`
+	AllowTEE       bool     `json:"allowTee,omitempty"`
 	MempoolRPC     string   `json:"mempoolRpc"`
 	AuctionTimeout uint64   `json:"auctionTimeout,omitempty"`
 }
