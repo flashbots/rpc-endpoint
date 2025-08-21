@@ -191,7 +191,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net/fast",
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
-					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}, AllowTEE: true},
 					Fast:    true,
 				},
 				prefWasSet: false,
@@ -204,7 +204,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net/fast?builder=builder3&builder=builder4",
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
-					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}},
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"hash", "special_logs"}, Builders: []string{"builder1", "builder2"}, AllowTEE: true},
 					Fast:    true,
 				},
 				prefWasSet: false,
@@ -217,7 +217,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net/fast?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash",
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
-					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}},
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}, AllowTEE: true},
 					Fast:    true,
 				},
 				prefWasSet: true,
@@ -230,7 +230,7 @@ func TestExtractAuctionPreferenceFromUrl(t *testing.T) {
 			url: "https://rpc.flashbots.net/fast?hint=contract_address&hint=function_selector&hint=logs&hint=calldata&hint=hash&auctionTimeout=1000",
 			want: URLParameters{
 				pref: types.PrivateTxPreferences{
-					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}},
+					Privacy: types.TxPrivacyPreferences{Hints: []string{"contract_address", "function_selector", "logs", "calldata", "hash"}, Builders: []string{"builder1", "builder2"}, AllowTEE: true},
 					Fast:    true,
 				},
 				prefWasSet:     true,

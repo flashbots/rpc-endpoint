@@ -204,7 +204,7 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 		}
 		params.auctionTimeout = uint64(timeout)
 	}
-	allowBob := normalizedQuery["allowbob"]
+	allowBob := normalizedQuery["allowtee"]
 	if len(allowBob) != 0 {
 		allowBobValue, err := strconv.ParseBool(allowBob[0])
 		if err != nil {
