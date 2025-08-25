@@ -1,0 +1,77 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "Protect API",
+    "description": "APIs that Protect API Serves without proxying upstream to a provider",
+    "version": "1.0.0"
+  },
+  "methods": [
+    {
+      "name": "eth_sendPrivateTransaction",
+      "description": "Send a single private transaction. Private transactions are sent directly to validators and not included in the public mempool.",
+      "params": [
+        {
+          "name": "TransactionString",
+          "description": "The raw signed transaction",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "MaxBlockNumber",
+          "description": "Highest block number that the block can be included in",
+          "schema": {
+            "type": "string",
+            "format": "^0x(0|[1-9a-f][0-9a-f]*)$"
+          }
+        },
+        {
+          "name": "Preferences",
+          "description": "Transaction preferences",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "fast": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "TransactionHash",
+        "schema": {
+          "title": "32 byte hex value",
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        }
+      },
+      "examples": [
+        {
+          "name": "sendPrivateTransactionExample",
+          "params": [
+            {
+              "name": "TransactionString",
+              "value": "0x02f87205158459682f00850c51e9727a82520894477db63b8e73aea96f201c3c4f5e8fbfcdd18b5c87038d7ea4c6800080c080a0312d6375e578ab953a41456d4be583a46dced97a9e38f349bb8e7b63d14cfc1ea001daea40332180670568a1864e6d3f910b194903128d4a0a5c499597f3f6ff40"
+            },
+            {
+              "name": "MaxBlockNumber",
+              "value": "0x2540be400"
+            },
+            {
+              "name": "Preferences",
+              "value": {
+                "fast": true
+              }
+            }
+          ],
+          "result": {
+            "name": "ResultExample",
+            "value": "0xb1770efb14906e509893b6190359658208ae64d0c56e22f748a1b0869885559e"
+          }
+        }
+      ]
+    }
+  ]
+}
