@@ -11,6 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	OriginKeyword = "origin"
+)
+
 var (
 	DefaultAuctionHint = []string{"hash", "special_logs"}
 
@@ -22,6 +26,7 @@ var (
 	ErrIncorrectOriginId                   = errors.New("Incorrect origin id, must be less then 255 char.")
 	ErrIncorrectRefundQuery                = errors.New("Incorrect refund query, must be 0xaddress:percentage.")
 	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
+	ErrUnsupportedRefundKeyword            = errors.New("Unsupported refund keyword (only 'origin' is supported).")
 	ErrIncorrectRefundPercentageQuery      = errors.New("Incorrect refund percentage.")
 	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be bellow 100%.")
 )
@@ -132,10 +137,23 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			if len(split) != 2 {
 				return params, ErrIncorrectRefundQuery
 			}
-			if !common.IsHexAddress(split[0]) {
+
+			addressPart := strings.ToLower(split[0])
+			
+			// Handle origin keyword
+			if addressPart == OriginKeyword {
+				addresses[i] = common.Address{}
+			} else if common.IsHexAddress(split[0]) {
+				// Handle valid hex address
+				addresses[i] = common.HexToAddress(split[0])
+			} else if strings.HasPrefix(addressPart, "0x") {
+				// Malformed address (starts with 0x but not valid)
 				return params, ErrIncorrectRefundAddressQuery
+			} else {
+				// Unsupported keyword
+				return params, ErrUnsupportedRefundKeyword
 			}
-			address := common.HexToAddress(split[0])
+
 			percent, err := strconv.Atoi(split[1])
 			if err != nil {
 				return params, ErrIncorrectRefundPercentageQuery
@@ -143,7 +161,6 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			if percent <= 0 || percent >= 100 {
 				return params, ErrIncorrectRefundPercentageQuery
 			}
-			addresses[i] = address
 			percents[i] = percent
 		}
 

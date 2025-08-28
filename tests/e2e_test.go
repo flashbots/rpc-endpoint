@@ -731,3 +731,38 @@ func Test_StoreValidateTxs(t *testing.T) {
 	}
 
 }
+
+// Test that origin keyword in refund config is replaced with sender address
+func TestOriginKeywordRefund(t *testing.T) {
+	testServerSetupWithMockStore()
+
+	tx := testutils.TestTx_BundleFailedTooManyTimes_RawTx
+	// sendRawTransaction with origin keyword
+	reqSendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{tx})
+	// call rpc with origin keyword in refund
+	r1 := testutils.SendRpcWithAuctionPreferenceAndParseResponse(t, reqSendRawTransaction, "/?refund=origin:50&refund=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:30")
+	require.Nil(t, r1.Error)
+
+	// Ensure that request called eth_sendPrivateTransaction with correct param
+	require.Equal(t, "eth_sendPrivateTransaction", testutils.MockBackendLastJsonRpcRequest.Method)
+
+	resp := testutils.MockBackendLastJsonRpcRequest.Params[0].(map[string]interface{})
+	require.Equal(t, tx, resp["tx"])
+
+	// Verify refund config was sent with actual sender address, not "origin" keyword
+	preferences := resp["preferences"].(map[string]interface{})
+	validity := preferences["validity"].(map[string]interface{})
+	refundConfigs := validity["refund"].([]interface{})
+
+	require.Equal(t, 2, len(refundConfigs))
+
+	// First refund should have the sender address (from testutils.TestTx_BundleFailedTooManyTimes_From)
+	refund0 := refundConfigs[0].(map[string]interface{})
+	require.Equal(t, strings.ToLower(testutils.TestTx_BundleFailedTooManyTimes_From), strings.ToLower(refund0["address"].(string)))
+	require.Equal(t, float64(50), refund0["percent"].(float64))
+
+	// Second refund should have the specified address
+	refund1 := refundConfigs[1].(map[string]interface{})
+	require.Equal(t, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", strings.ToLower(refund1["address"].(string)))
+	require.Equal(t, float64(30), refund1["percent"].(float64))
+}
