@@ -2,17 +2,20 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"net/url"
 	"os"
 
+	"github.com/ethereum/go-ethereum/log"
 	"gopkg.in/yaml.v3"
 )
 
 var ErrCustomerNotConfigured = errors.New("customer is not configured")
 
 type CustomersConfig struct {
-	URLs map[string][]string `yaml:"urls"`
+	URLs    map[string][]string `yaml:"urls"`
+	Presets map[string]string   `yaml:"presets,omitempty"`
 }
 
 // ConfigurationWatcher
@@ -20,31 +23,64 @@ type CustomersConfig struct {
 type ConfigurationWatcher struct {
 	// CustomersConfig represents config for each custom with allowed list of configuration parameters
 	ParsedCustomersConfig map[string][]URLParameters
+	// ParsedPresets contains pre-parsed preset configurations for header-based override
+	ParsedPresets map[string]URLParameters
+}
+
+// parseURLToParameters converts a raw URL string to URLParameters
+func parseURLToParameters(rawURL string) (URLParameters, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return URLParameters{}, fmt.Errorf("failed to parse URL: %w", err)
+	}
+	
+	params, err := ExtractParametersFromUrl(parsedURL, nil)
+	if err != nil {
+		return URLParameters{}, fmt.Errorf("failed to extract parameters: %w", err)
+	}
+	
+	return params, nil
 }
 
 func NewConfigurationWatcher(customersConfig CustomersConfig) (*ConfigurationWatcher, error) {
 	parsedCustomersConfig := make(map[string][]URLParameters)
-	for k, v := range customersConfig.URLs {
-		var allowedConfigs []URLParameters
-		for _, rawUrl := range v {
-			parsedUrl, err := url.Parse(rawUrl)
+	for customerID, urls := range customersConfig.URLs {
+		allowedConfigs := make([]URLParameters, 0, len(urls))
+		for _, rawURL := range urls {
+			urlParam, err := parseURLToParameters(rawURL)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("invalid URL for customer %s: %w", customerID, err)
 			}
-			URLParam, err := ExtractParametersFromUrl(parsedUrl, nil)
-			if err != nil {
-				return nil, err
-			}
-			allowedConfigs = append(allowedConfigs, URLParam)
+			allowedConfigs = append(allowedConfigs, urlParam)
 		}
-		parsedCustomersConfig[k] = allowedConfigs
+		parsedCustomersConfig[customerID] = allowedConfigs
 	}
-	return &ConfigurationWatcher{ParsedCustomersConfig: parsedCustomersConfig}, nil
+	
+	// Parse presets for header-based override
+	parsedPresets := make(map[string]URLParameters)
+	for originID, presetURL := range customersConfig.Presets {
+		params, err := parseURLToParameters(presetURL)
+		if err != nil {
+			// Log error but continue - graceful degradation
+			log.Error("Failed to parse preset configuration", "originID", originID, "url", presetURL, "error", err)
+			continue
+		}
+		parsedPresets[originID] = params
+		log.Info("Loaded preset configuration", "originID", originID)
+	}
+	
+	return &ConfigurationWatcher{
+		ParsedCustomersConfig: parsedCustomersConfig,
+		ParsedPresets:        parsedPresets,
+	}, nil
 }
 
 func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) {
 	if fileName == "" {
-		return &ConfigurationWatcher{ParsedCustomersConfig: make(map[string][]URLParameters)}, nil
+		return &ConfigurationWatcher{
+			ParsedCustomersConfig: make(map[string][]URLParameters),
+			ParsedPresets:        make(map[string]URLParameters),
+		}, nil
 	}
 	data, err := os.ReadFile(fileName)
 	if err != nil {
