@@ -73,6 +73,21 @@ func NewRpcRequestHandler(
 	}
 }
 
+// getEffectiveParameters determines the URL parameters to use for this request.
+// It checks for header-based preset override first, then falls back to URL parsing.
+func (r *RpcRequestHandler) getEffectiveParameters() (URLParameters, error) {
+	// Check for header-based preset override
+	if originID := r.req.Header.Get("X-Flashbots-Origin-ID"); originID != "" && r.configurationWatcher != nil {
+		if preset, exists := r.configurationWatcher.ParsedPresets[originID]; exists {
+			r.logger.Info("Using preset configuration", "originID", originID)
+			return preset, nil
+		}
+		r.logger.Info("Header present but no preset found", "originID", originID)
+	}
+	// Fall back to URL parsing
+	return ExtractParametersFromUrl(r.req.URL, r.builderNames)
+}
+
 // nolint
 func (r *RpcRequestHandler) process() {
 	r.logger = r.logger.New("uid", r.uid)
@@ -132,7 +147,7 @@ func (r *RpcRequestHandler) process() {
 	}
 
 	// mev-share parameters
-	urlParams, err := ExtractParametersFromUrl(r.req.URL, r.builderNames)
+	urlParams, err := r.getEffectiveParameters()
 	if err != nil {
 		r.logger.Warn("[process] Invalid auction preference", "error", err, "url", r.req.URL)
 		res := AuctionPreferenceErrorToJSONRPCResponse(jsonReq, err)

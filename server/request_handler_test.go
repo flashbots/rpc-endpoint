@@ -1,0 +1,92 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/require"
+)
+
+func TestGetEffectiveParameters(t *testing.T) {
+	// Core business logic test: header with preset uses preset (ignores URL)
+	config := CustomersConfig{
+		Presets: map[string]string{
+			"quicknode": "/fast?originId=quicknode&refund=0x1234567890123456789012345678901234567890:90",
+		},
+	}
+	
+	watcher, err := NewConfigurationWatcher(config)
+	require.NoError(t, err)
+	
+	// Request with header and different URL parameters
+	req := httptest.NewRequest(http.MethodPost, "/fast?originId=user-provided&refund=0xbad:10", nil)
+	req.Header.Set("X-Flashbots-Origin-ID", "quicknode")
+	
+	w := httptest.NewRecorder()
+	respw := http.ResponseWriter(w)
+	
+	handler := &RpcRequestHandler{
+		respw:                &respw,
+		req:                  req,
+		logger:               log.New(),
+		builderNames:         []string{"flashbots"},
+		configurationWatcher: watcher,
+	}
+	
+	params, err := handler.getEffectiveParameters()
+	require.NoError(t, err)
+	
+	// Should use preset values, ignore URL
+	require.Equal(t, "quicknode", params.originId)
+	require.True(t, params.fast)
+	require.Equal(t, 1, len(params.pref.Validity.Refund)) // Preset refund, not URL refund
+}
+
+func TestGetEffectiveParametersNoHeader(t *testing.T) {
+	// Fallback behavior: no header uses URL normally
+	req := httptest.NewRequest(http.MethodPost, "/fast?originId=normal-user", nil)
+	// No X-Flashbots-Origin-ID header
+	
+	w := httptest.NewRecorder()
+	respw := http.ResponseWriter(w)
+	
+	handler := &RpcRequestHandler{
+		respw:        &respw,
+		req:          req,
+		logger:       log.New(),
+		builderNames: []string{"flashbots"},
+		configurationWatcher: &ConfigurationWatcher{
+			ParsedPresets: make(map[string]URLParameters),
+		},
+	}
+	
+	params, err := handler.getEffectiveParameters()
+	require.NoError(t, err)
+	require.Equal(t, "normal-user", params.originId)
+	require.True(t, params.fast)
+}
+
+func TestGetEffectiveParametersHeaderNoPreset(t *testing.T) {
+	// Edge case: header present but no matching preset falls back to URL
+	req := httptest.NewRequest(http.MethodPost, "/fast?originId=fallback-user", nil)
+	req.Header.Set("X-Flashbots-Origin-ID", "unknown")
+	
+	w := httptest.NewRecorder()
+	respw := http.ResponseWriter(w)
+	
+	handler := &RpcRequestHandler{
+		respw:        &respw,
+		req:          req,
+		logger:       log.New(),
+		builderNames: []string{"flashbots"},
+		configurationWatcher: &ConfigurationWatcher{
+			ParsedPresets: make(map[string]URLParameters),
+		},
+	}
+	
+	params, err := handler.getEffectiveParameters()
+	require.NoError(t, err)
+	require.Equal(t, "fallback-user", params.originId)
+}
