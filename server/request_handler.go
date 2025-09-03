@@ -76,16 +76,23 @@ func NewRpcRequestHandler(
 // getEffectiveParameters determines the URL parameters to use for this request.
 // It checks for header-based preset override first, then falls back to URL parsing.
 func (r *RpcRequestHandler) getEffectiveParameters() (URLParameters, error) {
-	// Check for header-based preset override
-	if originID := r.req.Header.Get("X-Flashbots-Origin-ID"); originID != "" && r.configurationWatcher != nil {
-		if preset, exists := r.configurationWatcher.ParsedPresets[originID]; exists {
-			r.logger.Info("Using preset configuration", "originID", originID)
-			return preset, nil
-		}
-		r.logger.Info("Header present but no preset found", "originID", originID)
+	extracted, err := ExtractParametersFromUrl(r.req.URL, r.builderNames)
+	if err != nil {
+		return extracted, err
 	}
-	// Fall back to URL parsing
-	return ExtractParametersFromUrl(r.req.URL, r.builderNames)
+	if r.configurationWatcher == nil {
+		return extracted, nil
+	}
+	originID := extracted.originId
+	if headerOriginID := r.req.Header.Get("X-Flashbots-Origin-ID"); headerOriginID != "" {
+		originID = headerOriginID
+	}
+	if preset, exists := r.configurationWatcher.ParsedPresets[originID]; exists {
+		r.logger.Info("Using preset configuration", "originID", originID)
+		return preset, nil
+	}
+
+	return extracted, nil
 }
 
 // nolint
