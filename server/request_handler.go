@@ -84,7 +84,7 @@ func (r *RpcRequestHandler) getEffectiveParameters() (URLParameters, error) {
 		return extracted, nil
 	}
 	originID := extracted.originId
-	if headerOriginID := r.req.Header.Get("X-Flashbots-Origin-ID"); headerOriginID != "" {
+	if headerOriginID := r.req.Header.Get("X-Flashbots-Origin"); headerOriginID != "" {
 		originID = headerOriginID
 	}
 	if preset, exists := r.configurationWatcher.ParsedPresets[originID]; exists {

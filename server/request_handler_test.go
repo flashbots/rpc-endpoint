@@ -23,7 +23,7 @@ func TestGetEffectiveParameters(t *testing.T) {
 
 	// Request with header and different URL parameters
 	req := httptest.NewRequest(http.MethodPost, "/fast?originId=user-provided&refund=0xdadB0d80178819F2319190D340ce9A924f783711:10", nil)
-	req.Header.Set("X-Flashbots-Origin-ID", "quicknode")
+	req.Header.Set("X-Flashbots-Origin", "quicknode")
 
 	w := httptest.NewRecorder()
 	respw := http.ResponseWriter(w)
@@ -73,7 +73,7 @@ func TestGetEffectiveParametersNoHeader(t *testing.T) {
 func TestGetEffectiveParametersHeaderNoPreset(t *testing.T) {
 	// Edge case: header present but no matching preset falls back to URL
 	req := httptest.NewRequest(http.MethodPost, "/fast?originId=fallback-user", nil)
-	req.Header.Set("X-Flashbots-Origin-ID", "unknown")
+	req.Header.Set("X-Flashbots-Origin", "unknown")
 
 	w := httptest.NewRecorder()
 	respw := http.ResponseWriter(w)
