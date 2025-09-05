@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,4 +92,17 @@ func TestGetEffectiveParametersHeaderNoPreset(t *testing.T) {
 	params, err := handler.getEffectiveParameters()
 	require.NoError(t, err)
 	require.Equal(t, "fallback-user", params.originId)
+}
+
+func TestRpcRequestHandler_UrlParam(t *testing.T) {
+	wrec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/?url=http://mock.url", nil)
+
+	metrics.UrlParamUsage.Set(0)
+
+	var rw http.ResponseWriter = wrec
+	rh := NewRpcRequestHandler(log.New(), &rw, req, "", 0, nil, "", nil, nil, nil, nil, nil, nil)
+	rh.process()
+
+	require.Equal(t, uint64(1), metrics.UrlParamUsage.Get())
 }

@@ -9,9 +9,11 @@ var (
 	statusBadRequest          = metrics.NewCounter(`http_requests_total{status="400"}`)
 	statusNotFound            = metrics.NewCounter(`http_requests_total{status="404"}`)
 	statusInternalServerError = metrics.NewCounter(`http_requests_total{status="500"}`)
+	UrlParamUsage             = metrics.NewCounter(`http_requests_params{name="url"}`)
 )
 
 func StatusOKInc()                  { statusOK.Inc() }
 func StatusBadRequestInc()          { statusBadRequest.Inc() }
 func StatusNotFoundInc()            { statusNotFound.Inc() }
 func StatusInternalServerErrorInc() { statusInternalServerError.Inc() }
+func UrlParamUsageInc()             { UrlParamUsage.Inc() }
