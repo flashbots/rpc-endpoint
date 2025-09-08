@@ -115,6 +115,7 @@ func (r *RpcRequestHandler) process() {
 	// e.g. https://rpc.flashbots.net?url=http://RPC-ENDPOINT.COM
 	customProxyUrl, ok := r.req.URL.Query()["url"]
 	if ok && len(customProxyUrl[0]) > 1 {
+		metrics.UrlParamUsageInc()
 		r.defaultProxyUrl = customProxyUrl[0]
 		r.logger.Info("[process] Using custom url", "url", r.defaultProxyUrl)
 	}
