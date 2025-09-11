@@ -139,7 +139,7 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			}
 
 			addressPart := strings.ToLower(split[0])
-			
+
 			// Handle origin keyword
 			if addressPart == OriginKeyword {
 				addresses[i] = common.Address{}
@@ -187,6 +187,10 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 	useMempoolQuery := normalizedQuery["usemempool"]
 	if len(useMempoolQuery) != 0 && useMempoolQuery[0] == "true" {
 		params.pref.Privacy.UseMempool = true
+	}
+	protectRefundQuery := normalizedQuery["protectrefund"]
+	if len(protectRefundQuery) != 0 && protectRefundQuery[0] == "true" {
+		params.pref.Privacy.ProtectRefund = true
 	}
 	canRevertQuery := normalizedQuery["canrevert"]
 	if len(canRevertQuery) != 0 && canRevertQuery[0] == "true" {

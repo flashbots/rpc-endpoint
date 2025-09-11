@@ -16,11 +16,11 @@ func TestConfigurationWatcherPresets(t *testing.T) {
 			"quicknode": "/fast?originId=quicknode&refund=0x1234567890123456789012345678901234567890:90",
 		},
 	}
-	
+
 	watcher, err := NewConfigurationWatcher(config)
 	require.NoError(t, err)
 	require.NotNil(t, watcher)
-	
+
 	// Core functionality: preset should be parsed and available
 	preset, exists := watcher.ParsedPresets["quicknode"]
 	require.True(t, exists)
@@ -40,14 +40,14 @@ func TestConfigurationWatcherInvalidPresets(t *testing.T) {
 			"invalid": "://invalid-url", // This should be skipped
 		},
 	}
-	
+
 	watcher, err := NewConfigurationWatcher(config)
 	require.NoError(t, err) // Should not fail startup
-	
+
 	// Valid preset loaded
 	_, exists := watcher.ParsedPresets["valid"]
 	require.True(t, exists)
-	
+
 	// Invalid preset skipped
 	_, exists = watcher.ParsedPresets["invalid"]
 	require.False(t, exists)
