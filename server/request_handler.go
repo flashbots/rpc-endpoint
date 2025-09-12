@@ -117,7 +117,8 @@ func (r *RpcRequestHandler) process() {
 	if ok && len(customProxyUrl[0]) > 1 {
 		metrics.UrlParamUsageInc()
 		r.defaultProxyUrl = customProxyUrl[0]
-		r.logger.Info("[process] Using custom url", "url", r.defaultProxyUrl)
+		originID := r.req.Header.Get("X-Flashbots-Origin")
+		r.logger.Info("[process] Using custom url", "url", r.defaultProxyUrl, "originID", originID)
 	}
 
 	// Decode request JSON RPC
