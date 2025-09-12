@@ -320,7 +320,7 @@ func (r *RpcRequest) sendTxToRelay() {
 	sendPrivateTxArgs := types.SendPrivateTxRequestWithPreferences{}
 	sendPrivateTxArgs.Tx = r.rawTxHex
 	sendPrivateTxArgs.Preferences = &r.urlParams.pref
-	
+
 	// Replace null addresses (origin placeholders) with sender if needed
 	if len(r.urlParams.pref.Validity.Refund) > 0 {
 		sender := common.HexToAddress(r.txFrom)

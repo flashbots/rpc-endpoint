@@ -228,11 +228,11 @@ func TestMetamaskFix(t *testing.T) {
 	req_getTransactionCount := types.NewJsonRpcRequest(1, "eth_getTransactionCount", []interface{}{testutils.TestTx_MM2_From, "latest"})
 	txCountBefore := testutils.SendRpcAndParseResponseOrFailNowString(t, req_getTransactionCount)
 
-	//first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
+	// first sendRawTransaction call: rawTx that triggers the error (creates MM cache entry)
 	req_sendRawTransaction := types.NewJsonRpcRequest(1, "eth_sendRawTransaction", []interface{}{testutils.TestTx_MM2_RawTx})
 	r1 := testutils.SendRpcAndParseResponseOrFailNowAllowRpcError(t, req_sendRawTransaction)
 	require.NotNil(t, r1.Error, r1.Error) // tx will actually fail due to incorrect nonce but it's fine for this test, since we mark it as sent to relay
-	//fmt.Printf("\n\n\n\n\n")
+	// fmt.Printf("\n\n\n\n\n")
 
 	// call getTxReceipt to trigger query to Tx API
 	req_getTransactionReceipt := types.NewJsonRpcRequest(1, "eth_getTransactionReceipt", []interface{}{testutils.TestTx_MM2_Hash})
@@ -279,7 +279,7 @@ func TestRelayTx(t *testing.T) {
 
 	// Ensure that request was signed properly
 	pubkey := crypto.PubkeyToAddress(relaySigningKey.PublicKey).Hex()
-	require.Equal(t, pubkey+":0x06e1ea66c5fc1017787369beffc9c9acd82570b4ec4ea075c708f2351a26fdff4abbf601037884d0785ff88985b590f7b865852a4100d5670605a56b9118804900", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
+	require.Equal(t, pubkey+":0xfa3496a32970eb2caccb7cd361c9384e21e84363501cde0f325a529c2773c0a1638abf84d4d14db65b29140e2b61d1a91d0c2621abb0fb0d2eda73f1992a58d501", testutils.MockBackendLastRawRequest.Header.Get("X-Flashbots-Signature"))
 
 	// Check result - should be the tx hash
 	var res string
@@ -451,7 +451,6 @@ func TestBatch_eth_transaction(t *testing.T) {
 	for _, j := range res {
 		assert.Equal(t, m[j.Id.(float64)], j)
 	}
-
 }
 
 // Test batch request with different eth transaction
@@ -494,7 +493,6 @@ func TestBatch_eth_call(t *testing.T) {
 	for _, j := range res {
 		assert.Equal(t, m[j.Id.(float64)], j)
 	}
-
 }
 
 // Test batch request with different transaction
@@ -727,9 +725,7 @@ func Test_StoreValidateTxs(t *testing.T) {
 			require.Equal(t, 10, len(entry.TxSmartContractMethod))
 			require.False(t, entry.Fast)
 		}
-
 	}
-
 }
 
 // Test that origin keyword in refund config is replaced with sender address

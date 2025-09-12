@@ -33,12 +33,12 @@ func parseURLToParameters(rawURL string) (URLParameters, error) {
 	if err != nil {
 		return URLParameters{}, fmt.Errorf("failed to parse URL: %w", err)
 	}
-	
+
 	params, err := ExtractParametersFromUrl(parsedURL, nil)
 	if err != nil {
 		return URLParameters{}, fmt.Errorf("failed to extract parameters: %w", err)
 	}
-	
+
 	return params, nil
 }
 
@@ -55,7 +55,7 @@ func NewConfigurationWatcher(customersConfig CustomersConfig) (*ConfigurationWat
 		}
 		parsedCustomersConfig[customerID] = allowedConfigs
 	}
-	
+
 	// Parse presets for header-based override
 	parsedPresets := make(map[string]URLParameters)
 	for originID, presetURL := range customersConfig.Presets {
@@ -68,10 +68,10 @@ func NewConfigurationWatcher(customersConfig CustomersConfig) (*ConfigurationWat
 		parsedPresets[originID] = params
 		log.Info("Loaded preset configuration", "originID", originID)
 	}
-	
+
 	return &ConfigurationWatcher{
 		ParsedCustomersConfig: parsedCustomersConfig,
-		ParsedPresets:        parsedPresets,
+		ParsedPresets:         parsedPresets,
 	}, nil
 }
 
@@ -79,7 +79,7 @@ func ReadCustomerConfigFromFile(fileName string) (*ConfigurationWatcher, error) 
 	if fileName == "" {
 		return &ConfigurationWatcher{
 			ParsedCustomersConfig: make(map[string][]URLParameters),
-			ParsedPresets:        make(map[string]URLParameters),
+			ParsedPresets:         make(map[string]URLParameters),
 		}, nil
 	}
 	data, err := os.ReadFile(fileName)
