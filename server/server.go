@@ -344,5 +344,5 @@ func (s *RpcEndPointServer) HandleBundleRequest(respw http.ResponseWriter, req *
 
 func setCorsHeaders(respw http.ResponseWriter) {
 	respw.Header().Set("Access-Control-Allow-Origin", "*")
-	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type")
+	respw.Header().Set("Access-Control-Allow-Headers", "Accept,Content-Type,X-Flashbots-Origin")
 }
