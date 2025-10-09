@@ -529,7 +529,7 @@ func (r *RpcRequest) GetAddressNonceRange(address string) (minNonce, maxNonce ui
 
 	// Get maximum nonce by looking at redis, which has current pending transactions
 	_redisMaxNonce, _, _ := RState.GetSenderMaxNonce(r.txFrom)
-	maxNonce = Max(minNonce, _redisMaxNonce)
+	maxNonce = max(minNonce, _redisMaxNonce)
 	return minNonce, maxNonce, nil
 }
 
