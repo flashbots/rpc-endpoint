@@ -28,7 +28,7 @@ var (
 	ErrIncorrectRefundAddressQuery         = errors.New("Incorrect refund address.")
 	ErrUnsupportedRefundKeyword            = errors.New("Unsupported refund keyword (only 'origin' is supported).")
 	ErrIncorrectRefundPercentageQuery      = errors.New("Incorrect refund percentage.")
-	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be bellow 100%.")
+	ErrIncorrectRefundTotalPercentageQuery = errors.New("Incorrect refund total percentage, must be below 100%.")
 )
 
 type URLParameters struct {
