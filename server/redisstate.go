@@ -15,23 +15,23 @@ var RedisPrefix = "rpc-endpoint:"
 
 // Enable lookup of timeSentToRelay by txHash
 var RedisPrefixTxSentToRelay = RedisPrefix + "tx-sent-to-relay:"
-var RedisExpiryTxSentToRelay = 24 * time.Hour // 1 day
+var RedisExpiryTxSentToRelay = 10 * time.Minute
 
 // Enable lookup of txHash by txFrom+nonce (only if sent to relay)
 var RedisPrefixTxHashForSenderAndNonce = RedisPrefix + "txsender-and-nonce-to-txhash:"
-var RedisExpiryTxHashForSenderAndNonce = 24 * time.Hour // 1 day
+var RedisExpiryTxHashForSenderAndNonce = 10 * time.Minute
 
 // nonce-fix of an account (with number of times sent)
 var RedisPrefixNonceFixForAccount = RedisPrefix + "txsender-with-nonce-fix:"
-var RedisExpiryNonceFixForAccount = 24 * time.Hour // 1 day
+var RedisExpiryNonceFixForAccount = 10 * time.Minute
 
 // Enable lookup of txFrom by txHash
 var RedisPrefixSenderOfTxHash = RedisPrefix + "txsender-of-txhash:"
-var RedisExpirySenderOfTxHash = 24 * time.Hour // 1 day
+var RedisExpirySenderOfTxHash = 10 * time.Minute
 
 // Enable lookup of txNonce by txHash
 var RedisPrefixNonceOfTxHash = RedisPrefix + "txnonce-of-txhash:"
-var RedisExpiryNonceOfTxHash = 24 * time.Hour // 1 day
+var RedisExpiryNonceOfTxHash = 10 * time.Minute
 
 // Remember nonce of pending user tx
 var RedisPrefixSenderMaxNonce = RedisPrefix + "txsender-pending-max-nonce:"
@@ -39,11 +39,11 @@ var RedisExpirySenderMaxNonce = 280 * time.Second //weird time to be a little le
 
 // Enable lookup of bundle txs by bundleId
 var RedisPrefixWhitehatBundleTransactions = RedisPrefix + "tx-for-whitehat-bundle:"
-var RedisExpiryWhitehatBundleTransactions = 24 * time.Hour // 1 day
+var RedisExpiryWhitehatBundleTransactions = 10 * time.Minute
 
 // Enable lookup of bundle txs by bundleId
 var RedisPrefixBlockedTxHash = RedisPrefix + "blocked-tx-hash:"
-var RedisExpiryBlockedTxHash = 24 * time.Hour // 1 day
+var RedisExpiryBlockedTxHash = 10 * time.Minute
 
 // // Enable lookup of last privateTransaction-txHash sent by txFrom
 // var RedisPrefixLastPrivTxHashOfAccount = RedisPrefix + "last-txhash-of-txsender:"
