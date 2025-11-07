@@ -17,20 +17,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Min(a uint64, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func Max(a uint64, b uint64) uint64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func GetTx(rawTxHex string) (*ethtypes.Transaction, error) {
 	if len(rawTxHex) < 2 {
 		return nil, errors.New("invalid raw transaction")
