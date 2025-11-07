@@ -17,7 +17,7 @@ func Test_isOnOFACList(t *testing.T) {
 			address: "0X53B6936513E738F44FB50D2B9476730C0AB3BFC1",
 			want:    true,
 		},
-		"Check unknow": {
+		"Check unknown": {
 			address: "0X5",
 			want:    false,
 		},
