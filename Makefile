@@ -4,11 +4,12 @@ APP_NAME := rpc-endpoint
 GOPATH := $(if $(GOPATH),$(GOPATH),~/go)
 GIT_VER := $(shell git describe --tags --always --dirty="-dev")
 PACKAGES := $(shell go list -mod=readonly ./...)
+GOOS := $(if $(filter $(shell uname -s),Darwin),darwin,linux)
 
 all: clean build
 
 build:
-	CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.version=${GIT_VER}" -v -o ${APP_NAME} cmd/server/main.go
+	CGO_ENABLED=0 GOOS=${GOOS} go build -ldflags "-X main.version=${GIT_VER}" -v -o ${APP_NAME} cmd/server/main.go
 
 clean:
 	rm -rf ${APP_NAME} build/
@@ -41,7 +42,7 @@ down:
 	docker-compose down -v
 
 build-for-docker:
-	CGO_ENABLED=0 GOOS=linux go build -ldflags "-X main.version=${GIT_VER}" -v -o ${APP_NAME} cmd/server/main.go
+	CGO_ENABLED=0 GOOS=${GOOS} go build -ldflags "-X main.version=${GIT_VER}" -v -o ${APP_NAME} cmd/server/main.go
 
 docker-image:
 	DOCKER_BUILDKIT=1 docker build --platform linux/amd64  . -t ${IMAGE_REGISTRY_ACCOUNT}/${APP_NAME}:${GIT_VER}
