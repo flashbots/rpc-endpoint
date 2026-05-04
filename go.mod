@@ -8,7 +8,7 @@ require (
 	github.com/VictoriaMetrics/metrics v1.37.0
 	github.com/alicebob/miniredis v2.5.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/ethereum/go-ethereum v1.15.2
+	github.com/ethereum/go-ethereum v1.17.2
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/uuid v1.3.0
 	github.com/lib/pq v1.10.7
