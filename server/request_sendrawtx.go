@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/flashbots/rpc-endpoint/metrics"
 	"github.com/flashbots/rpc-endpoint/types"
 )
@@ -73,6 +74,17 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 
 	if len(r.tx.Data()) >= scMethodBytes {
 		r.ethSendRawTxEntry.TxSmartContractMethod = hexutil.Encode(r.tx.Data()[:scMethodBytes])
+	}
+
+	if err := validateTxLimits(r.tx); err != nil {
+		r.logger.Info("[sendRawTransaction] tx rejected - gas limit exceeds EIP-7825 cap",
+			"txHash", r.tx.Hash().Hex(),
+			"txGas", r.tx.Gas(),
+			"maxTxGas", params.MaxTxGas,
+			"fromAddress", r.txFrom,
+			"origin", r.origin)
+		r.writeRpcError(err.Error(), types.JsonRpcInvalidParams)
+		return
 	}
 
 	if r.tx.Nonce() >= 1e9 {
