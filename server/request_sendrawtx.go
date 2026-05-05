@@ -75,6 +75,17 @@ func (r *RpcRequest) handle_sendRawTransaction() {
 		r.ethSendRawTxEntry.TxSmartContractMethod = hexutil.Encode(r.tx.Data()[:scMethodBytes])
 	}
 
+	if err := validateTxLimits(r.tx); err != nil {
+		r.logger.Info("[sendRawTransaction] tx rejected - gas limit exceeds EIP-7825 cap",
+			"txHash", r.tx.Hash().Hex(),
+			"txGas", r.tx.Gas(),
+			"maxTxGas", maxTxGasEIP7825,
+			"fromAddress", r.txFrom,
+			"origin", r.origin)
+		r.writeRpcError(err.Error(), types.JsonRpcInvalidParams)
+		return
+	}
+
 	if r.tx.Nonce() >= 1e9 {
 		r.logger.Info("[sendRawTransaction] tx rejected - nonce too high", "txNonce", r.tx.Nonce(), "txFromLower", txFromLower, "origin", r.origin)
 		r.writeRpcError("tx rejected - nonce too high", types.JsonRpcInvalidRequest)
