@@ -22,8 +22,11 @@ type rpcProxyClient struct {
 
 func NewRPCProxyClient(logger log.Logger, proxyURL string, timeoutSeconds int, fingerprint Fingerprint) RPCProxyClient {
 	return &rpcProxyClient{
-		logger:      logger,
-		httpClient:  http.Client{Timeout: time.Second * time.Duration(timeoutSeconds)},
+		logger: logger,
+		httpClient: http.Client{
+			Timeout:       time.Second * time.Duration(timeoutSeconds),
+			CheckRedirect: validateRedirectURL,
+		},
 		proxyURL:    proxyURL,
 		fingerprint: fingerprint,
 	}

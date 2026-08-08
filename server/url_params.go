@@ -207,6 +207,9 @@ func ExtractParametersFromUrl(reqUrl *url.URL, allBuilders []string) (params URL
 			return params, ErrIncorrectMempoolURL
 		}
 		parsedUrl.Scheme = "https"
+		if err := ValidateOutboundRPCURL(parsedUrl.String()); err != nil {
+			return params, ErrIncorrectMempoolURL
+		}
 		params.pref.Privacy.MempoolRPC = parsedUrl.String()
 	}
 	blockRange := normalizedQuery["blockrange"]

@@ -112,9 +112,15 @@ func (r *RpcRequestHandler) process() {
 	referer := r.req.Header.Get("Referer")
 
 	// If users specify a proxy url in their rpc endpoint they can have their requests proxied to that endpoint instead of Infura
-	// e.g. https://rpc.flashbots.net?url=http://RPC-ENDPOINT.COM
+	// e.g. https://rpc.flashbots.net?url=https://RPC-ENDPOINT.COM
 	customProxyUrl, ok := r.req.URL.Query()["url"]
 	if ok && len(customProxyUrl[0]) > 1 {
+		if err := ValidateOutboundRPCURL(customProxyUrl[0]); err != nil {
+			r.requestRecord.UpdateRequestEntry(r.req, http.StatusBadRequest, err.Error())
+			r.logger.Warn("[process] Rejected custom url", "url", customProxyUrl[0], "error", err)
+			(*r.respw).WriteHeader(http.StatusBadRequest)
+			return
+		}
 		metrics.UrlParamUsageInc()
 		r.defaultProxyUrl = customProxyUrl[0]
 		r.logger.Info("[process] Using custom url", "url", r.defaultProxyUrl)
