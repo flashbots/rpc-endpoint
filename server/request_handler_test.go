@@ -96,7 +96,7 @@ func TestGetEffectiveParametersHeaderNoPreset(t *testing.T) {
 
 func TestRpcRequestHandler_UrlParam(t *testing.T) {
 	wrec := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/?url=http://mock.url", nil)
+	req := httptest.NewRequest("POST", "/?url=https://example.com", nil)
 
 	metrics.UrlParamUsage.Set(0)
 
